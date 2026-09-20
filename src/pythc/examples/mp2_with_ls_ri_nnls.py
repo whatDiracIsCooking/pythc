@@ -1,0 +1,61 @@
+import logging
+import sys
+
+from pyscf import gto, scf
+from pyscf.mp.dfmp2 import DFMP2
+
+from pythc.grid import BeckeGrid, NNLSGrid
+from pythc.methods.mp2 import LaplaceRMP2
+from pythc.thc.ls_ri_becke import LS_RI_Becke
+from pythc.thc.ls_ri_nnls import LS_RI_NNLS
+
+logging.basicConfig(
+    stream=sys.stdout, level=logging.INFO,
+    format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+
+
+def main():
+    water_cluster = """
+    H            0.087529        0.023820        0.930805
+    O            0.657172        0.599414        0.406256
+    H            0.792448        1.344387        1.004310
+    """
+
+    mol = gto.Mole()
+    mol.basis = 'cc-pvdz'
+    mol.atom = water_cluster
+    mol.build()
+
+    auxbasis = 'cc-pvdz-ri'
+
+    mf = scf.RHF(mol)
+    mf = mf.density_fit(auxbasis=auxbasis)
+    mf.verbose = 4
+    mf.kernel()
+
+    mp2_ref = DFMP2(mf).kernel()[0]
+    print(f'MP2 RI Reference: {mp2_ref}')
+
+    # The NNLS fit refits the quadrature weights so the grid reproduces the AO overlap
+    # matrix, and prunes every point whose weight comes out at zero.
+    thc = LS_RI_NNLS(mol=mol, auxbasis=auxbasis, mo_coeff=mf.mo_coeff,
+                     weight_threshold=1e-4)
+    eri = thc.build(mode='ov')
+
+    mp2e = LaplaceRMP2(mol, mf, eri, n_laplace=10).kernel()
+    print(f'MP2 E corr (NNLS grid, {eri.X.shape[0]} points): {mp2e}')
+
+    # NNLSGrid is an ordinary GridProvider, so it drops into any other THC class in
+    # place of the Becke grid they use by default.
+    thc_becke = LS_RI_Becke(mol=mol, auxbasis=auxbasis, mo_coeff=mf.mo_coeff,
+                            grid=NNLSGrid(mol, parent=BeckeGrid(mol), weight_threshold=1e-4))
+    eri_becke = thc_becke.build(mode='ov')
+
+    mp2e_becke = LaplaceRMP2(mol, mf, eri_becke, n_laplace=10).kernel()
+    print(f'MP2 E corr (LS_RI_Becke on the same grid): {mp2e_becke}')
+
+
+if __name__ == '__main__':
+    main()

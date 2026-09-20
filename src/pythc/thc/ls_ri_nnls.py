@@ -1,61 +1,70 @@
 import logging
 
 import numpy as np
-import scipy as sp
+from pyscf import gto
 
-import pythc.lib as lib
-from pythc.decomp.cholesky import AccelRPCholesky, SymMetric, SymMetricOV
+from pythc.grid import GridProvider, NNLSGrid
+from pythc.thc.ls_ri_thc import LS_RI_THC
 from pythc.thc.ls_thc_funcs import eval_basefuncs
 from pythc.thc.thc_base import Mode
-from pythc.thc.ls_ri_thc import LS_RI_THC
 
 logger = logging.getLogger()
 
+
 class LS_RI_NNLS(LS_RI_THC):
+    """
+    Least-squares THC on a grid whose quadrature weights have been refitted and pruned by
+    non-negative least squares, following Hillers-Bendtsen, Lu, Martinez
+    (2026 - DOI: 10.1021/acs.jctc.6c00664).
+
+    The decomposition itself is ordinary LS-THC, exactly as in
+    :class:`~pythc.thc.ls_ri_becke.LS_RI_Becke`; all that changes is the grid, which is
+    reweighted by :class:`~pythc.grid.NNLSGrid` so it reproduces the AO overlap matrix
+    under numerical integration. Most weights come out of that fit at exactly zero, so
+    the grid is pruned as a side effect.
+
+    Unlike the pivoted Cholesky pruning of
+    :class:`~pythc.thc.ls_ri_cholesky.LS_RI_Cholesky`, which selects grid points but
+    keeps their tabulated weights, refitting the weights means the resulting grid is not
+    capped at the accuracy of the input grid.
+    """
+
+    def __init__(self,
+                 mol: gto.Mole,
+                 auxbasis: str,
+                 grid: GridProvider = None,
+                 mo_coeff: np.ndarray = None,
+                 weight_threshold: float = 1e-4,
+                 blocked: bool = False,
+                 max_points: int = None):
+        """
+        :param grid: The *input* grid to reweight, not the grid used for the fit. Defaults
+            to the level 0 Becke grid.
+        :param weight_threshold: KKT tolerance of the NNLS fit; see :class:`~pythc.grid.NNLSGrid`.
+        :param blocked: Fit each atomic sub-grid separately. Approximate; see
+            :meth:`~pythc.grid.NNLSGrid._build_blocked`.
+        :param max_points: Cap on the number of retained grid points.
+        """
+        super().__init__(mol=mol,
+                         auxbasis=auxbasis,
+                         grid=NNLSGrid(mol,
+                                       parent=grid,
+                                       weight_threshold=weight_threshold,
+                                       blocked=blocked,
+                                       max_points=max_points),
+                         mo_coeff=mo_coeff)
+
+    @classmethod
+    def __str__(cls):
+        return "ls_thc_nnls"
+
     def build_pruned_X(self, mode: Mode, mo_coeff: np.ndarray, auxmol) -> np.ndarray:
+        # The grid arrives already pruned, so there is nothing left to select here: the
+        # collocation matrix is built over every point the NNLS fit kept.
         grid, weights = self.grid.build()
-        R = eval_basefuncs(self.mol, grid)
-        
-        # 1. Point Selection using Pivoted Cholesky
-        X_tmp = np.sqrt(np.sqrt(weights))[:, np.newaxis] * R
-        if mode != 'ao':
-            X_tmp = X_tmp @ mo_coeff
-            
-        n_occ = self.mol.nelectron // 2
-        
-        if mode == 'ao':
-            metric = SymMetric(X_tmp)
-        elif mode == 'ov':
-            metric = SymMetricOV(X_tmp[:, :n_occ], X_tmp[:, n_occ:])
-        else:
-            raise NotImplementedError
-            
-        decomp = AccelRPCholesky()
-        n_grid = X_tmp.shape[0]
-        # Defaulting to 1e-5 threshold similar to the Cholesky THC implementation
-        cholesky_threshold = getattr(self, 'cholesky_threshold', 1e-5)
-        _, piv, num_rank = decomp.decompose(metric, n_grid, cholesky_threshold)
-        piv = piv[:num_rank]
-        
-        # 2. Weight Optimization using NNLS on the pruned grid
-        R_pruned = R[piv]
-        if mode != 'ao':
-            R_pruned_mo = R_pruned @ mo_coeff
-        else:
-            R_pruned_mo = R_pruned
+        R = eval_basefuncs(self.mol, coords=grid)
+        X = np.sqrt(np.sqrt(weights))[:, np.newaxis] * R
 
-        N = R_pruned_mo.shape[1]
-        S = self.mol.intor('int1e_ovlp_sph')
-        A = lib.einsum('pn,pm->mnp', R_pruned_mo, R_pruned_mo).reshape(N**2, -1)
-        y = S.reshape(N**2)
+        self.pruned_grid = grid
 
-        # A is now heavily overdetermined (e.g. 841 x ~300), making NNLS converge in ms
-        w_pruned, _ = sp.optimize.nnls(A, y)
-
-        # Drop any points that NNLS assigned zero weight
-        piv_final = np.where(w_pruned > 1e-8)[0]
-        w_final = w_pruned[piv_final]
-        X_final = R_pruned[piv_final]
-        X_final = X_final * np.sqrt(np.sqrt(w_final))[:, np.newaxis]
-
-        return X_final
+        return X
