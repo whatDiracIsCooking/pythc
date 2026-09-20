@@ -92,6 +92,146 @@
             "pair": "N-H",
             "r": 1.019
           }
+        ],
+        "residual": [
+          {
+            "atom": 0,
+            "element": "C",
+            "n_support": 115,
+            "n_parent": 858,
+            "residual": 0.04537884283473432,
+            "residual_parent": 3.141249853945569e-12
+          },
+          {
+            "atom": 1,
+            "element": "N",
+            "n_support": 124,
+            "n_parent": 858,
+            "residual": 0.028050888171796,
+            "residual_parent": 3.115606448032826e-10
+          },
+          {
+            "atom": 2,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.0078541475758136,
+            "residual_parent": 1.0798336274280079e-12
+          },
+          {
+            "atom": 3,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.005617505309950044,
+            "residual_parent": 1.099126527605508e-12
+          },
+          {
+            "atom": 4,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.004713836279796261,
+            "residual_parent": 4.275738841682398e-12
+          },
+          {
+            "atom": 5,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.005301403659896782,
+            "residual_parent": 3.3012521554483696e-12
+          },
+          {
+            "atom": 6,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.01762897637188445,
+            "residual_parent": 3.924847931947887e-12
+          }
+        ]
+      },
+      "methanol": {
+        "natm": 6,
+        "nao": 48,
+        "elements": [
+          "C",
+          "H",
+          "O"
+        ],
+        "mp2_ri_reference": -0.34340192709398293,
+        "bonds": [
+          {
+            "pair": "C-O",
+            "r": 1.416
+          },
+          {
+            "pair": "C-H",
+            "r": 1.093
+          },
+          {
+            "pair": "C-H",
+            "r": 1.093
+          },
+          {
+            "pair": "C-H",
+            "r": 1.093
+          },
+          {
+            "pair": "O-H",
+            "r": 0.972
+          }
+        ],
+        "residual": [
+          {
+            "atom": 0,
+            "element": "C",
+            "n_support": 115,
+            "n_parent": 858,
+            "residual": 0.04626938635518407,
+            "residual_parent": 3.390479692802001e-12
+          },
+          {
+            "atom": 1,
+            "element": "O",
+            "n_support": 135,
+            "n_parent": 858,
+            "residual": 0.022438443671797422,
+            "residual_parent": 3.978551410425528e-10
+          },
+          {
+            "atom": 2,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.005772781926407313,
+            "residual_parent": 4.7032771483628824e-12
+          },
+          {
+            "atom": 3,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.0060289860513018465,
+            "residual_parent": 5.637019072970699e-12
+          },
+          {
+            "atom": 4,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.006617178975920253,
+            "residual_parent": 1.7746346791430298e-12
+          },
+          {
+            "atom": 5,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.01607883770534936,
+            "residual_parent": 1.1140617207085252e-11
+          }
         ]
       }
     },
@@ -568,6 +708,176 @@
         "C": "3726fda876b7",
         "H": "7a93a32f6e79",
         "N": "c2d77b0a5434"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 3288,
+      "natm": 6,
+      "rmsd_S": 0.00026867542665599576,
+      "e_corr": -0.34339920329830487,
+      "err_uha": 2.723795678061247,
+      "fit_seconds": 0.003764629364013672
+    },
+    {
+      "molecule": "methanol",
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 301,
+      "natm": 6,
+      "rmsd_S": 3.0482243279532213,
+      "e_corr": -0.34338551977280035,
+      "err_uha": 16.407321182576595,
+      "fit_seconds": 0.4900522232055664
+    },
+    {
+      "molecule": "methanol",
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 491,
+      "natm": 6,
+      "rmsd_S": 2.8880234677863243,
+      "e_corr": -0.34339663388605723,
+      "err_uha": 5.293207925693988,
+      "fit_seconds": 1.1365506649017334
+    },
+    {
+      "molecule": "methanol",
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 670,
+      "natm": 6,
+      "rmsd_S": 3.673710658092599,
+      "e_corr": -0.34339777627502055,
+      "err_uha": 4.150818962378455,
+      "fit_seconds": 1.6132516860961914
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 252,
+      "natm": 6,
+      "rmsd_S": 1.3957891580331712,
+      "e_corr": -0.34315653437245974,
+      "err_uha": 245.3927215231855,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 36,
+        "H": 42,
+        "O": 48
+      },
+      "fingerprint": {
+        "C": "e75dc834df61",
+        "H": "ac356e6588ce",
+        "O": "161a3459d226"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 485,
+      "natm": 6,
+      "rmsd_S": 1.9527243357211501,
+      "e_corr": -0.343384591899745,
+      "err_uha": 17.335194237910745,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 71,
+        "H": 85,
+        "O": 74
+      },
+      "fingerprint": {
+        "C": "a3f483d51022",
+        "H": "dfa85e4dfd71",
+        "O": "d6fa6d522e3c"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 634,
+      "natm": 6,
+      "rmsd_S": 3.184033882511781,
+      "e_corr": -0.3433898277543652,
+      "err_uha": 12.09933961771048,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 96,
+        "H": 108,
+        "O": 106
+      },
+      "fingerprint": {
+        "C": "0248429e2dc4",
+        "H": "494f003caade",
+        "O": "4c24a25f79b3"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 750,
+      "natm": 6,
+      "rmsd_S": 3.1024686889621162,
+      "e_corr": -0.343397313713054,
+      "err_uha": 4.613380928941702,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 115,
+        "H": 125,
+        "O": 135
+      },
+      "fingerprint": {
+        "C": "e0dec347bb53",
+        "H": "9c55a9e14c9a",
+        "O": "cf26e10364fa"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 851,
+      "natm": 6,
+      "rmsd_S": 3.1122083578437696,
+      "e_corr": -0.3433968442213688,
+      "err_uha": 5.082872614137202,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 142,
+        "H": 137,
+        "O": 161
+      },
+      "fingerprint": {
+        "C": "20439f584ae2",
+        "H": "4ef8f92128fe",
+        "O": "b7eceac82129"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 963,
+      "natm": 6,
+      "rmsd_S": 3.2407239147433273,
+      "e_corr": -0.34339765399751,
+      "err_uha": 4.27309647293983,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 173,
+        "H": 146,
+        "O": 206
+      },
+      "fingerprint": {
+        "C": "3726fda876b7",
+        "H": "7a93a32f6e79",
+        "O": "471e5cc3adc5"
       }
     }
   ]
