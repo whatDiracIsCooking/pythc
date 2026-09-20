@@ -41,6 +41,173 @@
             "pair": "C-N",
             "r": 1.16
           }
+        ],
+        "residual": [
+          {
+            "atom": 0,
+            "element": "C",
+            "n_support": 115,
+            "n_parent": 858,
+            "residual": 0.04629474581543842,
+            "residual_parent": 6.4751513156368945e-12
+          },
+          {
+            "atom": 1,
+            "element": "C",
+            "n_support": 115,
+            "n_parent": 858,
+            "residual": 0.03597497361869925,
+            "residual_parent": 1.5401085643093098e-10
+          },
+          {
+            "atom": 2,
+            "element": "N",
+            "n_support": 124,
+            "n_parent": 858,
+            "residual": 0.018607646107047838,
+            "residual_parent": 1.6998125719497667e-09
+          },
+          {
+            "atom": 3,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.007887337695483844,
+            "residual_parent": 2.6060184239170026e-12
+          },
+          {
+            "atom": 4,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.005879330372298411,
+            "residual_parent": 4.96071730031798e-12
+          },
+          {
+            "atom": 5,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.008262149112710929,
+            "residual_parent": 1.1473728321321897e-11
+          }
+        ]
+      },
+      "propene": {
+        "natm": 9,
+        "nao": 72,
+        "elements": [
+          "C",
+          "H"
+        ],
+        "mp2_ri_reference": -0.42545628509810424,
+        "bonds": [
+          {
+            "pair": "C-C",
+            "r": 1.493
+          },
+          {
+            "pair": "C-H",
+            "r": 1.094
+          },
+          {
+            "pair": "C-H",
+            "r": 1.095
+          },
+          {
+            "pair": "C-H",
+            "r": 1.094
+          },
+          {
+            "pair": "C-C",
+            "r": 1.339
+          },
+          {
+            "pair": "C-H",
+            "r": 1.088
+          },
+          {
+            "pair": "C-H",
+            "r": 1.086
+          },
+          {
+            "pair": "C-H",
+            "r": 1.086
+          }
+        ],
+        "residual": [
+          {
+            "atom": 0,
+            "element": "C",
+            "n_support": 115,
+            "n_parent": 858,
+            "residual": 0.0411533567972886,
+            "residual_parent": 5.072170317036306e-12
+          },
+          {
+            "atom": 1,
+            "element": "C",
+            "n_support": 115,
+            "n_parent": 858,
+            "residual": 0.03691193682320775,
+            "residual_parent": 8.438137493392178e-11
+          },
+          {
+            "atom": 2,
+            "element": "C",
+            "n_support": 115,
+            "n_parent": 858,
+            "residual": 0.034778664384491266,
+            "residual_parent": 2.9581943010238445e-10
+          },
+          {
+            "atom": 3,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.013237769140523449,
+            "residual_parent": 1.0773939771706728e-12
+          },
+          {
+            "atom": 4,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.0103694146980787,
+            "residual_parent": 1.7933295315798243e-13
+          },
+          {
+            "atom": 5,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.004357844909976836,
+            "residual_parent": 1.6282026265474604e-12
+          },
+          {
+            "atom": 6,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.004979516525242907,
+            "residual_parent": 1.5374103947880533e-13
+          },
+          {
+            "atom": 7,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.007076247719645671,
+            "residual_parent": 6.036377940894451e-12
+          },
+          {
+            "atom": 8,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.0054558708512128865,
+            "residual_parent": 5.637792069800873e-12
+          }
         ]
       }
     },
@@ -325,6 +492,164 @@
         "C": "3726fda876b7",
         "H": "7a93a32f6e79",
         "N": "c2d77b0a5434"
+      }
+    },
+    {
+      "molecule": "propene",
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 4928,
+      "natm": 9,
+      "rmsd_S": 0.00025858660647856246,
+      "e_corr": -0.4254495371415271,
+      "err_uha": 6.747956577124459,
+      "fit_seconds": 0.0562589168548584
+    },
+    {
+      "molecule": "propene",
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 453,
+      "natm": 9,
+      "rmsd_S": 1.1884808145808785,
+      "e_corr": -0.4254098389574645,
+      "err_uha": 46.446140639755384,
+      "fit_seconds": 1.0248806476593018
+    },
+    {
+      "molecule": "propene",
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 754,
+      "natm": 9,
+      "rmsd_S": 1.7098953514198991,
+      "e_corr": -0.42544530178187695,
+      "err_uha": 10.983316227286544,
+      "fit_seconds": 2.364076852798462
+    },
+    {
+      "molecule": "propene",
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 1076,
+      "natm": 9,
+      "rmsd_S": 1.8486905429889735,
+      "e_corr": -0.4254475235634785,
+      "err_uha": 8.761534625756351,
+      "fit_seconds": 4.089694976806641
+    },
+    {
+      "molecule": "propene",
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 360,
+      "natm": 9,
+      "rmsd_S": 0.24762692148911208,
+      "e_corr": -0.42418158777268755,
+      "err_uha": 1274.6973254166849,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 36,
+        "H": 42
+      },
+      "fingerprint": {
+        "C": "e75dc834df61",
+        "H": "ac356e6588ce"
+      }
+    },
+    {
+      "molecule": "propene",
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 723,
+      "natm": 9,
+      "rmsd_S": 0.31828948775604116,
+      "e_corr": -0.4253814976071181,
+      "err_uha": 74.78749098616122,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 71,
+        "H": 85
+      },
+      "fingerprint": {
+        "C": "a3f483d51022",
+        "H": "dfa85e4dfd71"
+      }
+    },
+    {
+      "molecule": "propene",
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 936,
+      "natm": 9,
+      "rmsd_S": 0.39209598980747135,
+      "e_corr": -0.4254410464689436,
+      "err_uha": 15.238629160641004,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 96,
+        "H": 108
+      },
+      "fingerprint": {
+        "C": "0248429e2dc4",
+        "H": "494f003caade"
+      }
+    },
+    {
+      "molecule": "propene",
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 1095,
+      "natm": 9,
+      "rmsd_S": 0.531205716260903,
+      "e_corr": -0.42544696812774685,
+      "err_uha": 9.316970357386989,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 115,
+        "H": 125
+      },
+      "fingerprint": {
+        "C": "e0dec347bb53",
+        "H": "9c55a9e14c9a"
+      }
+    },
+    {
+      "molecule": "propene",
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 1248,
+      "natm": 9,
+      "rmsd_S": 0.5584867730481717,
+      "e_corr": -0.42544743475716157,
+      "err_uha": 8.850340942667678,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 142,
+        "H": 137
+      },
+      "fingerprint": {
+        "C": "20439f584ae2",
+        "H": "4ef8f92128fe"
+      }
+    },
+    {
+      "molecule": "propene",
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 1395,
+      "natm": 9,
+      "rmsd_S": 0.5562578674558573,
+      "e_corr": -0.4254483419464559,
+      "err_uha": 7.943151648315272,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 173,
+        "H": 146
+      },
+      "fingerprint": {
+        "C": "3726fda876b7",
+        "H": "7a93a32f6e79"
       }
     }
   ]
