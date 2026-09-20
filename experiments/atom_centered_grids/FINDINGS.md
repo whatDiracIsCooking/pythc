@@ -1477,38 +1477,46 @@ condition, same level-0 Becke grid every THC fit in this directory is pruned fro
 its norm, and without them this would measure PySCF's default rather than what DFT can do
 - and the energy conserved to tens of uHa:
 
-| surface | grid | `|L - L0|` | over |
-| --- | --- | --- | --- |
-| RKS/PBE | level-0 Becke, 2328 pts | **9.25 hbar** | 1.0 ps |
-| frozen `ghost` THC | pruned from level 0, 414 pts | **1.49 hbar** | 2.5 ps |
-| RKS/PBE | level-3 Becke | **0.005 hbar** | 38 fs |
-| DF-RHF | none | 2.3e-5 hbar | 1.5 ps |
+`|L - L0|` in hbar, methanol, same initial condition throughout. **Quoted at matched
+times, which matters more than it sounds: these surfaces do not leak at the same rate, so
+a number read off one window says nothing against a number read off another.**
 
-all on methanol from the same initial condition. The level-0 row is not an integrator
-artefact: its energy drifts 21.7 uHa over the whole picosecond while `|L|` swings
-18.24 -> 10.07 -> 15.61, so the force is consistent with the energy and the angular
-momentum is going into the grid.
+| surface | grid | points | 100 fs | 225 fs | 1000 fs |
+| --- | --- | --- | --- | --- | --- |
+| RKS/PBE | level-0 Becke | 4656 | 0.638 | 0.677 | **9.250** |
+| frozen `ghost` THC | pruned from level 0 | 414 | 0.144 | 0.433 | **1.188** |
+| frozen `blocked` THC | in-molecule, weighted | 301 | 0.030 | 0.057 | **0.106** |
+| RKS/PBE | level-3 Becke | 67432 | 0.004 | 0.046 | - |
+| DF-RHF | none | - | \~0 | \~0 | 2.3e-5 |
 
-Two things follow, and they point in opposite directions.
+The level-0 row is not an integrator artefact: its energy drifts 21.7 uHa over the whole
+picosecond while `|L|` swings 18.24 -> 10.07 -> 15.61, so the force is consistent with the
+energy and the angular momentum is going into the grid.
 
-**Against the quadrature it is actually built from, the frozen support wins.** A level-0
-DFT calculation on the same molecule loses six times more angular momentum in 40% of the
-time, and keeps going. The frozen per-element support is not merely no worse than its
-parent grid - it is quieter than it. The ladder predicted this without anyone noticing:
-torque tracks grid accuracy at Spearman +0.86, and the NNLS reweighting `NNLSGrid`
-performs makes the pruned grid a better quadrature than its parent, which is the property
-the README already advertises for the overlap matrix and which turns out to buy
-orientation quality as well.
+Three things follow.
 
-**Against a production DFT grid, it does not.** Level 3 conserves `L` to `0.005 hbar`,
-some two to three orders of magnitude better than the frozen support. So "acTHC is no
-worse than DFT" is true of a matched, coarse parent grid and false of the grids anyone
-actually runs DFT on. The right reading is that **orientation quality is inherited from
-the parent grid and improved on, not created**: everything in this directory is pruned
-from a level-0 Becke grid, which is a bad grid to be rotationally invariant on, and the
-ladder's convergence with point count is the same statement from the other side. A frozen
-support built from a finer parent should inherit the finer parent's invariance; nothing
-here tests that, and it is the cheapest remaining experiment in the programme.
+**Against the quadrature it is actually built from, the frozen support wins, by about
+eightfold at a picosecond.** The frozen per-element support is not merely no worse than
+its parent grid - it is quieter than it. The ladder said so first and more directly: the
+complete 3284-point parent grid has a torque of 0.24 uHa/rad and the *pruned* 670-point
+weighted grid has 0.02. Pruning is a benefit, not a cost, because the NNLS reweighting
+makes the pruned grid a better quadrature than its parent - the property the README
+already advertises for the overlap matrix, which turns out to buy orientation quality too.
+
+**Against a production DFT grid it loses, by about one decade, not three.** At 225 fs
+level 3 is 0.046 against the transferable support's 0.433. An earlier reading of this
+table put the gap at two to three decades by comparing level 3 at 38 fs against the
+support at 2.5 ps; that is a factor of 66 in the window and the comparison is void. One
+decade, on 163x fewer points, is what compression costs rather than a defect of the
+freeze.
+
+**And the in-molecule grid is already at production-DFT quality.** `blocked` at 301 points
+gives 0.057 against level 3's 0.046 at 225 fs - within a factor of 1.2, on 224 times fewer
+points. `blocked` and `ghost` differ only in the weight footing and the transfer, and the
+ladder says the footing is nearly all of it. So the decade separating the transferable
+support from production DFT is not a property of frozen grids, of pruning, or of
+translating a support between molecules. **It is the weights**, and closing it is an
+offline fitting problem rather than a structural one.
 
 ### What this does not settle
 
