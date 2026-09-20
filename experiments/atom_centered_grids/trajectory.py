@@ -185,6 +185,14 @@ class Surface:
     by an order of magnitude. Sub-sampling it buys proportionally more physical time for
     the same cost, which is what decides whether the run reaches a rotational period.
 
+    ``reference`` picks what generates the trajectory, and it is the whole of the DFT
+    comparison. ``"rhf"`` is grid-free - density-fitted Hartree-Fock has no quadrature at
+    all, which is why the reference trajectory conserves ``L`` to the integrator floor and
+    why a leak measured along it belongs to the frozen grid. ``"rks"`` puts an ordinary
+    Becke grid back in, generated in lab axes at every geometry exactly as the frozen
+    grid is attached in lab axes - so whatever ``L`` an RKS trajectory fails to conserve
+    is the same defect, in the method acTHC would have to be no worse than.
+
     ``orientation`` is the feedback. A leak is not a small correction that can be
     integrated at a fixed orientation: at a hundred microhartree per radian the molecule
     picks up enough angular momentum to turn through a radian in a few hundred
@@ -210,8 +218,12 @@ class Surface:
     gradient far more sensitive to a loose reference than the energy is.
     """
 
-    def __init__(self, mol, grids, ridge, scheme, n_laplace, propagate, driver=None):
+    def __init__(self, mol, grids, ridge, scheme, n_laplace, propagate, driver=None,
+                 reference="rhf", xc="pbe", grid_level=0):
         self.orientation = None
+        self.reference = reference
+        self.xc = xc
+        self.grid_level = grid_level
         self.mol = mol
         self.grids = grids
         self.ridge = ridge
@@ -225,14 +237,25 @@ class Surface:
         self.mol.set_geom_(coords, unit="Bohr")
         self.mol.build(False, False)
 
-        mf = scf.RHF(self.mol).density_fit(auxbasis=AUXBASIS)
+        if self.reference == "rks":
+            mf = scf.RKS(self.mol).density_fit(auxbasis=AUXBASIS)
+            mf.xc = self.xc
+            mf.grids.level = self.grid_level
+        else:
+            mf = scf.RHF(self.mol).density_fit(auxbasis=AUXBASIS)
         mf.verbose = 0
         mf.conv_tol = 1e-12
         mf.kernel(dm0=self.dm)
         self.dm = mf.make_rdm1()
 
         energy = float(mf.e_tot)
-        de = np.asarray(mf.nuc_grad_method().kernel(), dtype=float)
+        grad = mf.nuc_grad_method()
+        if self.reference == "rks":
+            # The Becke weight derivatives. Without them the DFT force is missing 12% of
+            # its own norm on this grid, and the comparison would be measuring PySCF's
+            # default rather than what DFT can do.
+            grad.grid_response = True
+        de = np.asarray(grad.kernel(), dtype=float)
         e_corr, torques = 0.0, {}
 
         if not with_torque:
@@ -271,7 +294,8 @@ def rotate_by(omega, span, Q):
 
 
 def run(name, modes, threshold, steps, dt_fs, temperature, seed, project_rotation,
-        ridge, scheme, n_laplace, propagate, torque_every, feedback, out_path):
+        ridge, scheme, n_laplace, propagate, torque_every, feedback, out_path,
+        reference="rhf", xc="pbe", grid_level=0):
     mol = gto.M(atom=MOLECULES[name](), basis=BASIS, verbose=0)
     mass = np.asarray(mol.atom_mass_list()) * AMU
     coords = mol.atom_coords().copy()
@@ -286,6 +310,9 @@ def run(name, modes, threshold, steps, dt_fs, temperature, seed, project_rotatio
           + ", ".join(f"{m} {n} pts" for m, n in n_points.items())
           + (" (no grid)" if not grids else "")
           + f"  (fit {time.time() - t0:.1f}s)")
+    print(f"   reference: {reference}"
+          + (f"/{xc}, Becke grid level {grid_level}" if reference == "rks"
+             else " (density fitted, no quadrature grid)"))
     print(f"   {steps} x {dt_fs} fs on the {propagate} surface"
           + (f" driven by {driver}" if driver else "")
           + f", T0 = {temperature} K, "
@@ -295,7 +322,8 @@ def run(name, modes, threshold, steps, dt_fs, temperature, seed, project_rotatio
           + (f", leaked rotation fed back on {feedback}" if feedback else ""))
 
     v, dof = initial_velocities(mass, coords, temperature, seed, project_rotation)
-    surface = Surface(mol, grids, ridge, scheme, n_laplace, propagate, driver)
+    surface = Surface(mol, grids, ridge, scheme, n_laplace, propagate, driver,
+                      reference, xc, grid_level)
     dt = dt_fs * FS
     if propagate == "full":
         torque_every = 1
@@ -371,7 +399,7 @@ def run(name, modes, threshold, steps, dt_fs, temperature, seed, project_rotatio
 def write(path, scope, mol, rows):
     keys = ("name", "modes", "threshold", "n_points", "dt_fs", "temperature", "seed",
             "project_rotation", "ridge", "scheme", "propagate", "driver", "n_laplace",
-            "torque_every", "feedback", "tracked")
+            "torque_every", "feedback", "tracked", "reference", "xc", "grid_level")
     meta = {("molecule" if k == "name" else k): scope[k] for k in keys}
     meta.update(n_ao=int(mol.nao_nr()), natm=mol.natm, basis=BASIS, auxbasis=AUXBASIS,
                 inertia=np.linalg.eigvalsh(inertia(
@@ -411,19 +439,24 @@ def analyse(d, mode):
     """
     rows = d["rows"]
     t = np.array([r["time_fs"] for r in rows])
+    bare = mode not in d["n_points"]
     # The torque is sampled on a subset of the steps; the leak is carried on all of them.
     samples = [r for r in rows if r["torque"] is not None]
-    tau = np.array([r["torque"][mode] for r in samples])
+    tau = (np.zeros((len(samples), 3)) if bare
+           else np.array([r["torque"][mode] for r in samples]))
     tot = np.array([r["total"] for r in rows])
     L = np.array([r["L"] for r in rows])
     # On the hf surface the motion carries no leak, so the integrated torque is the
     # measurement; on the full surface the trajectory's own L is, and the two are checked
     # against each other below.
     coupled = d.get("propagate", "hf") == "full" and d.get("driver") == mode
-    seen = (L - L[0]) if coupled else np.array([r["leak"][mode] for r in rows])
+    seen = ((L - L[0]) if (coupled or bare)
+            else np.array([r["leak"][mode] for r in rows]))
     nrm = np.linalg.norm(seen, axis=1)
 
-    out = dict(molecule=d["molecule"], mode=mode, n_points=d["n_points"][mode],
+    out = dict(molecule=d["molecule"],
+               mode=(d.get("reference", "rhf") if bare else mode),
+               n_points=(0 if bare else d["n_points"][mode]),
                propagate="full" if coupled else "hf",
                project_rotation=d["project_rotation"],
                picoseconds=float(t[-1] / 1000), steps=len(rows) - 1,
@@ -490,7 +523,10 @@ def report(paths):
     extra = []
     for path in paths:
         d = json.load(open(path))
-        for mode in d["n_points"]:
+        # With no frozen grid carried, there is no leak to integrate and the trajectory's
+        # own failure to conserve L is the measurement - which is the whole point of the
+        # rks comparison.
+        for mode in (d["n_points"] or {"(reference)": 0}):
             a = analyse(d, mode)
             print(f"{a['molecule']:9s} {a['mode']:8s} {a['propagate']:5s} "
                   f"{a['n_points']:5d} {a['picoseconds']:5.2f} "
@@ -537,6 +573,14 @@ if __name__ == "__main__":
                    help="which surface drives the motion; see the module docstring")
     p.add_argument("--ridge", type=float, default=1e-8)
     p.add_argument("--scheme", default="damped", choices=["ridge", "damped"])
+    p.add_argument("--reference", default="rhf", choices=["rhf", "rks"],
+                   help="rhf is grid-free and conserves L to the integrator floor; rks "
+                        "puts an ordinary lab-fixed Becke grid back in, which is the "
+                        "same defect the frozen grid has, in the method it has to beat")
+    p.add_argument("--xc", default="pbe")
+    p.add_argument("--grid-level", type=int, default=0,
+                   help="Becke grid level for --reference rks; 0 matches the parent grid "
+                        "every THC fit in this directory is pruned from")
     p.add_argument("--n-laplace", type=int, default=10)
     p.add_argument("--feedback", default=None,
                    help="the grid whose leaked angular momentum is allowed to spin the "
@@ -563,4 +607,4 @@ if __name__ == "__main__":
 
     run(a.molecule, modes, a.threshold, a.steps, a.dt, a.temperature, a.seed,
         a.project_rotation, a.ridge, a.scheme, a.n_laplace, a.propagate,
-        max(1, a.torque_every), a.feedback, a.out)
+        max(1, a.torque_every), a.feedback, a.out, a.reference, a.xc, a.grid_level)
