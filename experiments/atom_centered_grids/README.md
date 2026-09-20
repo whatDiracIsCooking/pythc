@@ -26,6 +26,8 @@ kill the idea cheaply, but it cannot confirm it.
 | `rank.py` | co-density rank and LS-THC metric conditioning per grid |
 | `rotate.py` | energy shift when each atom's point set is spun about its own nucleus |
 | `weights.py` | whether the fitted weights matter, or only the points they select |
+| `ridge.py` | what ridge regularisation of the metric costs in accuracy, against truncation |
+| `scan.py` | whether the metric truncation puts steps in the PES, and whether ridge removes them |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -36,11 +38,13 @@ uv run python analyse.py ethanol.json
 uv run python rank.py ethanol 1e-3,1e-4,1e-5
 uv run python rotate.py ethanol 1e-3
 uv run python weights.py ethanol 1e-4
+uv run python ridge.py methanol 1e-3 --blocked
+uv run python scan.py methanol 1e-3
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Two headlines:
+See [`FINDINGS.md`](FINDINGS.md). Three headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -48,5 +52,9 @@ See [`FINDINGS.md`](FINDINGS.md). Two headlines:
   fit's real product is its support. Where the metric is full-rank, all-ones weights give
   bit-identical energies. That removes most of the gradient difficulty from the proposal,
   since `X = phi(r_P)` has no weight to differentiate.
+* With the grid frozen, the metric's **eigenvalue truncation is the last discrete step**
+  left, and it puts measurable ~0.5 uHa jumps in the energy exactly where an eigenvalue
+  crosses the cutoff. Ridge regularisation removes them for 0.1-2.2 uHa, and is now
+  available as `metric_ridge` on `LS_RI_THC`.
 
 Raw sweep output is under [`data/`](data).

@@ -10,7 +10,8 @@ should not re-derive machinery that turned out to be unnecessary.
 **In one sentence:** run NNLS per atom (with ghost atoms to keep bonding-region points
 alive) to select a point set per element, **discard the fitted weights and keep only the
 points**, build a molecule's grid as the union of its atoms' point sets, and - given
-sections 4(1) and 4(2) - get analytic nuclear gradients and a smooth PES for free.
+sections 4(1), now done, and 4(2), not - get analytic nuclear gradients and a smooth PES
+for free.
 
 Fit a THC grid once per element, offline, and translate it rigidly into any molecule - the
 acCD move (atomic Cholesky decomposition: do the pivoted selection once per element
@@ -29,7 +30,7 @@ what decides the programme.
 
 ## 2. What was attempted
 
-Four experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke parent
+Six experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke parent
 grid, `ov` mode, 10 Laplace points, against DF-MP2. Geometries from RDKit ETKDG + MMFF.
 
 | script | question | headline |
@@ -38,6 +39,8 @@ grid, `ov` mode, 10 Laplace points, against DF-MP2. Geometries from RDKit ETKDG 
 | `rank.py` | why - and what does it cost in conditioning? | global is a perfect rank-revealing selector; blocked metric min-eig 1e-20 vs 1e-8 |
 | `rotate.py` | does an arbitrarily-oriented frozen grid cost energy? | 0 uHa when rank-saturated, **27-39 uHa** when rank-limited; **no Lebedev shell survives intact** |
 | `weights.py` | do the fitted weights matter, or only the selection? | **only the selection**; all-ones weights are bit-identical or better |
+| `ridge.py` | what does ridge cost against the truncated pseudoinverse? | **0.1-2.2 uHa at `lambda = 1e-8`**; the truncation threshold itself changes nothing |
+| `scan.py` | does the truncation actually put steps in the PES? | **yes, ~0.5 uHa, exactly at the eigenvalue crossings**; ridge removes them |
 
 The key methodological move: `NNLSGrid(blocked=True)` already fits each atomic sub-grid
 independently, so the penalty for giving up molecular pruning is measurable today. Because
@@ -62,7 +65,7 @@ conclusions are listed here with their current status, so they are not re-derive
 | Frozen per-atom grids risk orientation-dependent energies | **Confirmed by measurement**: no angular shell survives intact (8-20% of each kept), and rank-limited grids shift 27-39 uHa under random per-atom rotation. This is a **rotational-invariance** failure (spurious torques), not merely an accuracy tax - see section 4(2). |
 | Fix isotropy with orbit-wise (group-sparsity) pruning over (radial shell, Lebedev orbit) blocks | **Endorsed, unimplemented.** The parent grid is already orbit-structured via `treutler_prune`, so the structure exists to exploit. |
 | Grid inflation will be 2-3x, i.e. 4-9x on the `n_P^2` parts | **Too pessimistic.** Measured 1.2-1.7x, i.e. ~1.5-2.9x. |
-| Unioned per-atom grids will wreck metric conditioning; use ridge, not eigenvalue truncation | **Confirmed** (min eigenvalue 1e-20 vs 1e-8). Ridge is a **prerequisite**: with points frozen and weights gone, the truncation threshold is the last discrete decision left in the pipeline - see section 4(1). |
+| Unioned per-atom grids will wreck metric conditioning; use ridge, not eigenvalue truncation | **Confirmed, and now implemented and measured** - see section 4(1). Min eigenvalue 1e-20 vs 1e-8; the truncation does put ~0.5 uHa steps in the PES at the eigenvalue crossings, and ridge removes them. One correction: ridge was expected to be a pure improvement, but it has a **floor** the truncation does not - too small a `lambda` inverts the null space's rounding noise. |
 | The overlap-metric target inherits a decade of validation from the 2013 DVR paper | **Substantially undermined.** `rmsd_S` is close to orthogonal to THC accuracy: it degraded 125x under rotation and ~2000x under all-ones weights with no loss (sometimes a gain) in MP2 accuracy. |
 | PyTHC is the fastest route to the decisive experiment | **Correct** - `blocked=True` made it cheaper still. |
 
@@ -80,11 +83,11 @@ but as a *point selector*, not a weight fitter.
 
 ## 4. Next directions, in order
 
-**(1) and (2) are prerequisites, not improvements.** Without them the scheme does not
-deliver what it promises: (1) is the last remaining source of PES non-smoothness, and (2)
-is what makes "attach the atomic grid rigidly" a well-defined operation at all. (3) is the
-thing you actually want, but measuring it before (1) and (2) exist measures an object you
-would not ship.
+**(1) is done.** It was a prerequisite, not an improvement: the metric truncation was the
+last remaining source of PES non-smoothness, and it is now measured and fixed. **(2) is
+still a prerequisite** - it is what makes "attach the atomic grid rigidly" a well-defined
+operation at all. (3) is the thing you actually want, but measuring it before (2) exists
+measures an object you would not ship.
 
 The target pipeline, for orientation:
 
@@ -95,31 +98,54 @@ The target pipeline, for orientation:
 | build `X = phi(r_P)` - no weights | per geometry | AO derivative + point translation |
 | fit `Z` by least squares against exact ERIs | per geometry | smooth, RI-like chain rule |
 
-Nothing discrete happens at runtime. That is the whole point, and (1) and (2) are what
-make it true.
+Nothing discrete happens at runtime. That is the whole point; (1) has now made it true of
+the `Z` fit, and (2) is what remains.
 
-**(1) Ridge instead of truncation.** Walk the pipeline above looking for anything discrete:
-the point selection is frozen offline, the weights do not exist, `X` is smooth in `R`, and
-the `Z` fit is smooth - *except* that the metric is rank-deficient and is currently handled
-by truncating eigenvalues below a threshold. That truncation is a geometry-dependent
-discrete decision: as nuclei move an eigenvalue crosses the cutoff, the effective rank
-jumps, and the energy has a small discontinuity. **It is the last remaining source of PES
-non-smoothness in the whole scheme**, and the atom-centred union makes it worse, since
-near-duplicate bonding-region points from neighbouring atoms are exactly what drives the
-minimum eigenvalue to 1e-20. Without this step the frozen-grid argument moves the kink
-rather than removing it.
+**(1) Ridge instead of truncation. DONE** - `lib.ridge_inv`, `lib.ridge_inv_sqrt`, and
+`metric_ridge` / `aux_ridge` on `LS_RI_THC`, reaching the inversion through
+`ls_thc_funcs.invert_metric`. Measured in `ridge.py` and `scan.py`, written up in
+FINDINGS.md section 6. The default is unchanged, so nothing that came before is
+invalidated; ridge is opt-in.
 
-It also pairs with dropping the weights. The weights were never contributing accuracy, but
-they *were* contributing conditioning - on methanol's 240-point grid, NNLS weights give
-`-log10 min eig = 7.8` against all-ones' `10.6`. **`w = 1` and ridge are a package**, not
-two independent choices.
+What it settled, and what it did not:
 
-Replace the truncated pseudoinverse with `(S + lambda I)^-1` at fixed `lambda`, measure the
-accuracy cost, and confirm the eigenvalue-crossing discontinuity is gone. Touches
-`lib.pseudo_inv_sqrt` and the metric inversion in `thc/ls_thc_funcs.py`. It is also the
-most independent piece of work here - arguably a defect in the current pseudoinverse path
-regardless of whether atom-centred grids ever happen - and so the most plausibly
-upstreamable.
+* **The steps were real.** With the grid frozen, scanning a bond, the truncation retains
+  294-296 eigenvalues on methanol and changes at 2 of 60 steps - and the two largest
+  second differences in the whole error curve sit exactly on those two steps, 80x the
+  background. Ethanol: one crossing in 30 steps, 22x. Under ridge the same points are
+  indistinguishable from their neighbours.
+* **They were small** - about 0.5 uHa - and that is the mildly deflationary part. The
+  truncated directions carry almost no energy: changing `epsilon` from 1e-8 to 1e-14,
+  retaining 412 to 477 of ethanol's 477 eigenvalues, leaves the correlation energy
+  identical to nine decimals. The cutoff was never buying accuracy. That is an argument
+  for replacing it rather than tuning it, but it is not a large error being fixed.
+* **The frozen grid is what makes it the leading defect.** Re-selecting the grid at every
+  geometry gives ~4 uHa of second difference *everywhere*, three orders of magnitude
+  above the truncation's steps. (1) only matters because the freeze comes first; do not
+  quote the 0.5 uHa number without that context.
+* **Ridge has a floor the truncation does not**, which was not anticipated. Where the
+  pseudoinverse discards the numerically null directions, ridge inverts them at
+  `1/lambda`. Water's blocked grid has 23 exactly null directions, and below
+  `shift/maxeig ~ 1e-15` the energy becomes noise - several hundred uHa, not reproducible
+  between runs differing only in SCF convergence tolerance.
+* **Smoothness finds that floor before accuracy does.** On water the static energies at
+  `lambda` = 1e-8, 1e-10 and 1e-12 agree within 0.3 uHa, but the scan's `max|d2|` goes
+  0.003 -> 0.37 -> 27.8. An energy that looks converged can sit on a curve whose
+  derivative is noise, so **do not pick `lambda` from an accuracy table alone.**
+* **Use `lambda = 1e-8`** at the default `"trace"` scaling. Smooth on all three systems
+  tested, costing 0.1-2.2 uHa. `1e-6` is too strong (+3 to +42 uHa), `1e-4` useless.
+
+One design decision worth not re-litigating: `lambda` is scaled by `tr(S)/n`, the mean
+eigenvalue, not by `max(eig(S))` as `pinv`'s `epsilon` is. The mean is linear in `S` and
+so analytic in the nuclear coordinates; the largest eigenvalue has a kink wherever it
+becomes degenerate, which would reintroduce in miniature the thing being removed.
+`"max_eig"` scaling exists for comparing against `epsilon` directly.
+
+Left undone here: nothing checks that an *analytic* gradient agrees with these curves,
+because there is no analytic gradient yet - see (5). The scans move a terminal hydrogen
+only, so a heavy-atom displacement may cross more often than 2 in 60 steps. And the
+aux Coulomb metric has the same truncation; `aux_ridge` handles it, but it was never the
+binding constraint and was not studied separately.
 
 **(2) Group-NNLS over (radial shell, angular orbit) blocks.** The reason this matters is
 **rotational invariance, not accuracy**. Attaching an atomic grid rigidly requires choosing
@@ -154,10 +180,11 @@ into one fit rather than agonising over octahedron vs icosahedron.
 formaldehyde) and compare supports. Decides whether one ghost geometry suffices or an
 environment ensemble is needed.
 
-**(5) Actually compute a gradient.** Nothing here measured one; the smoothness argument is
-structural. A finite-difference-vs-analytic check on a frozen grid, or simply scanning a
-bond length and looking for kinks, would be worth more than another accuracy sweep. Doing
-this *before* (1) would be a good way to see the truncation discontinuity directly.
+**(5) Actually compute a gradient.** Still nothing here computes one. `scan.py` now
+measures the *curve* rather than arguing about it structurally, so the smoothness claim is
+no longer purely theoretical - but a finite-difference-vs-analytic check would test the
+implementation, which the scan cannot. `scan.py` is the natural harness: it already walks
+a frozen grid along a bond at fixed ridge, which is the reference curve such a check needs.
 
 ## 5. Open questions
 
@@ -169,6 +196,14 @@ this *before* (1) would be a good way to see the truncation discontinuity direct
   A like-for-like selector comparison at matched point count has not been done here.
 * Does `rmsd_S` ever track accuracy, or should grid comparisons move to rank + min
   eigenvalue wholesale?
+* Should `metric_ridge` become the default rather than an opt-in? It costs a few uHa and
+  removes a discontinuity, which is the right trade for gradient work and the wrong one
+  for reproducing published single-point energies. The case for flipping it gets stronger
+  if 4(2)'s larger, more redundant grids make the near-null crowd worse.
+* Is a *fixed* `lambda` right, or should it track the grid? `shift/maxeig` at
+  `lambda = 1e-8` came out at 1.7e-10 to 3.3e-10 across three systems - close enough that
+  fixed looks defensible, but three systems in one basis is not a strong test. A much
+  larger molecule, or cc-pVTZ, would say.
 
 ## 6. Literature
 
@@ -210,8 +245,15 @@ uv run python experiments/atom_centered_grids/analyse.py alanine.json
 uv run python experiments/atom_centered_grids/rank.py methanol 1e-3,1e-4,1e-5
 uv run python experiments/atom_centered_grids/rotate.py ethanol 1e-3
 uv run python experiments/atom_centered_grids/weights.py methanol 1e-4
+uv run python experiments/atom_centered_grids/ridge.py methanol 1e-3 --blocked --out ridge_methanol.json
+uv run python experiments/atom_centered_grids/scan.py methanol 1e-3 --out scan_methanol.json
 ```
 
 Runtimes on 4 cores: water seconds, methanol ~3 min, ethanol ~10 min, alanine ~40 min
-(dominated by the unpruned-parent-grid baseline and the tight global fits). Raw output from
-the runs behind `FINDINGS.md` is in [`data/`](data).
+(dominated by the unpruned-parent-grid baseline and the tight global fits). `ridge.py` is
+seconds to a couple of minutes. `scan.py` rebuilds the SCF and the fit at every geometry,
+so it runs (number of steps) x (number of inversion schemes) single-point THC calculations:
+about 4 min for methanol's 61-step scan, 25 min for ethanol's 31-step one. Cut
+`--half-width` or raise `--step` to trade resolution for time, but note that the crossings
+are what the scan is looking for and a coarse scan can step over one. Raw output from the
+runs behind `FINDINGS.md` is in [`data/`](data).

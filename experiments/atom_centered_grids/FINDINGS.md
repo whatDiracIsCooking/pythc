@@ -162,6 +162,106 @@ well-conditioned support. It is not a measure of THC accuracy, and grids should 
 compared on it. What LS-THC needs is span and conditioning; §2's rank and minimum
 eigenvalue are the diagnostics that track the energy.
 
+## 6. The truncation really does put steps in the PES, and ridge removes them
+
+Sections 1-5 measured grids. This one measures the *pipeline*, and settles the first
+item on the next-directions list: with the grid frozen and the weights gone, the
+eigenvalue truncation in the metric inversion is the last discrete decision left, and
+`scan.py` shows it is not a theoretical worry.
+
+The test scans a bond length with the point sets **frozen** - fitted once at the
+reference geometry, thereafter only translated rigidly with their nuclei, which is
+exactly the target pipeline - and reports the second difference of the THC error curve.
+On a uniform scan that reads a jump off directly: for a smooth function it is
+`O(h^2)` and negligible, while a step of size `d` contributes `d`.
+
+| system, frozen grid | scheme | crossings | `|d2|` at a crossing | `|d2|` elsewhere |
+| --- | --- | --- | --- | --- |
+| methanol, 301 pts, 61 steps of 0.002 A | pinv (default) | 2 | **0.43, 0.46 uHa** | 0.006 |
+| | ridge 1e-8 | - | 0.005, 0.001 | 0.002 |
+| | ridge 1e-10 | - | 0.0003, 0.0001 | 0.002 |
+| | *refit at every geometry* | - | 8.0, 3.7 | **4.0** |
+| ethanol, 477 pts, 31 steps of 0.004 A | pinv (default) | 1 | **0.38 uHa** | 0.017 |
+| | ridge 1e-8 | - | 0.001 | 0.012 |
+| water, 118 pts, 61 steps of 0.002 A | pinv (default) | 0 | - | 0.0005 |
+
+**The steps are real and they are exactly where the theory says.** Along methanol's
+O-H scan the truncation retains 294-296 eigenvalues, changing at 2 of 60 steps, and the
+two largest second differences in the whole curve sit precisely at those two steps -
+80x the background. Ethanol has one crossing in 30 steps, with the largest second
+difference on it, 22x the background. Under ridge the same points are indistinguishable
+from their neighbours.
+
+They are also *small*: about 0.5 uHa, on a curve whose THC error is 5 uHa (methanol) to
+39 uHa (ethanol). The reason is section 3 all over again - the directions being
+truncated carry almost no energy. Indeed **the truncation threshold makes no difference
+to the energy at all**: from `epsilon = 1e-8` to `1e-14`, retaining anywhere from 412 to
+477 of ethanol's 477 eigenvalues, the correlation energy is identical to nine decimals.
+So the cutoff was never buying accuracy; it was numerical hygiene with a discontinuity
+attached. That is the case for replacing rather than tuning it.
+
+Magnitude is the wrong axis anyway. A 0.5 uHa step is a *discontinuity*: the derivative
+at that geometry does not exist, an analytic gradient will disagree with finite
+differences there, and an AIMD trajectory crossing it gains energy from nowhere.
+
+**The frozen grid is what makes any of this visible.** The control row is the point:
+re-running the NNLS selection at every geometry gives a second difference of ~4 uHa
+*everywhere*, with no distinction between crossing and non-crossing points - the
+selection noise is three orders of magnitude above the truncation's own steps and
+swamps them completely. Freezing the grid removes that, and only then does the
+truncation become the leading defect. The two steps are a package.
+
+### Ridge has a floor, and smoothness finds it before accuracy does
+
+Replacing `pinv(S)` with `(S + lambda I)^-1` costs very little accuracy over a wide
+window (`lambda` below is dimensionless, scaled by the mean eigenvalue; `shift/maxeig`
+puts it on the same axis as `pinv`'s `epsilon`):
+
+| system / grid | truncation | ridge 1e-6 | ridge 1e-8 | ridge 1e-10 | ridge 1e-12 |
+| --- | --- | --- | --- | --- | --- |
+| water blocked 3e-3, 118 pts | -0.71 | +1.79 | -0.59 | -0.75 | -0.45 |
+| methanol global 1e-4, 240 pts | +2.65 | +6.10 | +2.70 | +2.65 | +2.65 |
+| methanol blocked 1e-3, 301 pts | +5.29 | +30.53 | +8.31 | +5.79 | +5.76 |
+| ethanol blocked 1e-3, 477 pts | +38.64 | +80.81 | +40.84 | +38.37 | +37.80 |
+
+(MP2 error in uHa vs the DF-MP2 reference. `shift/maxeig` at `lambda = 1e-8` is
+3.3e-10 for water, 1.7e-10 for methanol and ethanol.)
+
+At `lambda = 1e-8` the cost is 0.1-2.2 uHa; by `1e-10` it is under 0.5 uHa and the two
+schemes have converged. `1e-6` is too strong and `1e-4` is useless (+170 to +450 uHa).
+
+But ridge cannot be taken arbitrarily small, and this is the one genuinely new
+constraint it introduces. Where the pseudoinverse *discards* the numerically null
+directions, ridge inverts them at `1/lambda`. Water's blocked grid has 23 exactly null
+directions (its co-density rank saturates at `n_occ * n_vir = 95` with 118 points), and
+below `shift/maxeig ~ 1e-15` the fit is inverting rounding noise: the water energy error
+goes from -0.45 uHa at `lambda = 1e-12` to several hundred uHa at `1e-14`, and is not
+even reproducible between runs that differ only in SCF convergence tolerance.
+
+The sharper version of the constraint comes from the scan, not the energy. On water,
+where the truncation is inert (no crossings, `|d2| = 0.0005`), ridge is smooth at
+`lambda = 1e-8` (`max|d2| = 0.003`) but **rough at `1e-10` (0.37) and destroyed at
+`1e-12` (27.8)** - while the static energies at all three are within 0.3 uHa of each
+other and of the truncation. So the static accuracy table above is not sufficient to
+choose `lambda`: an energy that looks converged can sit on a curve whose derivative is
+noise. **`lambda = 1e-8` at the default `"trace"` scaling is the value all three systems
+agree on**: smooth everywhere, 0.1-2.2 uHa.
+
+### What was implemented
+
+`lib.ridge_inv` and `lib.ridge_inv_sqrt`, plus `metric_ridge` / `aux_ridge` keywords on
+`LS_RI_THC`, which reach the metric inversion through
+`ls_thc_funcs.invert_metric`. The default is unchanged - `None` keeps the truncated
+pseudoinverse - so this is an opt-in path, not a silent change to every existing result.
+
+One design note. `lambda` is dimensionless and scaled by `tr(S)/n`, the *mean*
+eigenvalue, rather than by `max(eig(S))` as `pinv`'s `epsilon` is. That is not
+cosmetic: the mean eigenvalue is linear in `S` and therefore an analytic function of the
+nuclear coordinates, whereas the largest eigenvalue has a kink wherever it becomes
+degenerate. Scaling the regulariser by a quantity with its own kink would reintroduce,
+in miniature, the thing being removed. `"max_eig"` is available for comparing against
+`epsilon` directly.
+
 ---
 
 ## Verdict
@@ -178,9 +278,10 @@ What remains to be measured, in order:
    is the only remaining question that can still kill the idea.
 2. **The isotropy tax.** Implement group-NNLS over (radial shell, angular orbit) blocks and
    re-measure §1 and §4. Expect a larger grid and a smaller rotation spread.
-3. **Ridge vs truncation.** Replace the pseudoinverse truncation with `(S + lambda I)^-1`
-   and check the accuracy cost at fixed `lambda`. Needed for §2's conditioning, and removes
-   a discrete decision from the PES.
+3. ~~**Ridge vs truncation.**~~ **Done - see §6.** The truncation does put ~0.5 uHa steps
+   in the PES, exactly at the eigenvalue crossings; ridge at `lambda = 1e-8` removes them
+   for 0.1-2.2 uHa. Ridge has a floor of its own, and smoothness finds it before accuracy
+   does.
 4. **Transferability.** Fit the same element in several environments and compare the
    retained point sets. If they differ a lot, per-element grids need an environment
    ensemble rather than a single ghost geometry.
@@ -188,6 +289,14 @@ What remains to be measured, in order:
 ## Caveats
 
 cc-pVDZ only; four small molecules; MMFF geometries; `ov` mode and MP2 only. The rank and
-weight analyses are on methanol and ethanol. No gradients were computed - the smoothness
-argument here is structural, not measured. Ghost-augmented per-element grids, the object
+weight analyses are on methanol and ethanol. Ghost-augmented per-element grids, the object
 the proposal actually calls for, have not been built.
+
+§6 measures smoothness by finite differences along one bond of one molecule per system;
+no analytic gradient was computed, and nothing here checks that an implemented gradient
+agrees with the curve. The scans move a terminal hydrogen only, so they probe the metric
+less violently than a heavy-atom displacement would, and they are single 1D cuts - a
+crossing rate of 2 per 60 steps is an estimate from a small sample. The `lambda = 1e-8`
+recommendation rests on three systems in one basis, and the floor below which ridge
+becomes noise depends on how null the null space really is, which is a property of the
+grid and the basis.
