@@ -8,6 +8,7 @@ import cotengra as ctg
 import numpy as np
 import opt_einsum as oe
 import psutil
+import scipy.linalg
 import pyscf.lib as pyscflib
 import pytblis as pt
 from pyscf import df
@@ -69,6 +70,109 @@ def pinv(M: np.ndarray, epsilon: float = 1e-10) -> np.ndarray:
 
     S_inv = (eig_vecs * inv_eigvals) @ eig_vecs.T
     return S_inv
+
+
+def ridge_shift(M: np.ndarray, lam: float, scale: str = "trace") -> float:
+    """
+    Convert a dimensionless ridge strength into the absolute shift to add to ``M``.
+
+    Keeping ``lam`` dimensionless makes the regularised inverses below equivariant
+    under ``M -> c M``, which matters because the LS-THC metric carries the units of
+    whatever the collocation matrix was scaled by.
+
+    :param M: Hermitian matrix the shift will be applied to.
+    :param lam: Dimensionless regularisation strength.
+    :param scale: ``"trace"`` uses the mean eigenvalue ``tr(M)/n``, which is *linear*
+        in ``M`` and therefore an analytic function of nuclear coordinates - the
+        property the whole ridge construction exists to preserve. ``"max_eig"`` uses
+        the largest eigenvalue, matching the convention of :func:`pinv`'s ``epsilon``;
+        it is easier to compare against but only piecewise smooth, since it has a kink
+        wherever the top eigenvalue becomes degenerate. ``"absolute"`` takes ``lam`` at
+        face value.
+    :return: The absolute shift ``lambda``.
+    """
+    if scale == "trace":
+        reference = float(np.trace(M)) / M.shape[0]
+    elif scale == "max_eig":
+        reference = float(np.linalg.eigvalsh(M)[-1])
+    elif scale == "absolute":
+        reference = 1.0
+    else:
+        raise ValueError(f"unknown ridge scale {scale!r}, expected "
+                         "'trace', 'max_eig' or 'absolute'")
+
+    return lam * reference
+
+
+def ridge_inv(M: np.ndarray, lam: float = 1e-8, scale: str = "trace") -> np.ndarray:
+    """
+    Tikhonov-regularised inverse ``(M + lambda I)^-1`` of a Hermitian positive
+    semi-definite matrix.
+
+    A smooth alternative to :func:`pinv`, intended for the metric of a least-squares
+    fit. Where ``pinv`` zeroes every eigenvalue below a cutoff, ridge damps the whole
+    spectrum continuously. The difference is not an accuracy detail: truncation makes
+    the effective rank, and therefore the result, a *discontinuous* function of ``M``,
+    so as nuclei move an eigenvalue crosses the cutoff and the fitted quantity jumps.
+    Ridge has no such crossing - for ``lambda > 0`` the result is an analytic function
+    of ``M``, and so of the geometry. For a fit whose remaining steps are smooth, this
+    is what decides whether the potential energy surface has steps in it.
+
+    Applied to the metric of a normal-equation solve, this *is* the Tikhonov solution:
+    minimising ``||b - A x||^2 + lambda ||x||^2`` gives ``x = (A^T A + lambda I)^-1 A^T b``,
+    so replacing ``pinv(S)`` by ``ridge_inv(S, lam)`` in ``Z = S^-1 E S^-1`` solves a
+    ridge-penalised version of the same fit rather than a differently truncated one.
+
+    :param M: Hermitian, positive semi-definite matrix. Not modified.
+    :param lam: Dimensionless regularisation strength; see :func:`ridge_shift`.
+    :param scale: How ``lam`` becomes an absolute shift; see :func:`ridge_shift`.
+    :return: The regularised inverse.
+    """
+    M = 0.5 * (M + M.T)
+    shift = ridge_shift(M, lam, scale)
+    logger.info("ridge inverting matrix of shape %s with shift %.3e (lam=%.1e, scale=%s)",
+                M.shape, shift, lam, scale)
+
+    A = M + shift * np.eye(M.shape[0])
+    try:
+        factor = scipy.linalg.cho_factor(A, lower=True, check_finite=False)
+        inv = scipy.linalg.cho_solve(factor, np.eye(A.shape[0]), check_finite=False)
+    except scipy.linalg.LinAlgError:
+        # Only reachable if M has an eigenvalue below -shift, i.e. it was not the
+        # positive semi-definite matrix this function is for. Clamping puts the offender
+        # back on the ridge floor; the resulting jump is confined to that branch.
+        logger.warning("matrix is not positive semi-definite at ridge %.3e, "
+                       "falling back to a clamped eigendecomposition", shift)
+        eig_vals, eig_vecs = np.linalg.eigh(A)
+        inv = (eig_vecs / np.maximum(eig_vals, shift)) @ eig_vecs.T
+
+    return 0.5 * (inv + inv.T)
+
+
+def ridge_inv_sqrt(M: np.ndarray, lam: float = 1e-8, scale: str = "trace") -> np.ndarray:
+    """
+    Builds ``(M + lambda I)^(-1/2)``.
+
+    The ridge counterpart of :func:`pseudo_inv_sqrt`, and smooth in ``M`` for the same
+    reason :func:`ridge_inv` is: no eigenvalue is ever dropped, so there is no cutoff
+    for one to cross. Note that :func:`pseudo_inv_sqrt` already adds a *fixed absolute*
+    ``1e-8`` shift before truncating, which is a ridge in all but name - but it then
+    truncates on top of it, which is the part that reintroduces the discontinuity.
+
+    :param M: Hermitian, positive semi-definite matrix. Not modified.
+    :param lam: Dimensionless regularisation strength; see :func:`ridge_shift`.
+    :param scale: How ``lam`` becomes an absolute shift; see :func:`ridge_shift`.
+    :return: The regularised inverse square root.
+    """
+    M = 0.5 * (M + M.T)
+    shift = ridge_shift(M, lam, scale)
+
+    eig_vals, eig_vecs = np.linalg.eigh(M + shift * np.eye(M.shape[0]))
+    # See ridge_inv: the clamp only bites for a matrix that was not positive
+    # semi-definite to begin with.
+    inv_sqrt_vals = 1.0 / np.sqrt(np.maximum(eig_vals, shift))
+
+    return (eig_vecs * inv_sqrt_vals) @ eig_vecs.T
 
 
 def pseudo_inv_sqrt(M: np.ndarray, epsilon: float = 1e-10) -> np.ndarray:

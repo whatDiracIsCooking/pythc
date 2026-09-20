@@ -124,10 +124,66 @@ def contract_codensity_full_eri(self, X, mo_coeff):
     return E
 
 
-def build_aux_coulomb_inv(auxmol):
+def invert_metric(S: np.ndarray, ridge: Optional[float] = None,
+                  ridge_scale: str = "trace") -> np.ndarray:
+    """
+    Invert the LS-THC metric ``S_PQ = (X X^T) o (X X^T)``.
+
+    Two regularisations are available, and they differ in kind, not degree.
+
+    The default truncated pseudoinverse discards every eigenvalue below a relative
+    cutoff. That choice is *discrete*: the number of surviving eigenvalues is an integer
+    function of the geometry, so as nuclei move an eigenvalue crosses the cutoff and the
+    energy steps. Everything else in the LS-THC pipeline is smooth in the nuclear
+    coordinates once the grid is frozen, which makes this truncation the last thing
+    standing between the scheme and a differentiable potential energy surface.
+
+    Passing ``ridge`` replaces it with ``(S + lambda I)^-1``, which damps the same
+    ill-conditioned directions without ever dropping one, and is analytic in ``S``. It
+    matters most for grids assembled as a union of per-atom point sets, whose
+    near-duplicate points in bonding regions drive the smallest metric eigenvalue down
+    to ~1e-20 and so leave a crowd of eigenvalues loitering near any cutoff.
+
+    **Choosing lambda.** Ridge has a floor that truncation does not: where the
+    pseudoinverse discards the numerically null directions, ridge inverts them at
+    ``1/lambda``, so too small a lambda amplifies rounding noise instead of the signal.
+    Measured on the grids in ``experiments/atom_centered_grids`` (cc-pVDZ, ``ov`` mode),
+    a shift of ~1e-10 times the largest eigenvalue - ``ridge=1e-8`` at the default
+    ``"trace"`` scaling - costs between 0.1 and 3 uHa against the truncation and is
+    smooth on every system tried. Below ~1e-12 of the largest eigenvalue the energy is
+    still right but its *derivative* is not, and below ~1e-15 the energy itself becomes
+    noise. Smoothness, not accuracy, is the binding constraint from below.
+
+    :param S: The metric to invert.
+    :param ridge: Dimensionless ridge strength. ``None`` keeps the truncated
+        pseudoinverse.
+    :param ridge_scale: How ``ridge`` becomes an absolute shift; see
+        :func:`pythc.lib.ridge_shift`.
+    :return: The (regularised) inverse metric.
+    """
+    if ridge is None:
+        return lib.pinv(S)
+
+    return lib.ridge_inv(S, ridge, scale=ridge_scale)
+
+
+def build_aux_coulomb_inv(auxmol, ridge: Optional[float] = None,
+                          ridge_scale: str = "trace"):
+    """
+    The auxiliary Coulomb metric ``J^{-1/2}``.
+
+    ``ridge`` swaps the truncated pseudo inverse square root for the smooth
+    ``(J + lambda I)^(-1/2)``; see :func:`invert_metric` for why that distinction is not
+    cosmetic. This metric is far better conditioned than the THC one, so it is rarely
+    the binding constraint - but it is geometry dependent too, and a pipeline claiming
+    to be free of discrete decisions cannot leave one here.
+    """
     logger.info("Computing 2-center Coulomb metric and J^{-1/2}...")
     j2c = auxmol.intor('int2c2e', aosym='s1')
-    j2c_cholesky = lib.pseudo_inv_sqrt(j2c)
+    if ridge is None:
+        j2c_cholesky = lib.pseudo_inv_sqrt(j2c)
+    else:
+        j2c_cholesky = lib.ridge_inv_sqrt(j2c, ridge, scale=ridge_scale)
 
     return j2c_cholesky
 
@@ -172,23 +228,29 @@ def compute_ao_slices(mol, auxmol):
 
     return blocks
 
-def build_coulomb_matrix(mode: Mode, mol: gto.Mole, auxmol: gto.Mole, X, mo_coeff):
+def build_coulomb_matrix(mode: Mode, mol: gto.Mole, auxmol: gto.Mole, X, mo_coeff,
+                         metric_ridge: Optional[float] = None,
+                         aux_ridge: Optional[float] = None,
+                         ridge_scale: str = "trace"):
     active = ExperimentRun.get_active()
     n_occ = mol.nelectron // 2
     n_vir = mol.nao_nr() - n_occ
 
     S = build_S(mode, X, n_occ)
-    S_inv = lib.pinv(S)
+    S_inv = invert_metric(S, metric_ridge, ridge_scale)
     if active: active.checkpoint(METRIC_INVERSION)
 
-    j2c_inv = build_aux_coulomb_inv(auxmol)
+    j2c_inv = build_aux_coulomb_inv(auxmol, aux_ridge, ridge_scale)
     E = contract_codensity_df_eri(mode, X, mo_coeff, mol, auxmol, j2c_inv, n_occ, n_vir)
 
     D = E @ S_inv
 
     return D
 
-def build_coulomb_matrix_asym(mode: Mode, mol: gto.Mole, auxmol: gto.Mole, X_alpha, X_beta, mo_coeff):
+def build_coulomb_matrix_asym(mode: Mode, mol: gto.Mole, auxmol: gto.Mole, X_alpha, X_beta, mo_coeff,
+                              metric_ridge: Optional[float] = None,
+                              aux_ridge: Optional[float] = None,
+                              ridge_scale: str = "trace"):
     active = ExperimentRun.get_active()
 
     S = mol.spin
@@ -202,13 +264,13 @@ def build_coulomb_matrix_asym(mode: Mode, mol: gto.Mole, auxmol: gto.Mole, X_alp
 
 
     S_aa = build_S(mode, X_alpha, nocc_alpha)
-    S_aa_inv = lib.pinv(S_aa)
+    S_aa_inv = invert_metric(S_aa, metric_ridge, ridge_scale)
 
     S_bb = build_S(mode, X_beta, nocc_beta)
-    S_bb_inv = lib.pinv(S_bb)
+    S_bb_inv = invert_metric(S_bb, metric_ridge, ridge_scale)
     if active: active.checkpoint(METRIC_INVERSION)
 
-    j2c_inv = build_aux_coulomb_inv(auxmol)
+    j2c_inv = build_aux_coulomb_inv(auxmol, aux_ridge, ridge_scale)
     E_aa = contract_codensity_df_eri(mode, X_alpha, mo_coeff_alpha,
                                      mol, auxmol, j2c_inv,
                                      nocc_alpha, nvir_alpha)

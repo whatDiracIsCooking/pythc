@@ -32,12 +32,30 @@ class LS_RI_THC(THC):
                  auxbasis: str,
                  grid: GridProvider = None,
                  mo_coeff: np.ndarray = None,
+                 metric_ridge: float = None,
+                 aux_ridge: float = None,
+                 ridge_scale: str = "trace",
                  ):
+        """
+        :param metric_ridge: Regularise the LS-THC metric inversion as
+            ``(S + lambda I)^-1`` at this dimensionless strength instead of truncating
+            its small eigenvalues. ``None`` (the default) keeps the truncated
+            pseudoinverse. See :func:`~pythc.thc.ls_thc_funcs.invert_metric`: the
+            truncation is the only step of the fit that is not a smooth function of the
+            nuclear coordinates, so this is the knob that decides whether the potential
+            energy surface has steps in it.
+        :param aux_ridge: The same, for the auxiliary Coulomb metric ``J^(-1/2)``.
+        :param ridge_scale: How the two strengths above become absolute shifts; see
+            :func:`pythc.lib.ridge_shift`.
+        """
         self.N = mol.nao_nr()
         self.mol = mol
         self.grid = grid if grid is not None else BeckeGrid(mol)
         self.auxbasis = auxbasis if auxbasis else f'{mol.basis}-ri'
         self.mo_coeff = mo_coeff if mo_coeff is not None and len(mo_coeff) > 0 else np.eye(mol.nao_nr())
+        self.metric_ridge = metric_ridge
+        self.aux_ridge = aux_ridge
+        self.ridge_scale = ridge_scale
 
     @abstractmethod
     def build_pruned_X(self, mode: Mode, mo_coeff: np.ndarray, auxmol: gto.Mole) -> np.ndarray:
@@ -92,7 +110,9 @@ class LS_RI_THC(THC):
 
         if active: active.checkpoint(GRID_PRUNING)
 
-        D = build_coulomb_matrix(mode, self.mol, auxmol, X, self.mo_coeff)
+        D = build_coulomb_matrix(mode, self.mol, auxmol, X, self.mo_coeff,
+                                 metric_ridge=self.metric_ridge, aux_ridge=self.aux_ridge,
+                                 ridge_scale=self.ridge_scale)
         Z = D.T @ D
         if active: active.checkpoint(FITTING_MATRIX)
 
@@ -161,7 +181,10 @@ class LS_RI_THC(THC):
 
         if active: active.checkpoint(GRID_PRUNING)
 
-        Z_aa, Z_bb, Z_ab = build_coulomb_matrix_asym(mode, self.mol, auxmol, X_alpha, X_beta, self.mo_coeff)
+        Z_aa, Z_bb, Z_ab = build_coulomb_matrix_asym(mode, self.mol, auxmol, X_alpha, X_beta, self.mo_coeff,
+                                                     metric_ridge=self.metric_ridge,
+                                                     aux_ridge=self.aux_ridge,
+                                                     ridge_scale=self.ridge_scale)
         if active: active.checkpoint(FITTING_MATRIX)
 
         return ThcEriUnrestricted(self.mol.nelectron, X_alpha, X_beta, Z_aa, Z_bb, Z_ab)

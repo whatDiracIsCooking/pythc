@@ -1,0 +1,93 @@
+{
+  "molecule": "ethanol",
+  "threshold": 0.001,
+  "blocked": true,
+  "n_points": 477,
+  "mp2_ref": -0.48884080589311063,
+  "metric_min_eig": 1.2949471945050138e-12,
+  "n_near_cutoff": 24,
+  "rows": [
+    {
+      "inversion": "pinv eps=1e-08",
+      "e_corr": -0.4888021660517966,
+      "err_uha": 38.639841314025425,
+      "n_kept": 412,
+      "shift_rel": 1e-08
+    },
+    {
+      "inversion": "pinv eps=1e-10 (default)",
+      "e_corr": -0.4888021660517966,
+      "err_uha": 38.639841314025425,
+      "n_kept": 471,
+      "shift_rel": 1e-10
+    },
+    {
+      "inversion": "pinv eps=1e-12",
+      "e_corr": -0.4888021660517966,
+      "err_uha": 38.639841314025425,
+      "n_kept": 477,
+      "shift_rel": 1e-12
+    },
+    {
+      "inversion": "pinv eps=1e-14",
+      "e_corr": -0.4888021660517966,
+      "err_uha": 38.639841314025425,
+      "n_kept": 477,
+      "shift_rel": 1e-14
+    },
+    {
+      "inversion": "ridge lam=1e-04",
+      "e_corr": -0.4883873949171256,
+      "err_uha": 453.410975985058,
+      "n_kept": null,
+      "shift_rel": 1.681233026943517e-06,
+      "metric_ridge": 0.0001,
+      "aux_ridge": 0.0001
+    },
+    {
+      "inversion": "ridge lam=1e-06",
+      "e_corr": -0.48875999272771253,
+      "err_uha": 80.81316539809703,
+      "n_kept": null,
+      "shift_rel": 1.681233026943517e-08,
+      "metric_ridge": 1e-06,
+      "aux_ridge": 1e-06
+    },
+    {
+      "inversion": "ridge lam=1e-08",
+      "e_corr": -0.4887999665033817,
+      "err_uha": 40.83938972893053,
+      "n_kept": null,
+      "shift_rel": 1.681233026943517e-10,
+      "metric_ridge": 1e-08,
+      "aux_ridge": 1e-08
+    },
+    {
+      "inversion": "ridge lam=1e-10",
+      "e_corr": -0.488802438418423,
+      "err_uha": 38.36747468760615,
+      "n_kept": null,
+      "shift_rel": 1.6812330269435172e-12,
+      "metric_ridge": 1e-10,
+      "aux_ridge": 1e-10
+    },
+    {
+      "inversion": "ridge lam=1e-12",
+      "e_corr": -0.4888030040719962,
+      "err_uha": 37.80182111440267,
+      "n_kept": null,
+      "shift_rel": 1.681233026943517e-14,
+      "metric_ridge": 1e-12,
+      "aux_ridge": 1e-12
+    },
+    {
+      "inversion": "ridge lam=1e-14",
+      "e_corr": -0.4888030171677288,
+      "err_uha": 37.78872538184874,
+      "n_kept": null,
+      "shift_rel": 1.681233026943517e-16,
+      "metric_ridge": 1e-14,
+      "aux_ridge": 1e-14
+    }
+  ]
+}
