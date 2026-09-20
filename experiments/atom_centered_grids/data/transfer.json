@@ -1,0 +1,1527 @@
+{
+  "meta": {
+    "experiment": "transfer",
+    "basis": "cc-pvdz",
+    "auxbasis": "cc-pvdz-ri",
+    "ridge": 1e-08,
+    "weights": "ones",
+    "elements": [
+      "C",
+      "H",
+      "N",
+      "O"
+    ],
+    "molecules": {
+      "water": {
+        "natm": 3,
+        "nao": 24,
+        "elements": [
+          "H",
+          "O"
+        ],
+        "mp2_ri_reference": -0.20473964484836304,
+        "bonds": [
+          {
+            "pair": "H-O",
+            "r": 0.965
+          },
+          {
+            "pair": "O-H",
+            "r": 0.965
+          }
+        ],
+        "residual": [
+          {
+            "atom": 0,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.013887467301774242,
+            "residual_parent": 5.481634216357892e-13
+          },
+          {
+            "atom": 1,
+            "element": "O",
+            "n_support": 127,
+            "n_parent": 858,
+            "residual": 0.01251352798511875,
+            "residual_parent": 3.1205547928573206e-13
+          },
+          {
+            "atom": 2,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.02025815347473322,
+            "residual_parent": 4.1822532339448366e-14
+          }
+        ]
+      },
+      "methanol": {
+        "natm": 6,
+        "nao": 48,
+        "elements": [
+          "C",
+          "H",
+          "O"
+        ],
+        "mp2_ri_reference": -0.3434019270939822,
+        "bonds": [
+          {
+            "pair": "C-O",
+            "r": 1.416
+          },
+          {
+            "pair": "C-H",
+            "r": 1.093
+          },
+          {
+            "pair": "C-H",
+            "r": 1.093
+          },
+          {
+            "pair": "C-H",
+            "r": 1.093
+          },
+          {
+            "pair": "O-H",
+            "r": 0.972
+          }
+        ],
+        "residual": [
+          {
+            "atom": 0,
+            "element": "C",
+            "n_support": 100,
+            "n_parent": 858,
+            "residual": 0.04650166907347751,
+            "residual_parent": 3.390479692802001e-12
+          },
+          {
+            "atom": 1,
+            "element": "O",
+            "n_support": 127,
+            "n_parent": 858,
+            "residual": 0.01964369850012774,
+            "residual_parent": 3.978551410425528e-10
+          },
+          {
+            "atom": 2,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.014873808469488062,
+            "residual_parent": 4.7032771483628824e-12
+          },
+          {
+            "atom": 3,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.015243638517362918,
+            "residual_parent": 5.637019072970699e-12
+          },
+          {
+            "atom": 4,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.014948539913389793,
+            "residual_parent": 1.7746346791430298e-12
+          },
+          {
+            "atom": 5,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.02248788761752849,
+            "residual_parent": 1.1140617207085252e-11
+          }
+        ]
+      },
+      "ethane": {
+        "natm": 8,
+        "nao": 58,
+        "elements": [
+          "C",
+          "H"
+        ],
+        "mp2_ri_reference": -0.3075587171251909,
+        "bonds": [
+          {
+            "pair": "C-C",
+            "r": 1.512
+          },
+          {
+            "pair": "C-H",
+            "r": 1.094
+          },
+          {
+            "pair": "C-H",
+            "r": 1.094
+          },
+          {
+            "pair": "C-H",
+            "r": 1.094
+          },
+          {
+            "pair": "C-H",
+            "r": 1.094
+          },
+          {
+            "pair": "C-H",
+            "r": 1.094
+          },
+          {
+            "pair": "C-H",
+            "r": 1.094
+          }
+        ],
+        "residual": [
+          {
+            "atom": 0,
+            "element": "C",
+            "n_support": 100,
+            "n_parent": 858,
+            "residual": 0.05104949190007152,
+            "residual_parent": 3.1295907240230943e-12
+          },
+          {
+            "atom": 1,
+            "element": "C",
+            "n_support": 100,
+            "n_parent": 858,
+            "residual": 0.05325217595723414,
+            "residual_parent": 3.1295982690573682e-12
+          },
+          {
+            "atom": 2,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.014097310207888973,
+            "residual_parent": 5.874043212428904e-13
+          },
+          {
+            "atom": 3,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.016364620537683536,
+            "residual_parent": 1.1307791533246552e-12
+          },
+          {
+            "atom": 4,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.016166402575754895,
+            "residual_parent": 1.7000790412884674e-12
+          },
+          {
+            "atom": 5,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.018149034279321272,
+            "residual_parent": 1.7000801640907592e-12
+          },
+          {
+            "atom": 6,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.017894211245770505,
+            "residual_parent": 5.878280623846669e-13
+          },
+          {
+            "atom": 7,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.012342761805619957,
+            "residual_parent": 1.1294169799592494e-12
+          }
+        ]
+      },
+      "ethene": {
+        "natm": 6,
+        "nao": 48,
+        "elements": [
+          "C",
+          "H"
+        ],
+        "mp2_ri_reference": -0.28004803926384103,
+        "bonds": [
+          {
+            "pair": "C-C",
+            "r": 1.336
+          },
+          {
+            "pair": "C-H",
+            "r": 1.085
+          },
+          {
+            "pair": "C-H",
+            "r": 1.085
+          },
+          {
+            "pair": "C-H",
+            "r": 1.085
+          },
+          {
+            "pair": "C-H",
+            "r": 1.085
+          }
+        ],
+        "residual": [
+          {
+            "atom": 0,
+            "element": "C",
+            "n_support": 100,
+            "n_parent": 858,
+            "residual": 0.04298917146600615,
+            "residual_parent": 1.1841694094592586e-10
+          },
+          {
+            "atom": 1,
+            "element": "C",
+            "n_support": 100,
+            "n_parent": 858,
+            "residual": 0.047246677602418845,
+            "residual_parent": 1.1841687443743607e-10
+          },
+          {
+            "atom": 2,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.013777868589163906,
+            "residual_parent": 1.8115425078335527e-12
+          },
+          {
+            "atom": 3,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.014571898967323365,
+            "residual_parent": 3.5275804052632525e-12
+          },
+          {
+            "atom": 4,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.010068165779774556,
+            "residual_parent": 3.5275687143151272e-12
+          },
+          {
+            "atom": 5,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.01631241538238182,
+            "residual_parent": 1.8114340099101033e-12
+          }
+        ]
+      },
+      "acetylene": {
+        "natm": 4,
+        "nao": 38,
+        "elements": [
+          "C",
+          "H"
+        ],
+        "mp2_ri_reference": -0.25984478955839607,
+        "bonds": [
+          {
+            "pair": "C-C",
+            "r": 1.2
+          },
+          {
+            "pair": "C-H",
+            "r": 1.066
+          },
+          {
+            "pair": "C-H",
+            "r": 1.066
+          }
+        ],
+        "residual": [
+          {
+            "atom": 0,
+            "element": "C",
+            "n_support": 100,
+            "n_parent": 858,
+            "residual": 0.028676993881024983,
+            "residual_parent": 2.6901469267723105e-10
+          },
+          {
+            "atom": 1,
+            "element": "C",
+            "n_support": 100,
+            "n_parent": 858,
+            "residual": 0.031046808368311314,
+            "residual_parent": 2.689760340963046e-10
+          },
+          {
+            "atom": 2,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.008680856514095246,
+            "residual_parent": 1.8485889612610457e-11
+          },
+          {
+            "atom": 3,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.008773914906220856,
+            "residual_parent": 1.848638286061949e-11
+          }
+        ]
+      },
+      "formaldehyde": {
+        "natm": 4,
+        "nao": 38,
+        "elements": [
+          "C",
+          "H",
+          "O"
+        ],
+        "mp2_ri_reference": -0.3234443843350591,
+        "bonds": [
+          {
+            "pair": "C-O",
+            "r": 1.225
+          },
+          {
+            "pair": "C-H",
+            "r": 1.102
+          },
+          {
+            "pair": "C-H",
+            "r": 1.102
+          }
+        ]
+      }
+    },
+    "thresholds": [
+      0.001,
+      0.0003,
+      0.0001,
+      3e-05,
+      1e-05,
+      1e-06
+    ],
+    "blocked_thresholds": [
+      0.001,
+      0.0001,
+      1e-05
+    ],
+    "ghost_shells": {
+      "C-H": [
+        0.9630000000000001,
+        1.1235000000000002,
+        1.5515
+      ],
+      "C-C": [
+        1.368,
+        1.596,
+        2.2039999999999997
+      ],
+      "C-O": [
+        1.278,
+        1.4909999999999999,
+        2.0589999999999997
+      ],
+      "H-H": [
+        0.558,
+        0.651,
+        0.899
+      ],
+      "H-O": [
+        0.873,
+        1.0185,
+        1.4064999999999999
+      ],
+      "N-O": [
+        1.233,
+        1.4385000000000001,
+        1.9865000000000002
+      ],
+      "O-O": [
+        1.1880000000000002,
+        1.3860000000000001,
+        1.914
+      ]
+    },
+    "fingerprints": {
+      "1e-03": {
+        "C": "8af372306cb1",
+        "H": "e7acfa9a8b2c",
+        "N": "6c237bdd6424",
+        "O": "f319e06a1871"
+      },
+      "3e-04": {
+        "C": "9206caa3316b",
+        "H": "8d6326d30304",
+        "N": "9c3b6f18e3e3",
+        "O": "677b91237891"
+      },
+      "1e-04": {
+        "C": "585777ad9031",
+        "H": "acdc86d2f66d",
+        "N": "bac8b3614ca8",
+        "O": "9d6ba0bd209c"
+      },
+      "3e-05": {
+        "C": "72436607957a",
+        "H": "e8889100476a",
+        "N": "d4ecb97502e5",
+        "O": "2d1e3ff45e6c"
+      },
+      "1e-05": {
+        "C": "eac07e148126",
+        "H": "73ad469cdb08",
+        "N": "a73c960b1c37",
+        "O": "98295ea7f790"
+      },
+      "1e-06": {
+        "C": "af375edc46d1",
+        "H": "1dba617f2ccf",
+        "N": "86ba6597f928",
+        "O": "0f390193062d"
+      }
+    },
+    "suite": [
+      {
+        "molecule": "water",
+        "probes": "O sp3",
+        "in_ghost_range": true
+      },
+      {
+        "molecule": "methanol",
+        "probes": "O sp3 + C sp3",
+        "in_ghost_range": true
+      },
+      {
+        "molecule": "ethane",
+        "probes": "C sp3, C-C 1.51",
+        "in_ghost_range": true
+      },
+      {
+        "molecule": "ethene",
+        "probes": "C sp2, C=C 1.34",
+        "in_ghost_range": false
+      },
+      {
+        "molecule": "acetylene",
+        "probes": "C sp,  C#C 1.20",
+        "in_ghost_range": false
+      },
+      {
+        "molecule": "formaldehyde",
+        "probes": "O sp2, C=O 1.22",
+        "in_ghost_range": false
+      },
+      {
+        "molecule": "methylamine",
+        "probes": "N sp3, C-N unseen",
+        "in_ghost_range": false
+      },
+      {
+        "molecule": "hcn",
+        "probes": "C sp + N, C#N 1.16",
+        "in_ghost_range": false
+      }
+    ],
+    "directions": "icosahedron",
+    "partners": [
+      "H",
+      "C",
+      "O"
+    ],
+    "scales": [
+      0.9,
+      1.05,
+      1.45
+    ],
+    "full_cross": false
+  },
+  "rows": [
+    {
+      "molecule": "water",
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 1648,
+      "natm": 3,
+      "rmsd_S": 0.00033761241005472015,
+      "e_corr": -0.20474025347139224,
+      "err_uha": -0.608623029196842,
+      "fit_seconds": 0.002064228057861328
+    },
+    {
+      "molecule": "water",
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 156,
+      "natm": 3,
+      "rmsd_S": 5.6304931369513715,
+      "e_corr": -0.20473984663409248,
+      "err_uha": -0.201785729431192,
+      "fit_seconds": 0.16251111030578613
+    },
+    {
+      "molecule": "water",
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 204,
+      "natm": 3,
+      "rmsd_S": 3.411325099090705,
+      "e_corr": -0.20474015523068237,
+      "err_uha": -0.5103823193242096,
+      "fit_seconds": 0.24758672714233398
+    },
+    {
+      "molecule": "water",
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 273,
+      "natm": 3,
+      "rmsd_S": 7.904425358492262,
+      "e_corr": -0.20474004909965526,
+      "err_uha": -0.4042512922186603,
+      "fit_seconds": 0.3650040626525879
+    },
+    {
+      "molecule": "water",
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 116,
+      "natm": 3,
+      "rmsd_S": 1.9355005972908925,
+      "e_corr": -0.20473790782145612,
+      "err_uha": 1.7370269069227895,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "H": 35,
+        "O": 46
+      },
+      "fingerprint": {
+        "H": "e7acfa9a8b2c",
+        "O": "f319e06a1871"
+      }
+    },
+    {
+      "molecule": "water",
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 208,
+      "natm": 3,
+      "rmsd_S": 1.3653115247511316,
+      "e_corr": -0.20473944752214218,
+      "err_uha": 0.19732622086321427,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "H": 69,
+        "O": 70
+      },
+      "fingerprint": {
+        "H": "8d6326d30304",
+        "O": "677b91237891"
+      }
+    },
+    {
+      "molecule": "water",
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 259,
+      "natm": 3,
+      "rmsd_S": 2.1341617607877565,
+      "e_corr": -0.20474030339912175,
+      "err_uha": -0.6585507587031358,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "H": 84,
+        "O": 91
+      },
+      "fingerprint": {
+        "H": "acdc86d2f66d",
+        "O": "9d6ba0bd209c"
+      }
+    },
+    {
+      "molecule": "water",
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 327,
+      "natm": 3,
+      "rmsd_S": 7.177354097379543,
+      "e_corr": -0.20473961380831202,
+      "err_uha": 0.03104005102949614,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "H": 100,
+        "O": 127
+      },
+      "fingerprint": {
+        "H": "e8889100476a",
+        "O": "2d1e3ff45e6c"
+      }
+    },
+    {
+      "molecule": "water",
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 361,
+      "natm": 3,
+      "rmsd_S": 2.253793867471162,
+      "e_corr": -0.20474027117719262,
+      "err_uha": -0.6263288295782488,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "H": 108,
+        "O": 145
+      },
+      "fingerprint": {
+        "H": "73ad469cdb08",
+        "O": "98295ea7f790"
+      }
+    },
+    {
+      "molecule": "water",
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 424,
+      "natm": 3,
+      "rmsd_S": 1.5908749245382265,
+      "e_corr": -0.2047400918059386,
+      "err_uha": -0.4469575755616795,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "H": 124,
+        "O": 176
+      },
+      "fingerprint": {
+        "H": "1dba617f2ccf",
+        "O": "0f390193062d"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 3288,
+      "natm": 6,
+      "rmsd_S": 0.00026867542665599576,
+      "e_corr": -0.3433991367230374,
+      "err_uha": 2.790370944805165,
+      "fit_seconds": 0.00397038459777832
+    },
+    {
+      "molecule": "methanol",
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 301,
+      "natm": 6,
+      "rmsd_S": 3.0482243279532213,
+      "e_corr": -0.3433855197487708,
+      "err_uha": 16.407345211411073,
+      "fit_seconds": 0.375277042388916
+    },
+    {
+      "molecule": "methanol",
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 491,
+      "natm": 6,
+      "rmsd_S": 2.8880234677863243,
+      "e_corr": -0.34339663331307124,
+      "err_uha": 5.29378091096433,
+      "fit_seconds": 0.9805383682250977
+    },
+    {
+      "molecule": "methanol",
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 670,
+      "natm": 6,
+      "rmsd_S": 3.673710658092599,
+      "e_corr": -0.3433977751353895,
+      "err_uha": 4.151958592713001,
+      "fit_seconds": 1.6860687732696533
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 223,
+      "natm": 6,
+      "rmsd_S": 1.5665919403707183,
+      "e_corr": -0.34312406150757957,
+      "err_uha": 277.86558640263695,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 37,
+        "H": 35,
+        "O": 46
+      },
+      "fingerprint": {
+        "C": "8af372306cb1",
+        "H": "e7acfa9a8b2c",
+        "O": "f319e06a1871"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 414,
+      "natm": 6,
+      "rmsd_S": 0.7290696413977303,
+      "e_corr": -0.34338214630081776,
+      "err_uha": 19.780793164447807,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 68,
+        "H": 69,
+        "O": 70
+      },
+      "fingerprint": {
+        "C": "9206caa3316b",
+        "H": "8d6326d30304",
+        "O": "677b91237891"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 512,
+      "natm": 6,
+      "rmsd_S": 0.7054513386793316,
+      "e_corr": -0.34337166870691604,
+      "err_uha": 30.25838706616213,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 85,
+        "H": 84,
+        "O": 91
+      },
+      "fingerprint": {
+        "C": "585777ad9031",
+        "H": "acdc86d2f66d",
+        "O": "9d6ba0bd209c"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 627,
+      "natm": 6,
+      "rmsd_S": 3.1018612784524326,
+      "e_corr": -0.34339307353356646,
+      "err_uha": 8.853560415744699,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 100,
+        "H": 100,
+        "O": 127
+      },
+      "fingerprint": {
+        "C": "72436607957a",
+        "H": "e8889100476a",
+        "O": "2d1e3ff45e6c"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 702,
+      "natm": 6,
+      "rmsd_S": 0.777728063330733,
+      "e_corr": -0.3433960735619196,
+      "err_uha": 5.853532062616296,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 125,
+        "H": 108,
+        "O": 145
+      },
+      "fingerprint": {
+        "C": "eac07e148126",
+        "H": "73ad469cdb08",
+        "O": "98295ea7f790"
+      }
+    },
+    {
+      "molecule": "methanol",
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 816,
+      "natm": 6,
+      "rmsd_S": 0.8875206418900841,
+      "e_corr": -0.34339625200045676,
+      "err_uha": 5.675093525447927,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 144,
+        "H": 124,
+        "O": 176
+      },
+      "fingerprint": {
+        "C": "af375edc46d1",
+        "H": "1dba617f2ccf",
+        "O": "0f390193062d"
+      }
+    },
+    {
+      "molecule": "ethane",
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 4072,
+      "natm": 8,
+      "rmsd_S": 0.00022056187870835505,
+      "e_corr": -0.3075527280314855,
+      "err_uha": 5.989093705416337,
+      "fit_seconds": 0.00537419319152832
+    },
+    {
+      "molecule": "ethane",
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 380,
+      "natm": 8,
+      "rmsd_S": 1.5293600720497789,
+      "e_corr": -0.3075388926911968,
+      "err_uha": 19.82443399412004,
+      "fit_seconds": 0.4568600654602051
+    },
+    {
+      "molecule": "ethane",
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 632,
+      "natm": 8,
+      "rmsd_S": 1.2174889439286365,
+      "e_corr": -0.30755204264668157,
+      "err_uha": 6.674478509327564,
+      "fit_seconds": 1.066298246383667
+    },
+    {
+      "molecule": "ethane",
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 876,
+      "natm": 8,
+      "rmsd_S": 1.6870946246338938,
+      "e_corr": -0.307552431763172,
+      "err_uha": 6.285362018909613,
+      "fit_seconds": 1.8652417659759521
+    },
+    {
+      "molecule": "ethane",
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 284,
+      "natm": 8,
+      "rmsd_S": 1.4365411165056907,
+      "e_corr": -0.30731011272532505,
+      "err_uha": 248.60439986584825,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 37,
+        "H": 35
+      },
+      "fingerprint": {
+        "C": "8af372306cb1",
+        "H": "e7acfa9a8b2c"
+      }
+    },
+    {
+      "molecule": "ethane",
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 550,
+      "natm": 8,
+      "rmsd_S": 0.3336359064092876,
+      "e_corr": -0.3075480987046171,
+      "err_uha": 10.61842057381579,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 68,
+        "H": 69
+      },
+      "fingerprint": {
+        "C": "9206caa3316b",
+        "H": "8d6326d30304"
+      }
+    },
+    {
+      "molecule": "ethane",
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 674,
+      "natm": 8,
+      "rmsd_S": 0.4513221409226046,
+      "e_corr": -0.30754956508044295,
+      "err_uha": 9.152044747939847,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 85,
+        "H": 84
+      },
+      "fingerprint": {
+        "C": "585777ad9031",
+        "H": "acdc86d2f66d"
+      }
+    },
+    {
+      "molecule": "ethane",
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 800,
+      "natm": 8,
+      "rmsd_S": 0.4702886629536963,
+      "e_corr": -0.30755149656183045,
+      "err_uha": 7.220563360443855,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 100,
+        "H": 100
+      },
+      "fingerprint": {
+        "C": "72436607957a",
+        "H": "e8889100476a"
+      }
+    },
+    {
+      "molecule": "ethane",
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 898,
+      "natm": 8,
+      "rmsd_S": 0.5056613795015804,
+      "e_corr": -0.3075520739261606,
+      "err_uha": 6.643199030320623,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 125,
+        "H": 108
+      },
+      "fingerprint": {
+        "C": "eac07e148126",
+        "H": "73ad469cdb08"
+      }
+    },
+    {
+      "molecule": "ethane",
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 1032,
+      "natm": 8,
+      "rmsd_S": 0.557633580670508,
+      "e_corr": -0.3075524870088685,
+      "err_uha": 6.230116322392121,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 144,
+        "H": 124
+      },
+      "fingerprint": {
+        "C": "af375edc46d1",
+        "H": "1dba617f2ccf"
+      }
+    },
+    {
+      "molecule": "ethene",
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 3288,
+      "natm": 6,
+      "rmsd_S": 0.0001968385301313319,
+      "e_corr": -0.28004390796172796,
+      "err_uha": 4.131302113075108,
+      "fit_seconds": 0.004015684127807617
+    },
+    {
+      "molecule": "ethene",
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 290,
+      "natm": 6,
+      "rmsd_S": 2.216477529256895,
+      "e_corr": -0.28002730784414204,
+      "err_uha": 20.731419698993836,
+      "fit_seconds": 0.4437251091003418
+    },
+    {
+      "molecule": "ethene",
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 478,
+      "natm": 6,
+      "rmsd_S": 1.150635580112545,
+      "e_corr": -0.28004314790060847,
+      "err_uha": 4.891363232562007,
+      "fit_seconds": 0.9761028289794922
+    },
+    {
+      "molecule": "ethene",
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 648,
+      "natm": 6,
+      "rmsd_S": 2.3208023632778114,
+      "e_corr": -0.28004318422156793,
+      "err_uha": 4.855042273099741,
+      "fit_seconds": 1.521576166152954
+    },
+    {
+      "molecule": "ethene",
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 214,
+      "natm": 6,
+      "rmsd_S": 1.7333777891557351,
+      "e_corr": -0.27961049277301736,
+      "err_uha": 437.54649082367035,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 37,
+        "H": 35
+      },
+      "fingerprint": {
+        "C": "8af372306cb1",
+        "H": "e7acfa9a8b2c"
+      }
+    },
+    {
+      "molecule": "ethene",
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 412,
+      "natm": 6,
+      "rmsd_S": 0.3556784110065217,
+      "e_corr": -0.28002832023456664,
+      "err_uha": 19.719029274389843,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 68,
+        "H": 69
+      },
+      "fingerprint": {
+        "C": "9206caa3316b",
+        "H": "8d6326d30304"
+      }
+    },
+    {
+      "molecule": "ethene",
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 506,
+      "natm": 6,
+      "rmsd_S": 0.4827534104410444,
+      "e_corr": -0.2800351932356529,
+      "err_uha": 12.8460281881293,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 85,
+        "H": 84
+      },
+      "fingerprint": {
+        "C": "585777ad9031",
+        "H": "acdc86d2f66d"
+      }
+    },
+    {
+      "molecule": "ethene",
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 600,
+      "natm": 6,
+      "rmsd_S": 0.4745958432275819,
+      "e_corr": -0.28004114548172704,
+      "err_uha": 6.893782113992497,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 100,
+        "H": 100
+      },
+      "fingerprint": {
+        "C": "72436607957a",
+        "H": "e8889100476a"
+      }
+    },
+    {
+      "molecule": "ethene",
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 682,
+      "natm": 6,
+      "rmsd_S": 0.5115270285953296,
+      "e_corr": -0.2800435573959368,
+      "err_uha": 4.481867904249093,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 125,
+        "H": 108
+      },
+      "fingerprint": {
+        "C": "eac07e148126",
+        "H": "73ad469cdb08"
+      }
+    },
+    {
+      "molecule": "ethene",
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 784,
+      "natm": 6,
+      "rmsd_S": 0.5669475018267172,
+      "e_corr": -0.2800437265053676,
+      "err_uha": 4.3127584734570235,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 144,
+        "H": 124
+      },
+      "fingerprint": {
+        "C": "af375edc46d1",
+        "H": "1dba617f2ccf"
+      }
+    },
+    {
+      "molecule": "acetylene",
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 2504,
+      "natm": 4,
+      "rmsd_S": 0.000148802122310881,
+      "e_corr": -0.2598551962056054,
+      "err_uha": -10.40664720930451,
+      "fit_seconds": 0.0032770633697509766
+    },
+    {
+      "molecule": "acetylene",
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 222,
+      "natm": 4,
+      "rmsd_S": 1.3463787061567611,
+      "e_corr": -0.25984915932651304,
+      "err_uha": -4.369768116962991,
+      "fit_seconds": 0.2938730716705322
+    },
+    {
+      "molecule": "acetylene",
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 332,
+      "natm": 4,
+      "rmsd_S": 0.9872262770227209,
+      "e_corr": -0.25985481974267854,
+      "err_uha": -10.030184282472376,
+      "fit_seconds": 0.5592806339263916
+    },
+    {
+      "molecule": "acetylene",
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 424,
+      "natm": 4,
+      "rmsd_S": 2.627362998436356,
+      "e_corr": -0.2598542164039078,
+      "err_uha": -9.42684551175077,
+      "fit_seconds": 0.8559460639953613
+    },
+    {
+      "molecule": "acetylene",
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 144,
+      "natm": 4,
+      "rmsd_S": 2.1876878310556367,
+      "e_corr": -0.2590102167002202,
+      "err_uha": 834.5728581758971,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 37,
+        "H": 35
+      },
+      "fingerprint": {
+        "C": "8af372306cb1",
+        "H": "e7acfa9a8b2c"
+      }
+    },
+    {
+      "molecule": "acetylene",
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 274,
+      "natm": 4,
+      "rmsd_S": 0.40838385249020126,
+      "e_corr": -0.2598389927173703,
+      "err_uha": 5.796841025751398,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 68,
+        "H": 69
+      },
+      "fingerprint": {
+        "C": "9206caa3316b",
+        "H": "8d6326d30304"
+      }
+    },
+    {
+      "molecule": "acetylene",
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 338,
+      "natm": 4,
+      "rmsd_S": 0.6102325354723945,
+      "e_corr": -0.25985349453626316,
+      "err_uha": -8.704977867091124,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 85,
+        "H": 84
+      },
+      "fingerprint": {
+        "C": "585777ad9031",
+        "H": "acdc86d2f66d"
+      }
+    },
+    {
+      "molecule": "acetylene",
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 400,
+      "natm": 4,
+      "rmsd_S": 0.5792324306647951,
+      "e_corr": -0.25985465236888683,
+      "err_uha": -9.862810490757212,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 100,
+        "H": 100
+      },
+      "fingerprint": {
+        "C": "72436607957a",
+        "H": "e8889100476a"
+      }
+    },
+    {
+      "molecule": "acetylene",
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 466,
+      "natm": 4,
+      "rmsd_S": 0.5809604175958297,
+      "e_corr": -0.2598543334551925,
+      "err_uha": -9.543896796415652,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 125,
+        "H": 108
+      },
+      "fingerprint": {
+        "C": "eac07e148126",
+        "H": "73ad469cdb08"
+      }
+    },
+    {
+      "molecule": "acetylene",
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 536,
+      "natm": 4,
+      "rmsd_S": 0.631226800434669,
+      "e_corr": -0.25985465344835723,
+      "err_uha": -9.863889961159167,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 144,
+        "H": 124
+      },
+      "fingerprint": {
+        "C": "af375edc46d1",
+        "H": "1dba617f2ccf"
+      }
+    },
+    {
+      "molecule": "formaldehyde",
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 2504,
+      "natm": 4,
+      "rmsd_S": 0.0001795142172089371,
+      "e_corr": -0.32345078848909403,
+      "err_uha": -6.404154034911347,
+      "fit_seconds": 0.0028319358825683594
+    },
+    {
+      "molecule": "formaldehyde",
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 219,
+      "natm": 4,
+      "rmsd_S": 1.423660699557307,
+      "e_corr": -0.32343717705433583,
+      "err_uha": 7.207280723287024,
+      "fit_seconds": 0.34628748893737793
+    },
+    {
+      "molecule": "formaldehyde",
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 328,
+      "natm": 4,
+      "rmsd_S": 2.241161242320733,
+      "e_corr": -0.3234490513594257,
+      "err_uha": -4.667024366578065,
+      "fit_seconds": 0.6305065155029297
+    },
+    {
+      "molecule": "formaldehyde",
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 458,
+      "natm": 4,
+      "rmsd_S": 4.535876366458026,
+      "e_corr": -0.32344864654039085,
+      "err_uha": -4.262205331728719,
+      "fit_seconds": 1.1426682472229004
+    },
+    {
+      "molecule": "formaldehyde",
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 153,
+      "natm": 4,
+      "rmsd_S": 1.9539869855057888,
+      "e_corr": -0.32296466083110675,
+      "err_uha": 479.7235039523673,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 37,
+        "H": 35,
+        "O": 46
+      },
+      "fingerprint": {
+        "C": "8af372306cb1",
+        "H": "e7acfa9a8b2c",
+        "O": "f319e06a1871"
+      }
+    },
+    {
+      "molecule": "formaldehyde",
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 276,
+      "natm": 4,
+      "rmsd_S": 0.8710080754673212,
+      "e_corr": -0.3234027684740268,
+      "err_uha": 41.61586103229587,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 68,
+        "H": 69,
+        "O": 70
+      },
+      "fingerprint": {
+        "C": "9206caa3316b",
+        "H": "8d6326d30304",
+        "O": "677b91237891"
+      }
+    },
+    {
+      "molecule": "formaldehyde",
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 344,
+      "natm": 4,
+      "rmsd_S": 0.8284139117075365,
+      "e_corr": -0.3234191707540659,
+      "err_uha": 25.213580993221907,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 85,
+        "H": 84,
+        "O": 91
+      },
+      "fingerprint": {
+        "C": "585777ad9031",
+        "H": "acdc86d2f66d",
+        "O": "9d6ba0bd209c"
+      }
+    },
+    {
+      "molecule": "formaldehyde",
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 427,
+      "natm": 4,
+      "rmsd_S": 3.8976701176613258,
+      "e_corr": -0.32344480261942543,
+      "err_uha": -0.4182843663103064,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 100,
+        "H": 100,
+        "O": 127
+      },
+      "fingerprint": {
+        "C": "72436607957a",
+        "H": "e8889100476a",
+        "O": "2d1e3ff45e6c"
+      }
+    },
+    {
+      "molecule": "formaldehyde",
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 486,
+      "natm": 4,
+      "rmsd_S": 0.8806455757244944,
+      "e_corr": -0.3234472283617169,
+      "err_uha": -2.844026657788934,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 125,
+        "H": 108,
+        "O": 145
+      },
+      "fingerprint": {
+        "C": "eac07e148126",
+        "H": "73ad469cdb08",
+        "O": "98295ea7f790"
+      }
+    },
+    {
+      "molecule": "formaldehyde",
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 568,
+      "natm": 4,
+      "rmsd_S": 1.020754247262718,
+      "e_corr": -0.323447831768961,
+      "err_uha": -3.447433901904162,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 144,
+        "H": 124,
+        "O": 176
+      },
+      "fingerprint": {
+        "C": "af375edc46d1",
+        "H": "1dba617f2ccf",
+        "O": "0f390193062d"
+      }
+    }
+  ]
+}
