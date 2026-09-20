@@ -326,6 +326,8 @@ def invert_metric_adjoint(S: np.ndarray, S_inv: np.ndarray, S_inv_bar: np.ndarra
     if scheme == "damped":
         return damped_inv_adjoint(S, S_inv_bar, ridge, ridge_scale)
 
+    # "ridge_eigh" is the same map as "ridge", computed differently, so it shares the
+    # adjoint: dB = -B dA B holds for the inverse however the inverse was obtained.
     return ridge_inv_adjoint(S, S_inv, S_inv_bar, ridge, ridge_scale)
 
 

@@ -167,8 +167,11 @@ def invert_metric(S: np.ndarray, ridge: Optional[float] = None,
 
     if scheme == "damped":
         return lib.damped_inv(S, ridge, scale=ridge_scale)
+    if scheme == "ridge_eigh":
+        return lib.ridge_inv_eigh(S, ridge, scale=ridge_scale)
     if scheme != "ridge":
-        raise ValueError(f"unknown metric scheme {scheme!r}, expected 'ridge' or 'damped'")
+        raise ValueError(f"unknown metric scheme {scheme!r}, expected 'ridge', "
+                         "'ridge_eigh' or 'damped'")
 
     return lib.ridge_inv(S, ridge, scale=ridge_scale)
 

@@ -175,6 +175,33 @@ def ridge_inv_sqrt(M: np.ndarray, lam: float = 1e-8, scale: str = "trace") -> np
     return (eig_vecs * inv_sqrt_vals) @ eig_vecs.T
 
 
+def ridge_inv_eigh(M: np.ndarray, lam: float = 1e-8, scale: str = "trace") -> np.ndarray:
+    """
+    ``(M + lambda I)^-1`` by eigendecomposition rather than by Cholesky.
+
+    Mathematically identical to :func:`ridge_inv` and numerically not: a Cholesky
+    factorisation of a matrix whose condition number runs to 1e11 and beyond loses
+    digits that a backward-stable symmetric eigensolver keeps. That matters here only as
+    a *control*. :func:`damped_inv` changes the filter **and** the algorithm at once, so
+    without this function any improvement it shows could be either, and the question of
+    whether the filter shape is what matters would stay open.
+
+    Not intended for production use - :func:`ridge_inv` is cheaper and, where the metric
+    is not pathological, indistinguishable.
+
+    :param M: Hermitian, positive semi-definite matrix. Not modified.
+    :param lam: Dimensionless regularisation strength; see :func:`ridge_shift`.
+    :param scale: How ``lam`` becomes an absolute shift; see :func:`ridge_shift`.
+    :return: The regularised inverse.
+    """
+    M = 0.5 * (M + M.T)
+    shift = ridge_shift(M, lam, scale)
+
+    eig_vals, eig_vecs = np.linalg.eigh(M)
+
+    return (eig_vecs / (eig_vals + shift)) @ eig_vecs.T
+
+
 def damped_inv(M: np.ndarray, lam: float = 1e-4, scale: str = "trace") -> np.ndarray:
     """
     Damped (Tikhonov-filtered) pseudoinverse ``M (M^2 + mu^2 I)^-1`` of a Hermitian
