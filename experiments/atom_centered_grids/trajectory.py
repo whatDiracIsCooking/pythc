@@ -396,6 +396,14 @@ def analyse(d, mode):
     time average over the rms of its instantaneous norm. 1 is a torque that never turns;
     0 is one that averages to nothing.
 
+    ``spin_up`` and ``tilt`` are the decomposition that turns out to matter. A leak
+    along ``L`` changes how fast the molecule spins, and energy conservation caps it: the
+    work the orientational potential can do is bounded by its own amplitude, which is the
+    section 7 rotation spread. A leak *perpendicular* to ``L`` does no work at leading
+    order, so nothing bounds it - it tilts the rotation axis instead, and accumulates.
+    The two are different failure modes and only the first would heat a trajectory, so a
+    bare ``|leak|`` conflates the one energy conservation forbids with the one it allows.
+
     ``rotation_deg`` is the self-consistency check on the first-order treatment - the
     angle the leaked ``L`` would have turned the molecule through by the end. While that
     stays small the orientation barely moved, so the torque this trajectory sampled is
@@ -429,6 +437,25 @@ def analyse(d, mode):
     out["coherence"] = (out["mean_torque_uha"] / out["rms_torque_uha"]
                         if out["rms_torque_uha"] else float("nan"))
 
+    # Split the leak along and across the angular momentum it is leaking into. With
+    # L(0) = 0 there is no axis to split about and the whole leak is a spin-up.
+    # Only meaningful when the molecule carries real rotation to decompose against; with
+    # L(0) = 0 projected out there is no axis, and the whole leak is a spin-up.
+    norm_L = np.linalg.norm(L, axis=1)
+    if not d["project_rotation"] and norm_L[-1] > 10 * nrm[-1]:
+        Lhat = L / np.maximum(norm_L, 1e-30)[:, None]
+        along = np.einsum("ti,ti->t", seen, Lhat)
+        across = np.linalg.norm(seen - along[:, None] * Lhat, axis=1)
+        out["spin_up"] = float(along[-1])
+        out["tilt"] = float(across[-1])
+        out["tilt_deg"] = float(np.degrees(np.arctan2(across[-1], norm_L[-1])))
+        out["L_scale"] = float(norm_L[-1])
+    else:
+        out["spin_up"] = float(nrm[-1])
+        out["tilt"] = 0.0
+        out["tilt_deg"] = 0.0
+        out["L_scale"] = 0.0
+
     if len(rows) > 10:
         fit = np.polyfit(t / 1000, nrm, 1)
         out["secular_slope_per_ps"] = float(fit[0])
@@ -458,8 +485,8 @@ def analyse(d, mode):
 def report(paths):
     print(f"{'molecule':9s} {'mode':8s} {'prop':5s} {'pts':>5s} {'ps':>5s} "
           f"{'L(0)=0':>7s} {'T/K':>6s} {'<tau>':>9s} {'rms tau':>9s} {'coh':>6s} "
-          f"{'leak end':>10s} {'leak max':>10s} {'per ps':>10s} {'end/max':>8s} "
-          f"{'spun/deg':>9s} {'E drift':>9s}")
+          f"{'leak end':>10s} {'spin up':>9s} {'tilt':>9s} {'tilt/deg':>9s} "
+          f"{'per ps':>10s} {'spun/deg':>9s} {'E drift':>9s}")
     extra = []
     for path in paths:
         d = json.load(open(path))
@@ -470,9 +497,8 @@ def report(paths):
                   f"{str(a['project_rotation']):>7s} {a['temperature']:6.0f} "
                   f"{a['mean_torque_uha']:9.2f} {a['rms_torque_uha']:9.2f} "
                   f"{a['coherence']:6.2f} {a['final_leak']:10.3e} "
-                  f"{a['max_leak']:10.3e} "
+                  f"{a['spin_up']:9.3f} {a['tilt']:9.3f} {a['tilt_deg']:9.2f} "
                   f"{a.get('secular_slope_per_ps', float('nan')):10.3e} "
-                  f"{a.get('end_over_max', float('nan')):8.2f} "
                   + (f"{a['spun_deg']:9.1f} " if a.get("feedback") == a["mode"]
                      else f"{a.get('rotation_deg', float('nan')):8.1f}* ")
                   + f"{a['energy_drift_uha']:9.1f}")
@@ -481,7 +507,9 @@ def report(paths):
 
     print("\nleak = int tau dt in hbar; torques in uHa/rad; E drift in uHa over the run.")
     print("coh = |<tau>| / rms|tau|: 1 is a torque that never turns, 0 one that averages")
-    print("away. end/max near 1 is a ramp, well below 1 an oscillation.")
+    print("away. spin up / tilt split the leak along and across L: only the first does")
+    print("work, so only the first is bounded by the orientational potential. tilt/deg is")
+    print("the angle the rotation axis has been pushed through.")
     print("spun/deg is how far the leak actually turned the molecule; a starred value is")
     print("the first-order estimate for a grid that was not fed back on, and that grid's")
     print("leak is only meaningful while it stays small.")
