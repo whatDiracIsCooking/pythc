@@ -243,16 +243,17 @@ def compute_ao_slices(mol, auxmol):
 def build_coulomb_matrix(mode: Mode, mol: gto.Mole, auxmol: gto.Mole, X, mo_coeff,
                          metric_ridge: Optional[float] = None,
                          aux_ridge: Optional[float] = None,
-                         ridge_scale: str = "trace"):
+                         ridge_scale: str = "trace",
+                         metric_scheme: str = "ridge"):
     active = ExperimentRun.get_active()
     n_occ = mol.nelectron // 2
     n_vir = mol.nao_nr() - n_occ
 
     S = build_S(mode, X, n_occ)
-    S_inv = invert_metric(S, metric_ridge, ridge_scale)
+    S_inv = invert_metric(S, metric_ridge, ridge_scale, metric_scheme)
     if active: active.checkpoint(METRIC_INVERSION)
 
-    j2c_inv = build_aux_coulomb_inv(auxmol, aux_ridge, ridge_scale)
+    j2c_inv = build_aux_coulomb_inv(auxmol, aux_ridge, ridge_scale, metric_scheme)
     E = contract_codensity_df_eri(mode, X, mo_coeff, mol, auxmol, j2c_inv, n_occ, n_vir)
 
     D = E @ S_inv

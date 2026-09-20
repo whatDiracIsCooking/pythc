@@ -116,7 +116,7 @@ def roughness(errors):
 
 
 def main(name, threshold, bond=None, half_width=0.06, step=0.002, lambdas=(1e-8, 1e-10, 1e-12),
-         refit=True, out_path=None):
+         damped_lambdas=(), refit=True, out_path=None):
     symbols, coords0 = parse_geometry(MOLECULES[name]())
     anchor, mover = bond if bond else default_bond(symbols, coords0)
     r0 = float(np.linalg.norm(coords0[mover] - coords0[anchor]))
@@ -131,6 +131,14 @@ def main(name, threshold, bond=None, half_width=0.06, step=0.002, lambdas=(1e-8,
     variants = [('pinv (default)', {})]
     variants += [(f'ridge {lam:.0e}', dict(metric_ridge=lam, aux_ridge=lam))
                  for lam in lambdas]
+    # The damped filter is analytic in S like the ridge, so it should be just as free of
+    # steps - but it approaches the truncation as lambda falls, and the truncation is
+    # what put the steps there. That it stays smooth where it is numerically closest to
+    # pinv is the thing this has to show; without it, window.py's noise result would
+    # have bought a quiet gradient at the cost of the surface it is a gradient of.
+    variants += [(f'damped {lam:.0e}',
+                  dict(metric_ridge=lam, aux_ridge=lam, metric_scheme='damped'))
+                 for lam in damped_lambdas]
 
     print(f"== {name}  {symbols[anchor]}{anchor}-{symbols[mover]}{mover} bond, "
           f"{r0:.4f} +- {half_width:.3f} A in {len(lengths)} steps of {step:.4f} A",
@@ -204,10 +212,13 @@ if __name__ == '__main__':
     p.add_argument('--half-width', type=float, default=0.06, help='scan half range in Angstrom')
     p.add_argument('--step', type=float, default=0.002, help='scan step in Angstrom')
     p.add_argument('--lambdas', default='1e-8,1e-10,1e-12')
+    p.add_argument('--damped-lambdas', default='',
+                   help='same ladder under the damped pseudoinverse; see lib.damped_inv')
     p.add_argument('--no-refit', action='store_true', help='skip the re-selected-grid control')
     p.add_argument('--out')
     a = p.parse_args()
     main(a.molecule, a.threshold,
          tuple(int(x) for x in a.bond.split(',')) if a.bond else None,
          a.half_width, a.step, [float(x) for x in a.lambdas.split(',') if x],
+         [float(x) for x in a.damped_lambdas.split(',') if x],
          not a.no_refit, a.out)

@@ -249,6 +249,54 @@ def main(name, threshold, mode, ridges, schemes, n_laplace, n_perm, seed, fd_h, 
     return result
 
 
+def report(paths, tol):
+    """
+    The window, reduced to the one number that decides whether a gradient is affordable.
+
+    A lambda is *usable* if the permutation noise in the gradient is below `tol` -
+    relabelling points cannot change a gradient by more than that, so anything above it
+    is a gradient whose digits are not real. Among the usable lambdas, the best is the
+    one whose energy is closest to the truncation's. That pair - the smallest usable
+    lambda and what it costs - is the whole trade, and it is what a scheme has to be
+    compared on.
+    """
+    print(f"usable = permutation noise in the gradient below {tol:.0e} of |grad|\n")
+    print(f"{'system':28s} {'points':>7s} {'null':>6s} {'scheme':>11s} "
+          f"{'best lam':>9s} {'|dE| vs pinv':>13s} {'noise':>9s} {'net torque':>11s}")
+
+    for path in paths:
+        with open(path) as fh:
+            d = json.load(fh)
+
+        label = f"{d['molecule']} {d['mode']} {d['threshold']:.0e}"
+        n_null = d["spectrum"]["n_null"]["1e-14"]
+        pinv = [r for r in d["rows"] if r["scheme"] == "pinv"]
+        schemes = []
+        for r in d["rows"]:
+            if r["scheme"] != "pinv" and r["scheme"] not in schemes:
+                schemes.append(r["scheme"])
+
+        if pinv:
+            r = pinv[0]
+            print(f"{label:28s} {d['rows'][0]['n_points']:7d} {n_null:6d} "
+                  f"{'pinv':>11s} {'-':>9s} {'(reference)':>13s} "
+                  f"{r['noise_grad']:9.1e} {1e6 * r['net_torque']:11.3f}")
+
+        for scheme in schemes:
+            usable = [r for r in d["rows"]
+                      if r["scheme"] == scheme and r["noise_grad"] < tol]
+            if not usable:
+                print(f"{label:28s} {'':7s} {'':6s} {scheme:>11s} "
+                      f"{'none':>9s} {'-':>13s}")
+                continue
+
+            best = min(usable, key=lambda r: abs(r["d_energy_vs_pinv"]))
+            print(f"{label:28s} {'':7s} {'':6s} {scheme:>11s} "
+                  f"{best['ridge']:9.0e} {1e6 * abs(best['d_energy_vs_pinv']):12.2f}u "
+                  f"{best['noise_grad']:9.1e} {1e6 * best['net_torque']:11.3f}")
+        print()
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     p.add_argument("molecule", nargs="?", default="water", choices=sorted(MOLECULES))
@@ -264,7 +312,14 @@ if __name__ == "__main__":
                    help="also run a one-atom finite difference at this step, in Bohr")
     p.add_argument("--fd-atom", type=int, default=0)
     p.add_argument("--out")
+    p.add_argument("--report", nargs="+", help="summarise finished runs instead")
+    p.add_argument("--tol", type=float, default=1e-6,
+                   help="permutation noise below which a gradient counts as usable")
     a = p.parse_args()
+
+    if a.report:
+        report(a.report, a.tol)
+        sys.exit(0)
 
     main(a.molecule, a.threshold, a.mode,
          [float(r) for r in a.ridges.split(",") if r.strip()],
