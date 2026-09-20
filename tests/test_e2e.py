@@ -16,6 +16,7 @@ from pythc.thc.ls_snri_cholesky import LS_snRI_Cholesky
 from pythc.thc.ls_ri_cholesky import LS_RI_Cholesky
 from pythc.thc.ls_ri_becke import LS_RI_Becke
 from pythc.thc.ls_ri_kmeans import LS_RI_KMeans
+from pythc.thc.ls_ri_nnls import LS_RI_NNLS
 from pythc.thc.ls_ri_qrcp import LS_RI_QRCP
 
 DIET_GMTKN_55_150_MOLS = [r for r in parse_yaml_to_reactions('tests/DietGMTKN55/GoodSamples/AllElements_150.yaml')
@@ -68,6 +69,7 @@ class TestEriApprox(unittest.TestCase):
         'LS-RI-QRCP': (LS_RI_QRCP, {'tolerance': 1e-4}, 1),
         'LS-RI-KMeans': (LS_RI_KMeans, {'ips_per_naux': 6}, 1),
         'LS-RI-Cholesky': (LS_RI_Cholesky, {'cholesky_threshold': 1e-5}, 1),
+        'LS-RI-NNLS': (LS_RI_NNLS, {'weight_threshold': 1e-4}, 1),
         'LS-snRI-Cholesky': (LS_snRI_Cholesky, {'cholesky_threshold': 1e-5}, 1),
         'LS-Aux-Becke': (LS_Aux_Becke, {'fit_auxbasis': 'cc-pv5z'}, 5),
     }
@@ -77,6 +79,7 @@ class TestEriApprox(unittest.TestCase):
         'LS-RI-QRCP': (LS_RI_QRCP, {'tolerance': 1e-6}, 1),
         'LS-RI-KMeans': (LS_RI_KMeans, {'ips_per_naux': 5.5}, 1),
         'LS-RI-Cholesky': (LS_RI_Cholesky, {'cholesky_threshold': 1e-8}, 1),
+        'LS-RI-NNLS': (LS_RI_NNLS, {'weight_threshold': 1e-6}, 1),
         'LS-snRI-Cholesky': (LS_snRI_Cholesky, {'cholesky_threshold': 1e-8}, 1),
         'LS-Aux-Becke': (LS_Aux_Becke, {'fit_auxbasis': 'etb-1.1'}, 5),
     }

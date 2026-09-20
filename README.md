@@ -113,6 +113,44 @@ thc_eri = thc_builder.build(mode='ao')
 Supported modes are `ao` for the AO-ERI $(\mu \nu|\lambda \sigma)$ and `ov` for the occupied-virtual block if the MO-ERI $(i j|a b)$.
 The THC representation **must** be built in `mode='ao'` for the HF-SCF calculation.
 
+### Grid reweighting and pruning
+
+The accuracy and cost of LS-THC are largely set by the quadrature grid. `NNLSGrid` refits the grid weights
+so that numerical integration on the grid reproduces the AO overlap matrix, subject to $w_P \ge 0$
+([Hillers-Bendtsen, Lu, Martínez 2026](https://doi.org/10.1021/acs.jctc.6c00664)). The non-negativity
+constraint leaves most weights at exactly zero, so the fit prunes the grid as a side effect, while the
+surviving weights remain a valid quadrature rule.
+
+It is an ordinary grid builder, so it drops into any THC class in place of `BeckeGrid`:
+
+```python
+from pythc.grid import BeckeGrid, NNLSGrid
+
+grid_builder = NNLSGrid(mol, parent=BeckeGrid(mol), weight_threshold=1e-4)
+thc_builder = LS_RI_Becke(mol=mol, grid=grid_builder, auxbasis='cc-pvdz-ri')
+```
+
+`weight_threshold` trades accuracy against compactness: looser values terminate the fit earlier and
+retain fewer points. For water in cc-pVDZ, the default of `1e-4` keeps 124 of the 1648 points of the
+level 0 Becke grid, and `1e-6` keeps 186 while reproducing the overlap matrix *better* than the full
+input grid — something a pure point-selection scheme such as the pivoted Cholesky pruning in
+`LS_RI_Cholesky` cannot do, since it keeps the tabulated weights.
+
+`LS_RI_NNLS` is the same thing packaged as a THC class, taking the *input* grid as its `grid` argument:
+
+```python
+from pythc.thc.ls_ri_nnls import LS_RI_NNLS
+
+thc_builder = LS_RI_NNLS(mol=mol, auxbasis='cc-pvdz-ri', weight_threshold=1e-4)
+```
+
+The cost of the fit grows steeply with the number of points it retains: water in cc-pVDZ takes about a
+second, alanine in cc-pVDZ (119 basis functions) takes ~20 s at a loose threshold and considerably
+longer at a tight one. Past roughly a hundred basis functions, pass `blocked=True` to fit each atomic
+sub-grid separately, which keeps the cost linear in the number of atoms (alanine at `1e-4`: 1289 points
+in 28 s, giving an MP2 correlation energy within 9 µHa of the RI reference). Blocking is an extension
+beyond the reference and is approximate — verify it against the global fit for your system.
+
 Once the THC ERI is built, we can retrieve the $X_\mu^P$ and $Z^{P Q}$ matrices using:
 
 ```python
