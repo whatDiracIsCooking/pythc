@@ -158,6 +158,56 @@
             "pair": "C-N",
             "r": 1.16
           }
+        ],
+        "residual": [
+          {
+            "atom": 0,
+            "element": "C",
+            "n_support": 100,
+            "n_parent": 858,
+            "residual": 0.055983355201527786,
+            "residual_parent": 6.4751513156368945e-12
+          },
+          {
+            "atom": 1,
+            "element": "C",
+            "n_support": 100,
+            "n_parent": 858,
+            "residual": 0.04166089581663149,
+            "residual_parent": 1.5401085643093098e-10
+          },
+          {
+            "atom": 2,
+            "element": "N",
+            "n_support": 117,
+            "n_parent": 858,
+            "residual": 0.019385778021770515,
+            "residual_parent": 1.6998125719497667e-09
+          },
+          {
+            "atom": 3,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.012807760772168962,
+            "residual_parent": 2.6060184239170026e-12
+          },
+          {
+            "atom": 4,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.019000437411296686,
+            "residual_parent": 4.96071730031798e-12
+          },
+          {
+            "atom": 5,
+            "element": "H",
+            "n_support": 100,
+            "n_parent": 392,
+            "residual": 0.01812618462382428,
+            "residual_parent": 1.1473728321321897e-11
+          }
         ]
       }
     },
@@ -426,6 +476,165 @@
       "e_corr": -0.43150919045947267,
       "err_uha": -18.260059929220418,
       "fit_seconds": 0.004523038864135742
+    },
+    {
+      "molecule": "acetonitrile",
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 369,
+      "natm": 6,
+      "rmsd_S": 2.8230982077187226,
+      "e_corr": -0.4315105525031757,
+      "err_uha": -19.622103632266352,
+      "fit_seconds": 0.7947297096252441
+    },
+    {
+      "molecule": "acetonitrile",
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 542,
+      "natm": 6,
+      "rmsd_S": 2.3952667731221102,
+      "e_corr": -0.431505578048495,
+      "err_uha": -14.647648951537917,
+      "fit_seconds": 2.019109010696411
+    },
+    {
+      "molecule": "acetonitrile",
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 768,
+      "natm": 6,
+      "rmsd_S": 2.8123469015845557,
+      "e_corr": -0.4315069429124079,
+      "err_uha": -16.012512864427286,
+      "fit_seconds": 2.955840587615967
+    },
+    {
+      "molecule": "acetonitrile",
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 223,
+      "natm": 6,
+      "rmsd_S": 1.6681491930231198,
+      "e_corr": -0.4275822434939014,
+      "err_uha": 3908.686905642056,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 37,
+        "H": 35,
+        "N": 44
+      },
+      "fingerprint": {
+        "C": "8af372306cb1",
+        "H": "e7acfa9a8b2c",
+        "N": "6c237bdd6424"
+      }
+    },
+    {
+      "molecule": "acetonitrile",
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 412,
+      "natm": 6,
+      "rmsd_S": 0.5293978582916736,
+      "e_corr": -0.4312724006344858,
+      "err_uha": 218.52976505765122,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 68,
+        "H": 69,
+        "N": 69
+      },
+      "fingerprint": {
+        "C": "9206caa3316b",
+        "H": "8d6326d30304",
+        "N": "9c3b6f18e3e3"
+      }
+    },
+    {
+      "molecule": "acetonitrile",
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 506,
+      "natm": 6,
+      "rmsd_S": 1.0175397437489746,
+      "e_corr": -0.4314935294693092,
+      "err_uha": -2.599069765740758,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 85,
+        "H": 84,
+        "N": 84
+      },
+      "fingerprint": {
+        "C": "585777ad9031",
+        "H": "acdc86d2f66d",
+        "N": "bac8b3614ca8"
+      }
+    },
+    {
+      "molecule": "acetonitrile",
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 617,
+      "natm": 6,
+      "rmsd_S": 1.0319053527910937,
+      "e_corr": -0.43150489981024975,
+      "err_uha": -13.969410706304863,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 100,
+        "H": 100,
+        "N": 117
+      },
+      "fingerprint": {
+        "C": "72436607957a",
+        "H": "e8889100476a",
+        "N": "d4ecb97502e5"
+      }
+    },
+    {
+      "molecule": "acetonitrile",
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 704,
+      "natm": 6,
+      "rmsd_S": 0.7176966621717947,
+      "e_corr": -0.43149340574831885,
+      "err_uha": -2.475348775399233,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 125,
+        "H": 108,
+        "N": 130
+      },
+      "fingerprint": {
+        "C": "eac07e148126",
+        "H": "73ad469cdb08",
+        "N": "a73c960b1c37"
+      }
+    },
+    {
+      "molecule": "acetonitrile",
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 819,
+      "natm": 6,
+      "rmsd_S": 2.0300811068847673,
+      "e_corr": -0.4315054018256227,
+      "err_uha": -14.471426079243344,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 144,
+        "H": 124,
+        "N": 159
+      },
+      "fingerprint": {
+        "C": "af375edc46d1",
+        "H": "1dba617f2ccf",
+        "N": "86ba6597f928"
+      }
     }
   ]
 }
