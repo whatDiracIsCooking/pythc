@@ -125,7 +125,8 @@ def contract_codensity_full_eri(self, X, mo_coeff):
 
 
 def invert_metric(S: np.ndarray, ridge: Optional[float] = None,
-                  ridge_scale: str = "trace") -> np.ndarray:
+                  ridge_scale: str = "trace",
+                  scheme: str = "ridge") -> np.ndarray:
     """
     Invert the LS-THC metric ``S_PQ = (X X^T) o (X X^T)``.
 
@@ -164,11 +165,20 @@ def invert_metric(S: np.ndarray, ridge: Optional[float] = None,
     if ridge is None:
         return lib.pinv(S)
 
+    if scheme == "damped":
+        return lib.damped_inv(S, ridge, scale=ridge_scale)
+    if scheme == "ridge_eigh":
+        return lib.ridge_inv_eigh(S, ridge, scale=ridge_scale)
+    if scheme != "ridge":
+        raise ValueError(f"unknown metric scheme {scheme!r}, expected 'ridge', "
+                         "'ridge_eigh' or 'damped'")
+
     return lib.ridge_inv(S, ridge, scale=ridge_scale)
 
 
 def build_aux_coulomb_inv(auxmol, ridge: Optional[float] = None,
-                          ridge_scale: str = "trace"):
+                          ridge_scale: str = "trace",
+                          scheme: str = "ridge"):
     """
     The auxiliary Coulomb metric ``J^{-1/2}``.
 
@@ -182,6 +192,8 @@ def build_aux_coulomb_inv(auxmol, ridge: Optional[float] = None,
     j2c = auxmol.intor('int2c2e', aosym='s1')
     if ridge is None:
         j2c_cholesky = lib.pseudo_inv_sqrt(j2c)
+    elif scheme == "damped":
+        j2c_cholesky = lib.damped_inv_sqrt(j2c, ridge, scale=ridge_scale)
     else:
         j2c_cholesky = lib.ridge_inv_sqrt(j2c, ridge, scale=ridge_scale)
 
@@ -231,16 +243,17 @@ def compute_ao_slices(mol, auxmol):
 def build_coulomb_matrix(mode: Mode, mol: gto.Mole, auxmol: gto.Mole, X, mo_coeff,
                          metric_ridge: Optional[float] = None,
                          aux_ridge: Optional[float] = None,
-                         ridge_scale: str = "trace"):
+                         ridge_scale: str = "trace",
+                         metric_scheme: str = "ridge"):
     active = ExperimentRun.get_active()
     n_occ = mol.nelectron // 2
     n_vir = mol.nao_nr() - n_occ
 
     S = build_S(mode, X, n_occ)
-    S_inv = invert_metric(S, metric_ridge, ridge_scale)
+    S_inv = invert_metric(S, metric_ridge, ridge_scale, metric_scheme)
     if active: active.checkpoint(METRIC_INVERSION)
 
-    j2c_inv = build_aux_coulomb_inv(auxmol, aux_ridge, ridge_scale)
+    j2c_inv = build_aux_coulomb_inv(auxmol, aux_ridge, ridge_scale, metric_scheme)
     E = contract_codensity_df_eri(mode, X, mo_coeff, mol, auxmol, j2c_inv, n_occ, n_vir)
 
     D = E @ S_inv

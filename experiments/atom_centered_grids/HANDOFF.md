@@ -12,8 +12,10 @@ alive) to select a point set per element, **discard the fitted weights and keep 
 points**, build a molecule's grid as the union of its atoms' point sets, and - given
 sections 4(1) and 4(5), both now done - get analytic nuclear gradients and a smooth PES
 for free. The gradient is no longer a promise: it is implemented in `pythc.grad` and
-agrees with a finite difference to machine precision, subject to a ridge window three
-decades tighter than the one 4(1) recommends for energies.
+agrees with a finite difference to machine precision. The ridge window that 4(5) had
+to live inside turned out to be a property of the ridge rather than of the metric, and
+4(6) removes it: with the damped pseudoinverse the gradient is clean at microhartree
+accuracy on a surface smoother than the ridge's.
 
 Fit a THC grid once per element, offline, and translate it rigidly into any molecule - the
 acCD move (atomic Cholesky decomposition: do the pivoted selection once per element
@@ -41,7 +43,7 @@ in-range against 1.50x out-of-range. The transferable grid transfers.**
 
 ## 2. What was attempted
 
-Ten experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke
+Eleven experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke
 parent grid, `ov` mode, 10 Laplace points, against DF-MP2. Geometries from RDKit ETKDG +
 MMFF.
 
@@ -58,6 +60,7 @@ MMFF.
 | `ensemble.py` | does the *choice* of ghost ensemble change that? | **1.35x on methanol, 1.05x on ethanol** - it amortises; but each ensemble has a hard **rank ceiling** |
 | `transfer.py` | does one element's grid serve bonding it was never fitted in? | **yes.** 1.49x in-range vs **1.50x** out-of-range; an unseen partner element costs nothing, and adding one makes things worse |
 | `gradient.py` | can the gradient be computed, and does it match the curve? | **yes, to machine precision** - but only for `lambda` in `1e-2..1e-5`; at 4(1)'s `1e-8` it varies 2x between runs. Net torque 188 uHa/rad blocked, **5592 ghost** |
+| `window.py` | what sets that floor, and is the torque a property of the grid? | **the filter's shape, not the metric's rank.** The damped inverse buys 3-5 decades of `lambda` and <5 uHa. The torques were mostly the regulariser: **water's are 0.001/0.002 at `pinv`**, and the ghost:blocked ratio is 4.5x, not 30x |
 
 The key methodological move: `NNLSGrid(blocked=True)` already fits each atomic sub-grid
 independently, so the penalty for giving up molecular pruning is measurable today. Because
@@ -123,7 +126,9 @@ strength 4(1) recommends is three decades too small for a gradient to mean anyth
 the orientation dependence 4(2) deflated has a torque attached to it that is now measured
 rather than argued about. See 4(5) and FINDINGS section 11.
 
-**Nothing is left that can kill the idea.** What remains is the orbital-response layer -
+**Nothing is left that can kill the idea.** 4(6) has since removed the one thing 4(5)
+left looking awkward - the `lambda` window - and cut the orientation problem down with
+it. What remains is the orbital-response layer -
 standard DF-MP2 machinery, and the only thing between this and a total gradient - plus
 the open questions in section 5, of which the selector question is now the one with the
 most leverage.
@@ -362,7 +367,11 @@ What it settled, and what it did not:
   collocation term, since under a uniform shift its two halves are equal and opposite and
   an error in either cannot cancel. The energy reproduces `LS_RI_Becke` + `LaplaceRMP2`
   to 1.2e-11.
-* **Section 4(1)'s `lambda = 1e-8` is far too small for a gradient, and this is the
+* **[SUPERSEDED by 4(6).** The floor below is real for the *ridge* and was correctly
+  measured, but it is a property of that filter rather than of the metric: the damped
+  pseudoinverse puts the usable window three to five decades lower at microhartree cost.
+  Do not carry the `1e-2..1e-5` recommendation forward without reading 4(6).**]**
+  **Section 4(1)'s `lambda = 1e-8` is far too small for a gradient, and this is the
   result to carry forward.** At that value the energy is reproducible to 0.002 uHa and
   the gradient varies by a **factor of two** between runs of the identical calculation,
   because 61 of water's 156 metric directions sit below 1e-14 of the top eigenvalue and
@@ -376,7 +385,12 @@ What it settled, and what it did not:
   the grid is frozen - is 1.4%. The rest is derivative integrals. That is the reassuring
   direction: a frozen grid is not injecting large spurious forces, which is what you would
   expect given that `Z` is fitted to reproduce DF ERIs that do not depend on the grid at all.
-* **The torque is now a number, and it does not say what the spread said.** Section 4(2)
+* **[SUPERSEDED by 4(6).** These numbers are measured at `lambda = 1e-4` and are
+  dominated by the regulariser, not the grid. Against a `pinv` control the same two
+  water grids give **0.001 and 0.002 uHa/rad** - water is rank-saturated, so its torque
+  was always going to be zero, which is exactly why 4(3) and 4(4) refuse to quote it.
+  The ghost:blocked ratio on a molecule that does not saturate is **4.5x, not 30x**.**]**
+  **The torque is now a number, and it does not say what the spread said.** Section 4(2)
   measured orientation dependence as an energy spread and could only argue about the
   lab-frame-versus-molecular-frame choice. `dE/dtheta` is exactly computable - rotating a
   point set about its own nucleus leaves the molecule, the AOs and the SCF untouched, so
@@ -404,6 +418,62 @@ Left undone: the orbital response, which would also turn the rotational identity
 `sum_A a_A x dE/dR_A + sum_A tau_A = 0` into a second free test (it currently fails by
 4.7e-4 relative, which *is* the omitted term). Everything above is water, one geometry,
 cc-pVDZ; the ridge window in particular is read off a single system.
+
+**(6) Fix the ridge window. DONE** - `lib.damped_inv`, driven by `window.py`, written up
+in FINDINGS section 12. 4(5) left the gradient working but standing somewhere
+uncomfortable: usable only for `lambda >= 1e-5`, costing 23 uHa on water and up to 1808
+elsewhere. That is now fixed, and fixing it overturned 4(5)'s other result as well.
+
+* **The floor was the filter's shape, not the metric's rank.** `(S + lambda I)^-1` gives
+  an eigenvalue `sigma` the gain `1/(sigma + mu)`, which *rises* to `1/mu` as `sigma`
+  falls - the null directions get the largest gain in the whole operator, and `Z = D^T D`
+  carries `S^-1` twice. Measured, the gradient's permutation noise grows as `lambda^-1.9`:
+  essentially `1/lambda^2`, which is what that mechanism predicts and what nothing else
+  would.
+* **The fix is one spectral function.** `damped_inv` applies `sigma/(sigma^2 + mu^2)`:
+  analytic in `S` like the ridge, with no cutoff for an eigenvalue to cross, but sending
+  the null directions to zero like the truncation. Same peak gain `1/(2 mu)`, so `lambda`
+  means the same thing on both ladders. Usable `lambda` drops three to five decades and
+  the accuracy it costs goes from **166-1808 uHa to under 5** across five grids. Select it
+  with `metric_scheme="damped"` on `ThcFactorisation`, `thc_mp2_gradient` or `LS_RI_THC`;
+  the default is unchanged.
+* **`ridge_inv_eigh` is why that conclusion is allowed.** `damped_inv` changes the filter
+  *and* the algorithm (`eigh` against `ridge_inv`'s Cholesky), and those differ by 7.8e-8
+  at `lambda = 1e-8` on a metric like this. The spectral ridge tracks the Cholesky ridge
+  to within a factor of two at every `lambda` on both molecules. Do not re-litigate this
+  as a linear-algebra quality question; it is the filter.
+* **The permutation probe is the instrument to reuse.** Relabelling an atom's points is an
+  exact symmetry of the energy, the gradient and the torque, so anything that moves under
+  it is noise. It is deterministic, needs no multi-process comparison, and says *how much*
+  noise rather than only that there is some.
+* **It stays smooth, which was the thing that could have gone wrong.** The damped filter
+  approaches the truncation as `lambda` falls, and the truncation is what 4(1) removed the
+  steps with. `scan.py --damped-lambdas` says damped at `1e-10` is the *smoothest* curve
+  in the table - `max|d2| = 0.013` against `pinv`'s 0.511 - at a `lambda` where the
+  ridge's gradient is 81% noise.
+* **4(5)'s torques were mostly the regulariser, and this is the conclusion to carry
+  forward.** Both schemes reduce to `pinv` as `lambda` falls, so `pinv` is the control
+  4(5) could not reach. Water's 188 and 5592 uHa/rad become **0.001 and 0.002**. Water is
+  rank-saturated - co-density rank 95 against 156 and 208 points - so its torque was
+  always going to be zero, and 4(3) and 4(4) both say in terms not to quote water. On
+  methanol, which does not saturate, the ghost:blocked ratio is **4.5x rather than 30x**,
+  and the leak on the real transferable object is **3.1e-3 bohr/rad** against 4(5)'s
+  1.35e-1. **A torque is not a property of a grid; quote it with the regularisation that
+  produced it.**
+* **The accuracy tax was never the problem.** The ridge's 280 uHa penalty on methanol
+  varies by 2.28 uHa along a bond scan - a constant offset, invisible to a trajectory -
+  and every scheme, including the bare frozen grid, biases the O-H force constant by under
+  1.7 cm^-1. The case against the ridge is the gradient noise and nothing else.
+
+Left undone: `damped_inv` costs a full eigendecomposition where `ridge_inv` costs a
+Cholesky, ~3x on that step, and no cheaper iteration to the same filter was tried - the
+obvious one being to solve the `Z` fit as a least-squares problem directly rather than
+forming `S^-1` twice, which was the second escape 4(5) listed and would reach this filter
+by construction. The ghost grids' torque does not converge to `pinv` the way the blocked
+ones do, because `pinv` and a small-`mu` damped filter are genuinely different operators
+in the limit, so a ghost grid's torque has a value per inversion rather than a value.
+Everything is cc-pVDZ, `ov`, MP2, fixed-orbital, one geometry and one orientation per
+grid. And nothing integrates a trajectory.
 
 ## 5. Open questions
 
@@ -454,6 +524,16 @@ cc-pVDZ; the ridge window in particular is read off a single system.
   metric in the set. `ridge.py` sets `mf.conv_tol = 1e-12`; `sweep.py` and `ghosts.py` do
   not. Noticed, not diagnosed - and it is exactly the kind of thing that matters more for
   a gradient (5) than for an energy.
+* ~~**What is the right `lambda` for gradient work?**~~ **Answered - `window.py`,
+  FINDINGS section 12.** Not by tuning `lambda` but by changing the filter. The third
+  escape listed below - a better-conditioned treatment of the near-null directions - is
+  the one that worked, in the cheapest available form: keep the overlap target, keep the
+  grid, and replace `(S + lambda I)^-1` with `S (S^2 + mu^2 I)^-1`. Usable `lambda` drops
+  from `1e-4` to `1e-8..1e-10` and the cost from 166-1808 uHa to under 5, on a PES
+  smoother than the ridge's. The first escape (projecting the null space out) is now
+  moot; the second (solving the fit as least squares directly) would be a cheaper route
+  to the same filter and is still worth doing. **Superseded question below, kept for the
+  record:**
 * **What is the right `lambda` for gradient work, and is `1e-5` really the best available?**
   Section 4(5) brackets it at `1e-2..1e-5` on water: below that the null space is inverted
   into noise and the gradient moves by a factor of two between runs; above it the ridge
@@ -573,6 +653,13 @@ uv run python experiments/atom_centered_grids/transfer.py --report transfer*.jso
 uv run python experiments/atom_centered_grids/gradient.py water --out gradient_water.json
 uv run python experiments/atom_centered_grids/gradient.py water --mode ghost \
     --threshold 3e-4 --out gradient_water_ghost.json
+uv run python experiments/atom_centered_grids/window.py water --mode blocked \
+    --threshold 1e-3 --schemes ridge,ridge_eigh,damped --out data/window_water_blocked.json
+uv run python experiments/atom_centered_grids/window.py methanol --mode ghost \
+    --threshold 3e-4 --perms 2 --out data/window_methanol_ghost.json
+uv run python experiments/atom_centered_grids/window.py --report data/window_*.json
+uv run python experiments/atom_centered_grids/scan.py methanol 1e-3 --no-refit \
+    --lambdas 1e-8 --damped-lambdas 1e-8,1e-10 --out data/scan_methanol_damped.json
 uv run pytest tests/test_thc_gradient.py
 ```
 
@@ -624,6 +711,15 @@ that moves the metric's null directions by more than the ridge shift measures
 nonlinearity rather than a derivative, so `--steps` and `--ridges` are not independent
 knobs; and the torque must be finite-differenced about each atom's *own* torque axis,
 since a fixed lab axis nearly orthogonal to it returns noise.
+
+`window.py` runs `(1 + n_schemes * n_lambdas) * (1 + n_perms)` analytic gradients and no
+finite difference, so it is minutes on water, ~2 min on methanol and ~10 min on ethanol at
+`--perms 2`. Two things to know before running it. The `pinv` control row is not optional:
+both regularised schemes converge to it as `lambda` falls, and without it a torque
+measured at one `lambda` cannot be distinguished from the regulariser's own orientation
+dependence - which is exactly the trap 4(5) fell into. And a molecule below ~40 AOs
+saturates the co-density rank, which drives the true torque to zero, so water is a
+verification system here and not a measurement; read methanol or ethanol for the numbers.
 
 `ghosts.py` fits each element in seconds - the offline stage is genuinely cheap, and
 independent of the molecule - so its cost is all in the single points: 16 of them on the
