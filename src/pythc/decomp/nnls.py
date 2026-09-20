@@ -25,6 +25,11 @@ Two details drive the implementation:
 :class:`GroupOperator` additionally ties the weights of a group of points together, so
 that the same solver selects whole symmetry orbits of the grid instead of individual
 points. See :func:`~pythc.grid.octahedral_orbits` for what the groups are and why.
+
+:class:`StackedOperator` goes the other way and ties several *fits* together, so that
+one support has to serve a point set in more than one environment at once. That is what
+an offline, per-element grid needs: the element is fitted against a range of ghost
+neighbours simultaneously rather than in any one of them.
 """
 
 import logging
@@ -410,3 +415,100 @@ def lawson_hanson(op: NNLSOperator | np.ndarray,
                 f"residual {float(np.linalg.norm(r)):.3e}")
 
     return w
+
+
+class StackedOperator(NNLSOperator):
+    """
+    Stacks several fitting matrices that share a common set of variables, so that one
+    NNLS solve satisfies all of them at once.
+
+    Given operators ``A^(1) .. A^(K)`` with the same number of columns, this is the
+    operator
+
+        A = [ c_1 A^(1) ; c_2 A^(2) ; ... ; c_K A^(K) ]
+
+    whose least-squares problem against the correspondingly stacked right-hand side is
+    the sum of the individual residuals. The solution is therefore a single weight
+    vector - and, because the solver leaves most of it at zero, a single **support** -
+    that serves every block.
+
+    The grid application is offline per-element fitting (see
+    ``experiments/atom_centered_grids/ghosts.py``): the columns are the points of one
+    element's atomic grid, and each block is that element's overlap fit in a different
+    ghost environment - a different neighbour, at a different distance, in a different
+    direction. A point that only matters when a bond points along ``+z`` has a nonzero
+    gradient in the block that puts a ghost there, and so survives a fit that a single
+    environment would have pruned it out of.
+
+    The blocks do not have to agree on their row count or even on what their rows mean;
+    they only have to agree on the columns. That is what lets each environment screen
+    its own AO set and carry its own neighbour basis.
+
+    :param scales: Per-block multipliers ``c_k`` applied to both the block and its share
+        of the right-hand side, so the fitted quantity is unchanged and only its weight
+        in the objective moves. Rescaling matters here because the blocks are not
+        commensurate: an environment with a larger neighbour basis has both more rows
+        and a larger target norm, and so would otherwise dominate the fit for reasons
+        that have nothing to do with the physics. See :func:`stack_targets`.
+    """
+
+    def __init__(self, blocks: list[NNLSOperator | np.ndarray], scales: np.ndarray = None):
+        if not blocks:
+            raise ValueError("need at least one block to stack")
+
+        blocks = [DenseOperator(b) if isinstance(b, np.ndarray) else b for b in blocks]
+        n = blocks[0].shape[1]
+        for k, b in enumerate(blocks):
+            if b.shape[1] != n:
+                raise ValueError(f"block {k} has {b.shape[1]} columns, but block 0 has "
+                                 f"{n}; stacked blocks must share their variables")
+
+        self.blocks = blocks
+        self.scales = (np.ones(len(blocks)) if scales is None
+                       else np.asarray(scales, dtype=float))
+        if self.scales.shape != (len(blocks),):
+            raise ValueError(f"expected one scale per block, got {self.scales.shape} "
+                             f"for {len(blocks)} blocks")
+
+        self.offsets = np.cumsum([0] + [b.shape[0] for b in blocks])
+        self.n_var = n
+
+    @property
+    def shape(self):
+        return int(self.offsets[-1]), self.n_var
+
+    def column(self, j):
+        return np.concatenate([c * b.column(j) for c, b in zip(self.scales, self.blocks)])
+
+    def gradient(self, r):
+        # A^T r splits over the blocks: each sees only its own slice of the residual.
+        g = np.zeros(self.n_var)
+        for k, (c, b) in enumerate(zip(self.scales, self.blocks)):
+            g += c * b.gradient(r[self.offsets[k]:self.offsets[k + 1]])
+        return g
+
+
+def stack_targets(targets: list[np.ndarray], normalise: bool = True):
+    """
+    Assemble the right-hand side of a :class:`StackedOperator` and the block scales that
+    go with it.
+
+    With ``normalise`` the blocks are put on an equal footing: each is scaled to unit
+    target norm and then by ``1/sqrt(K)``, so the stacked right-hand side is a unit
+    vector however many blocks there are and whatever their sizes. The objective is then
+    the mean *relative* residual over the environments, which is the sense in which a
+    ghost-augmented fit should treat them equally.
+
+    Be aware that this rescales the KKT gradient too, so a ``weight_threshold`` for a
+    normalised stack is not on the same scale as one for a single unnormalised overlap
+    fit; ladders have to be calibrated per mode.
+
+    :return: ``(b, scales)`` for :func:`lawson_hanson` and :class:`StackedOperator`.
+    """
+    if normalise:
+        norms = np.array([max(float(np.linalg.norm(t)), 1e-300) for t in targets])
+        scales = 1.0 / (norms * np.sqrt(len(targets)))
+    else:
+        scales = np.ones(len(targets))
+
+    return np.concatenate([c * t for c, t in zip(scales, targets)]), scales

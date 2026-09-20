@@ -24,7 +24,9 @@ pay, because the blocked fit gets two advantages a frozen scheme never will:
   over-provisioning for bond directions that turn out not to exist;
 * it prunes **point-wise**, so it pays no isotropy tax.
 
-It can therefore kill the idea cheaply, but cannot confirm it.
+It can therefore kill the idea cheaply, but cannot confirm it. **§8 supplies the
+confirmation**: ghost-augmented per-element grids are now built and measured, and they
+cost 1.1-1.8x over `blocked` on top of `blocked`'s 1.2-1.7x over `global`.
 
 ## Setup
 
@@ -396,42 +398,255 @@ ghost-augmented per-element fit sees an artificial environment and may be anisot
 ways a real-neighbour `blocked` fit is not; that is the case where exact `O_h` invariance
 could still earn its points, and it is untested.
 
+## 8. The ghost gap: ghosts work, free atoms cannot
+
+`ghosts.py`. This is the experiment the whole programme was pointed at. Every number
+before this one bounds a scheme that still sees the molecule: `blocked` fits each atom
+separately, but it fits it *in situ*, against that atom's real neighbours at their real
+positions. A transferable grid never sees them. It is fitted once per element, offline,
+against a guess at what a neighbour looks like, and then attached to every atom of that
+element in every molecule. §1 priced giving up molecular pruning. This prices giving up
+the molecule.
+
+Three point sets per element, all selected by the same NNLS solver on the same level-0
+atomic grid, all evaluated with `w = 1` (§3) and `metric_ridge = 1e-8` (§6) so that the
+only difference between them is *where the points came from*:
+
+* **blocked** - fitted in the molecule, per atom. The lower bound. Not transferable.
+* **free** - fitted on the isolated atom. The strawman the design discussion predicted
+  would fail.
+* **ghost** - fitted against ghost atoms (neighbour basis functions, no nuclear charge)
+  at 12 icosahedral directions, cycling through partners H/C/O at 0.90, 1.05 and 1.45
+  times the covalent bond length, plus the free atom itself: 13 environments stacked
+  into **one** NNLS solve over the shared atomic grid
+  (`decomp.nnls.StackedOperator`). The proposal.
+
+Methanol, parent-grid floor `+2.68` uHa; ethanol, floor `+5.96` uHa:
+
+| mode | methanol pts | err/uHa | ethanol pts | err/uHa |
+| --- | --- | --- | --- | --- |
+| free | 105 | +7659.85 | 157 | +14904.79 |
+| free | 141 | +1623.51 | 208 | +3436.43 |
+| free | 170 | +386.35 | 255 | +1016.41 |
+| free | 200 | +155.79 | 299 | +340.52 |
+| ghost | 223 | +277.87 | 330 | +767.30 |
+| ghost | 414 | +19.78 | 620 | +119.26 |
+| ghost | 512 | +30.26 | 765 | +61.50 |
+| ghost | 627 | **+8.85** | 927 | +16.80 |
+| ghost | 702 | **+5.85** | 1043 | **+10.68** |
+| ghost | 816 | **+5.67** | 1208 | +10.97 |
+| blocked | 301 | +16.41 | 477 | +66.71 |
+| blocked | 491 | +5.29 | 765 | +14.85 |
+| blocked | 670 | +4.15 | 1090 | +9.14 |
+
+`analyse.py`, interpolating each curve to a fixed distance above its floor:
+
+| target | methanol blocked | methanol ghost | ethanol blocked | ethanol ghost |
+| --- | --- | --- | --- | --- |
+| 50 uHa | 301 | 326 (**1.08x**) | 500 | 775 (**1.55x**) |
+| 20 uHa | 301 | 400 (**1.33x**) | 627 | 863 (**1.38x**) |
+| 10 uHa | 330 | 587 (**1.78x**) | 743 | 938 (**1.26x**) |
+| 5 uHa | 405 | 650 (**1.60x**) | 933 | 1035 (**1.11x**) |
+
+`free` reaches no row of that table on either molecule: it never gets within 50 uHa of
+the floor at all.
+
+### The ghost gap is 1.1-1.8x, and it shrinks as the molecule grows
+
+That is the headline, and it is the same shape as §1's result one level down. Ethanol's
+ratios are *lower* than methanol's and fall as the target tightens - 1.55x at 50 uHa to
+1.11x at 5 uHa - which is the opposite of what a scheme that is fundamentally missing
+information would do. Whatever the ghost fit gets wrong is a fixed per-atom overhead,
+not a defect that compounds.
+
+Compounding it with §1 gives the number the programme actually has to pay. Against a
+single *global* molecular fit, a frozen per-element grid costs
+
+* methanol: 1.51x (blocked/global) x 1.78x (ghost/blocked) = **2.7x** at 10 uHa,
+  1.47 x 1.60 = **2.4x** at 5 uHa;
+* ethanol: 1.39 x 1.26 = **1.8x** at 10 uHa, 1.44 x 1.11 = **1.6x** at 5 uHa.
+
+So **1.6-2.7x on points, 2.6-7.3x on the `n_P^2` parts**, improving with system size.
+That lands back inside the design discussion's original "2-3x, i.e. 4-9x" estimate,
+which §1 had deflated to 1.2-1.7x - and §1's deflation should not be quoted on its own
+any more. It priced one of the two things a transferable grid gives up.
+
+### Free atoms fail for a reason nobody anticipated: the target runs out of rank
+
+The design discussion predicted the free-atom fit would fail *geometrically* - an
+isolated atom has no amplitude where a bond would be, so NNLS discards exactly the tail
+points a bond needs. It does fail, comprehensively: at 200 points methanol is still
+156 uHa from its floor where `ghost` is at 8.85 uHa on 627.
+
+But the binding mechanism is not placement, it is **information**. An NNLS solve can
+retain at most `min(n_equations, n_variables)` points, and the isolated atom's target
+supplies only `n_AO (n_AO + 1) / 2` equations - the unique entries of its own overlap
+matrix. In cc-pVDZ that is **15 for hydrogen** and 105 for carbon or oxygen. Driving
+the threshold to `1e-12` confirms it exactly:
+
+| element | AOs | pair equations | free atom keeps | ghost keeps | grid |
+| --- | --- | --- | --- | --- | --- |
+| H | 5 | **15** | **15** (hard cap) | 132 | 392 |
+| C | 14 | 105 | 92 | 155 | 858 |
+| O | 14 | 105 | 92 | 199 | 858 |
+
+Hydrogen sits exactly on its rank bound: **no threshold, no solver and no amount of
+patience can give a free-atom fit more than 15 points per hydrogen in this basis.**
+Methanol's free-atom grid therefore cannot exceed `4 x 15 + 92 + 92 = 244` points however
+it is tuned. Built at exactly that ceiling it lands at **+69.79 uHa**, 67 uHa above the
+floor, and there is nowhere further to go: 244 points is not a threshold choice, it is
+the end of the ladder. Carbon and oxygen converge before their bound rather than on it,
+but the bound is what makes the failure structural rather than a matter of tuning.
+
+Ghosts fix this on both counts at once, and the rank one is the important one. Each
+environment contributes its own AO-pair equations - `O` with a ghost carbon has 28 AOs
+and 406 pairs, not 105 - and thirteen of them stacked give the solver roughly 3500
+equations to work with instead of 105. The point set can then be as large as the grid
+supports, and the extra points land where the ghosts put amplitude, which is where the
+bonds are.
+
+This is worth stating plainly because it changes what "fit an element offline" means.
+The offline target is not a property of the element; it is a property of the element
+*plus an environment*, and without an environment it is not merely biased, it is rank
+deficient. A ghost is not a correction to the free-atom fit. It is what makes the fit
+well posed.
+
+### Orientation: worse per point, identical per uHa
+
+§7 closed with one case it could not test - a grid trained against ghosts in twelve
+chosen directions has a reason to be anisotropic that a real-neighbour `blocked` fit does
+not, and that is exactly where exact `O_h` invariance might still have earned its points.
+`ghosts.py --rotate` tests it, spinning each atom's frozen point set about its own
+nucleus. All rows are methanol at `w = 1` and `metric_ridge = 1e-8`, so `blocked` is
+re-measured here rather than read across from §7, which used NNLS weights under the
+truncated pseudoinverse. Floor `+2.86` uHa, 4 random `SO(3)` draws per grid:
+
+| mode | points | err/uHa | ptp/uHa |
+| --- | --- | --- | --- |
+| free | 244 (**its ceiling**) | +69.79 | 34.40 |
+| ghost | 414 | +19.78 | 27.08 |
+| ghost | 627 | +8.85 | 4.20 |
+| ghost | 882 | +5.14 | **0.94** |
+| blocked | 301 | +16.41 | 11.67 |
+| blocked | 491 | +5.29 | **0.91** |
+| blocked | 670 | +4.15 | 0.33 |
+
+**At matched point count the ghost grid is 2-5x more orientation-dependent**: 627 points
+spin by 4.20 uHa where 670 blocked points spin by 0.33. So the worry was well founded.
+
+**At matched accuracy the difference vanishes entirely.** Ghost at 882 points sits at
++5.14 uHa with a 0.94 uHa spread; blocked at 491 points sits at +5.29 uHa with a 0.91 uHa
+spread. Same energy, same spread, 1.80x the points - which is just §8's point-count tax,
+paid once, with nothing extra owed on the orientation axis.
+
+That is §7's thesis holding in the case §7 could not reach. Orientation dependence tracks
+how rank-limited the grid is and nothing else; a ghost-fitted grid is further from
+converged at a given size, so it is more anisotropic at a given size, and the fix is the
+same fix - more points - rather than a structural one. **Orbit grouping does not get a
+second chance here.** It would buy exact invariance under 24 of the rotations at 1.2-1.6x
+the points (§7), where simply converging the grid buys the same spread under all of them
+for point count that is already being spent.
+
+The free-atom row is worth reading alongside. Driven to its hard rank ceiling of 244
+points it still sits 67 uHa above the floor and spins by 34 uHa, which is the anisotropy
+the design discussion predicted - an atom fitted with no neighbours really has no reason
+to keep points where the bonds are. It is real. It is just not what stops the free-atom
+scheme working, because the scheme runs out of equations first.
+
+### The supports do not agree, and that is fine
+
+The cheap SCF-free diagnostic in `ghosts.py` asks how much of the in-molecule `blocked`
+selection the offline one reproduces. Not much: on ethanol at a comparable size the
+ghost set contains 24-31% of what `blocked` picks for C and O and 47-64% for H. Yet it
+matches `blocked`'s accuracy for 1.1-1.5x the points.
+
+The two fits are not converging on the same answer and there is no reason they should.
+§2 and §3 already established that what LS-THC wants is a point set that *spans the
+co-density manifold*, not any particular set of quadrature nodes, and §5 that the
+overlap RMSD - the thing both fits nominally minimise - is close to orthogonal to THC
+accuracy. Support agreement is the same kind of diagnostic: it measures whether two
+grids are the same grid, which is not the question. Only the point count at matched
+energy is.
+
 ---
 
 ## Verdict
 
-The kill shot missed. The structural penalty for giving up molecular pruning is 1.2-1.7x,
-not 3x, and it shrinks as molecules grow. More importantly, §3 removes most of the
-difficulty from the gradient side of the proposal: freeze the point set, drop the weights,
-and the nuclear derivative is elementary. §6 and §7 have since disposed of the two
-remaining structural objections, in opposite ways: the metric truncation's steps were
-real and are now fixable with ridge, while the missing orientation turned out not to
-need a structural fix at all - it converges away with grid size.
+**Every objection that could have killed this has now been measured, and none of them
+did.** The proposed object exists: §8 builds genuine offline per-element point sets, fits
+them against nothing but ghosts, translates them rigidly into methanol and ethanol, and
+they land 1.1-1.8x off the in-molecule `blocked` grids at matched accuracy. Compounded
+with §1, a frozen per-element grid costs **1.6-2.7x** the points of a single global
+molecular fit, improving with system size - about `2.6-7.3x` on the `n_P^2` parts. That
+is a real tax and it is affordable.
+
+The two results that most changed the shape of the programme were both unanticipated.
+§3: the fitted weights are almost irrelevant, so the offline object is a *point set*, the
+whole active-set/reparametrisation apparatus disappears, and `X = phi(r_P)` has nothing
+to differentiate. §8: the free-atom fit does not merely place points badly, it runs out
+of **rank** - an isolated hydrogen's overlap matrix supplies 15 equations in cc-pVDZ and
+so can never yield more than 15 points, at any threshold. A ghost is not a correction to
+the free-atom fit; it is what makes the fit well posed.
+
+The remaining structural objections went the other two ways. §6: the metric truncation's
+PES steps were real, and ridge at `lambda = 1e-8` removes them. §7: the missing
+orientation needed no structural fix at all - it converges away with grid size, and
+whole-orbit pruning is not the way to buy it.
 
 What remains to be measured, in order:
 
-1. **The ghost gap.** §1 bounds a scheme that sees real neighbours. Build ghost-augmented
-   per-element grids for H/C/N/O and measure how much worse than `blocked` they are. This
-   is the only remaining question that can still kill the idea.
-2. ~~**The isotropy tax.**~~ **Done - see §7, and the answer is no.** Whole-orbit fitting
-   makes each atomic grid exactly invariant under the octahedral group, for 1.2-1.6x the
-   points. It never reduces the spread under *general* rotations: at matched point count
-   a point-wise grid is better on both accuracy and spread. §4's anisotropy converges
-   away with grid size in either mode. Keep it opt-in; revisit only for (1), where a
-   ghost-fitted grid may be anisotropic in a way a real-neighbour fit is not.
-3. ~~**Ridge vs truncation.**~~ **Done - see §6.** The truncation does put ~0.5 uHa steps
+1. ~~**The ghost gap.**~~ **Done - see §8, and the answer is yes.** 1.1-1.8x over
+   `blocked`, shrinking with system size; free-atom fits fail structurally.
+2. **Transferability.** Now the leading question. §8 fits each element against one fixed
+   ghost ensemble and never checks whether a *different* ensemble would give a materially
+   different support, nor whether one ensemble serves O in water, methanol and
+   formaldehyde equally. The 24-31% support agreement between the ghost and `blocked`
+   fits (§8) says the fit has a lot of freedom in which points it picks, which cuts both
+   ways: it may mean the choice hardly matters, or it may mean the answer is unstable.
+3. **A gradient.** Nothing in this directory computes one. Every smoothness claim here is
+   a finite-difference statement about the energy curve; none of them tests an
+   implementation. §8's grids are the first ones a gradient would actually be run on.
+4. ~~**The isotropy tax.**~~ **Done - see §7 and §8.** Whole-orbit fitting makes each
+   atomic grid exactly invariant under the octahedral group for 1.2-1.6x the points, and
+   never reduces the spread under *general* rotations. §7 flagged one case as untested -
+   ghost-fitted grids, which have a reason to be anisotropic that a real-neighbour fit
+   does not - and §8 tested it: they *are* more orientation-dependent than `blocked` at
+   matched size, but it still converges away with grid size rather than needing a
+   structural fix. Keep orbit grouping opt-in.
+5. ~~**Ridge vs truncation.**~~ **Done - see §6.** The truncation does put ~0.5 uHa steps
    in the PES, exactly at the eigenvalue crossings; ridge at `lambda = 1e-8` removes them
    for 0.1-2.2 uHa. Ridge has a floor of its own, and smoothness finds it before accuracy
    does.
-4. **Transferability.** Fit the same element in several environments and compare the
-   retained point sets. If they differ a lot, per-element grids need an environment
-   ensemble rather than a single ghost geometry.
 
 ## Caveats
 
 cc-pVDZ only; four small molecules; MMFF geometries; `ov` mode and MP2 only. The rank and
-weight analyses are on methanol and ethanol. Ghost-augmented per-element grids, the object
-the proposal actually calls for, have not been built.
+weight analyses are on methanol and ethanol.
+
+§8 rests on two molecules. Water was run and is not quoted for the ratio: at 24 AOs its
+co-density manifold saturates at ~95 points, so every grid in the comparison is
+rank-saturated and all three modes reach the floor - the ratios there are artefacts of
+where each ladder happens to start, not measurements. The ghost ensemble (12 icosahedral
+directions, partners H/C/O at 0.90/1.05/1.45 bond lengths, cycled one combination per
+direction) was chosen once and never varied; `--full-cross` and `--directions octahedron`
+exist to test that choice and were not run. N was never fitted, so the ghost grids cover
+H/C/O only, and no molecule outside the fitting set was tried - which is the whole of
+what transferability means and is why it is now the leading open question. The
+orientation rows are 4 random draws per grid, a coarser statistic than §7's 5-6, and the
+matched-accuracy comparison is matched to 0.15 uHa in energy but not in point count.
+
+`blocked` appears in §8 with `w = 1` under ridge and in §1 and §7 with NNLS weights under
+the truncated pseudoinverse, and the two do not give identical numbers - ethanol's
+477-point blocked grid is +66.71 uHa here against a curve that reached 50 uHa at 477
+points there. §3 predicts exactly this: the weights matter only where their dynamic range
+was buying numerical rank. Ratios should be read within a table, not across them.
+
+The parent-grid floor for methanol came out `+2.68` uHa in one run of `ghosts.py` and
+`+2.86` uHa in another differing only in its threshold list. 0.18 uHa is immaterial
+against the 5-50 uHa targets it anchors, but it is not nothing, and §6's ridge floor is
+the obvious suspect on a 3288-point parent grid whose metric is maximally redundant.
+`ridge.py` sets `mf.conv_tol = 1e-12` for related reasons; `sweep.py` and `ghosts.py` do
+not. This was noticed, not diagnosed.
 
 §7 covers two molecules over eight and four grid sizes, with 6 and 5 random rotations
 each; a peak-to-peak over so few draws is a coarse statistic, and the matched-size rows
