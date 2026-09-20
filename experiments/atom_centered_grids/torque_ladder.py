@@ -161,7 +161,10 @@ def metric_diagnostics(mol, mf, per_atom, ridge, n_laplace):
 
     eig = np.linalg.eigvalsh(0.5 * (fac.S + fac.S.T))
     top = float(eig[-1])
-    shift = float(ridge_shift(0.5 * (fac.S + fac.S.T), ridge, "trace"))
+    # ``ridge is None`` is the pinv control: nothing is added to the metric, and the
+    # directions it drops are the ones below ``pinv``'s own relative cutoff.
+    shift = (0.0 if ridge is None
+             else float(ridge_shift(0.5 * (fac.S + fac.S.T), ridge, "trace")))
 
     # eig[0] runs slightly negative on a rank-deficient metric, so a condition number is
     # meaningless here; min_eig / max_eig says the same thing without dividing by it.
@@ -214,8 +217,16 @@ def measure(mol, mf, per_atom, ridge, n_laplace, draws, seed, scheme="ridge"):
     return row
 
 
+def dump(path, name, mol, ref, n_laplace, draws, seed, scheme, rows):
+    """Snapshot the ladder so far."""
+    with open(path, "w") as fh:
+        json.dump(dict(molecule=name, n_ao=int(mol.nao_nr()), natm=mol.natm, basis=BASIS,
+                       auxbasis=AUXBASIS, mp2_ri_reference=ref, n_laplace=n_laplace,
+                       draws=draws, seed=seed, scheme=scheme, rows=rows), fh, indent=2)
+
+
 def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent,
-         out_path, scheme="ridge"):
+         out_path, scheme="ridge", with_pinv=False):
     mol = gto.M(atom=MOLECULES[name](), basis=BASIS, verbose=0)
     mf = scf.RHF(mol).density_fit(auxbasis=AUXBASIS)
     mf.verbose = 0
@@ -225,13 +236,20 @@ def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent,
 
     print(f"== {name}: {mol.natm} atoms, {mol.nao_nr()} AOs, DF-MP2 ref {ref:.8f}")
     print(f"   modes {', '.join(modes)}; {draws} random per-atom orientations per grid; "
-          f"{scheme} lambdas {', '.join(f'{r:.0e}' for r in ridges)}")
+          f"{scheme} lambdas {', '.join(f'{r:.0e}' for r in ridges)}"
+          + ("; plus a pinv control row per rung" if with_pinv else ""))
     print("   weight footing: blocked/ghostw/parent carry fitted weights, "
           "blocked1/ghost/parent1 are w = 1", flush=True)
 
     rungs = [(m, t) for m in modes for t in thresholds.get(m, (None,))]
     if with_parent:
         rungs.extend([("parent", None), ("parent1", None)])
+
+    # Section 4(6): both regularised schemes reduce to the truncated pseudoinverse as
+    # lambda falls, so pinv is the torque they should converge on, and a ladder without
+    # it cannot say whether a trend belongs to the grid or to the filter. window.py
+    # carries this control for one grid per mode; here it runs on every rung.
+    ladder = ([None] if with_pinv else []) + list(ridges)
 
     support_cache, rows = {}, []
     for mode, threshold in rungs:
@@ -246,28 +264,34 @@ def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent,
               f"{'net tau':>11s} {'rms tau':>10s} {'tau/|grad|':>12s} "
               f"{'rms draw tau':>13s} {'spread/uHa':>11s} {'below ridge':>12s}")
 
-        for ridge in ridges:
+        for ridge in ladder:
             t1 = time.time()
+            row_scheme = "pinv" if ridge is None else scheme
             row = measure(mol, mf, per_atom, ridge, n_laplace, draws, seed, scheme)
             row.update(metric_diagnostics(mol, mf, per_atom, ridge, n_laplace))
-            row.update(mode=mode, threshold=threshold, n_points=n_points, scheme=scheme,
+            row.update(mode=mode, threshold=threshold, n_points=n_points,
+                       scheme=row_scheme,
                        err_uha=1e6 * (row["energy"] - ref), seconds=time.time() - t1)
             rows.append(row)
+            # Written per row, not at the end: a parent rung is an eigendecomposition of
+            # a few-thousand-square metric and can be killed by the machine rather than
+            # by itself, which on a write-at-the-end script loses every row before it.
+            if out_path:
+                dump(out_path, name, mol, ref, n_laplace, draws, seed, scheme, rows)
 
-            print(f"   {ridge:7.0e} {row['err_uha']:10.2f} {row['grad_norm']:12.4e} "
+            print(f"   {'pinv' if ridge is None else f'{ridge:.0e}':>7s} "
+                  f"{row['err_uha']:10.2f} {row['grad_norm']:12.4e} "
                   f"{1e6 * row['net_torque']:11.2f} {1e6 * row['rms_atom_torque']:10.2f} "
                   f"{row['ratio']:12.3e} "
                   f"{1e6 * row.get('rms_draw_net_torque', np.nan):13.2f} "
                   f"{row.get('spread_uha', np.nan):11.3f} "
                   f"{row['below_ridge']:6d}/{row['n_metric']:<5d}", flush=True)
 
-    result = dict(molecule=name, n_ao=int(mol.nao_nr()), natm=mol.natm, basis=BASIS,
-                  auxbasis=AUXBASIS, mp2_ri_reference=ref, n_laplace=n_laplace,
-                  draws=draws, seed=seed, scheme=scheme, rows=rows)
     if out_path:
-        with open(out_path, "w") as fh:
-            json.dump(result, fh, indent=2)
-    return result
+        dump(out_path, name, mol, ref, n_laplace, draws, seed, scheme, rows)
+    return dict(molecule=name, n_ao=int(mol.nao_nr()), natm=mol.natm, basis=BASIS,
+                auxbasis=AUXBASIS, mp2_ri_reference=ref, n_laplace=n_laplace,
+                draws=draws, seed=seed, scheme=scheme, rows=rows)
 
 
 def report(paths, ridge):
@@ -282,7 +306,8 @@ def report(paths, ridge):
     """
     for path in paths:
         d = json.load(open(path))
-        print(f"\n=== {d['molecule']} ({d['n_ao']} AOs), ridge {ridge:.0e}, "
+        label = "pinv" if ridge is None else f"{d['rows'][0].get('scheme', 'ridge')} {ridge:.0e}"
+        print(f"\n=== {d['molecule']} ({d['n_ao']} AOs), {label}, "
               f"{d['draws']} draws")
 
         for mode in MODES:
@@ -317,7 +342,8 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     p.add_argument("--report", nargs="+",
                    help="read result JSONs and print the ladders; runs nothing")
-    p.add_argument("--report-ridge", type=float, default=1e-4)
+    p.add_argument("--report-ridge", default="1e-4",
+                   help="which rung to tabulate; 'pinv' selects the control row")
     p.add_argument("molecule", nargs="?", default="methanol", choices=sorted(MOLECULES))
     p.add_argument("--modes", default="blocked,blocked1,ghost",
                    help=f"comma separated, from {', '.join(MODES)}")
@@ -332,13 +358,17 @@ if __name__ == "__main__":
     p.add_argument("--scheme", default="ridge", choices=["ridge", "damped"],
                    help="metric filter; section 4(6) says a torque must be quoted "
                         "with the regularisation that produced it")
+    p.add_argument("--pinv", action="store_true",
+                   help="add a pseudoinverse control row to every rung; without it a "
+                        "trend cannot be attributed to the grid rather than the filter")
     p.add_argument("--parent", action="store_true",
                    help="add the unpruned atomic grid as the top of the ladder")
     p.add_argument("--out")
     a = p.parse_args()
 
     if a.report:
-        report(a.report, a.report_ridge)
+        report(a.report,
+               None if a.report_ridge.strip() == "pinv" else float(a.report_ridge))
         raise SystemExit(0)
 
     modes = [m.strip() for m in a.modes.split(",") if m.strip()]
@@ -351,4 +381,4 @@ if __name__ == "__main__":
 
     main(a.molecule, modes, thresholds,
          [float(r) for r in a.ridges.split(",") if r.strip()],
-         a.n_laplace, a.draws, a.seed, a.parent, a.out, a.scheme)
+         a.n_laplace, a.draws, a.seed, a.parent, a.out, a.scheme, a.pinv)
