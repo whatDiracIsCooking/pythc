@@ -1,0 +1,129 @@
+{
+  "meta": {
+    "molecule": "ethanol",
+    "natm": 9,
+    "nao": 72,
+    "basis": "cc-pvdz",
+    "auxbasis": "cc-pvdz-ri",
+    "mp2_ri_reference": -0.4888407532918529
+  },
+  "rows": [
+    {
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 4928,
+      "rmsd_S": 0.0002793799831170549,
+      "e_corr": -0.4888347883589858,
+      "err_uha": 5.9649328670863255,
+      "fit_seconds": 121.77615070343018
+    },
+    {
+      "mode": "global",
+      "threshold": 0.001,
+      "n_points": 275,
+      "rmsd_S": 0.003958972468030224,
+      "e_corr": -0.48848847370118664,
+      "err_uha": 352.279590666249,
+      "fit_seconds": 4.8962242603302
+    },
+    {
+      "mode": "global",
+      "threshold": 0.0003,
+      "n_points": 331,
+      "rmsd_S": 0.0022217932259003042,
+      "e_corr": -0.4887531551865398,
+      "err_uha": 87.59810531311362,
+      "fit_seconds": 7.256277561187744
+    },
+    {
+      "mode": "global",
+      "threshold": 0.0001,
+      "n_points": 375,
+      "rmsd_S": 0.0012002520993389264,
+      "e_corr": -0.48880760944463225,
+      "err_uha": 33.14384722064023,
+      "fit_seconds": 9.37943983078003
+    },
+    {
+      "mode": "global",
+      "threshold": 3e-05,
+      "n_points": 431,
+      "rmsd_S": 0.0007018345175422731,
+      "e_corr": -0.48883096666182424,
+      "err_uha": 9.786630028651988,
+      "fit_seconds": 13.164097309112549
+    },
+    {
+      "mode": "global",
+      "threshold": 1e-05,
+      "n_points": 498,
+      "rmsd_S": 0.00043843455493112706,
+      "e_corr": -0.4888321837015885,
+      "err_uha": 8.569590264406735,
+      "fit_seconds": 24.241456031799316
+    },
+    {
+      "mode": "global",
+      "threshold": 1e-06,
+      "n_points": 660,
+      "rmsd_S": 0.00011868790969189889,
+      "e_corr": -0.4888347001587703,
+      "err_uha": 6.0531330826063545,
+      "fit_seconds": 130.1326048374176
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 477,
+      "rmsd_S": 0.0058482202057977585,
+      "e_corr": -0.4888021132338341,
+      "err_uha": 38.64005801879067,
+      "fit_seconds": 15.805368185043335
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.0003,
+      "n_points": 602,
+      "rmsd_S": 0.0031149767893954338,
+      "e_corr": -0.4888287796755832,
+      "err_uha": 11.973616269700393,
+      "fit_seconds": 20.09648060798645
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 765,
+      "rmsd_S": 0.001302928885296578,
+      "e_corr": -0.48883456256473934,
+      "err_uha": 6.190727113553063,
+      "fit_seconds": 5.702333211898804
+    },
+    {
+      "mode": "blocked",
+      "threshold": 3e-05,
+      "n_points": 943,
+      "rmsd_S": 0.0009233135082146968,
+      "e_corr": -0.4888348045476213,
+      "err_uha": 5.948744231598635,
+      "fit_seconds": 7.2372519969940186
+    },
+    {
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 1090,
+      "rmsd_S": 0.0008105389008881907,
+      "e_corr": -0.4888347794973276,
+      "err_uha": 5.973794525271359,
+      "fit_seconds": 8.939621925354004
+    },
+    {
+      "mode": "blocked",
+      "threshold": 1e-06,
+      "n_points": 1387,
+      "rmsd_S": 0.0006944936133376886,
+      "e_corr": -0.4888347944762898,
+      "err_uha": 5.958815563089637,
+      "fit_seconds": 14.03385615348816
+    }
+  ]
+}

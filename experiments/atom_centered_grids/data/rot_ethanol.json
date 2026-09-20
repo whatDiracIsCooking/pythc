@@ -1,0 +1,98 @@
+{
+  "molecule": "ethanol",
+  "threshold": 0.001,
+  "n_points": 477,
+  "e_fitted": -0.4888021133736902,
+  "e_rotated": [
+    -0.4888117146681405,
+    -0.48881625378808313,
+    -0.4888190683496991,
+    -0.488807178492208,
+    -0.4888082401821453,
+    -0.4888337914184571
+  ],
+  "mp2_ref": -0.48884075329185206,
+  "rmsd_fitted": 0.0058482202057977585,
+  "rmsd_rotated": [
+    0.09690497499633827,
+    0.10882529331847299,
+    0.11512149972468963,
+    0.10861335869518332,
+    0.12307603247129159,
+    0.10133154200382422
+  ],
+  "shells": [
+    {
+      "atom": "C",
+      "n_shells": 15,
+      "shells_empty": 6,
+      "shells_full": 0,
+      "shells_partial": 9,
+      "mean_partial_fraction": 0.14257659653008492
+    },
+    {
+      "atom": "C",
+      "n_shells": 15,
+      "shells_empty": 7,
+      "shells_full": 0,
+      "shells_partial": 8,
+      "mean_partial_fraction": 0.1570764119601329
+    },
+    {
+      "atom": "O",
+      "n_shells": 15,
+      "shells_empty": 6,
+      "shells_full": 0,
+      "shells_partial": 9,
+      "mean_partial_fraction": 0.14645256552233296
+    },
+    {
+      "atom": "H",
+      "n_shells": 10,
+      "shells_empty": 5,
+      "shells_full": 0,
+      "shells_partial": 5,
+      "mean_partial_fraction": 0.15199999999999997
+    },
+    {
+      "atom": "H",
+      "n_shells": 10,
+      "shells_empty": 4,
+      "shells_full": 0,
+      "shells_partial": 6,
+      "mean_partial_fraction": 0.13999999999999999
+    },
+    {
+      "atom": "H",
+      "n_shells": 10,
+      "shells_empty": 6,
+      "shells_full": 0,
+      "shells_partial": 4,
+      "mean_partial_fraction": 0.2
+    },
+    {
+      "atom": "H",
+      "n_shells": 10,
+      "shells_empty": 5,
+      "shells_full": 0,
+      "shells_partial": 5,
+      "mean_partial_fraction": 0.156
+    },
+    {
+      "atom": "H",
+      "n_shells": 10,
+      "shells_empty": 4,
+      "shells_full": 0,
+      "shells_partial": 6,
+      "mean_partial_fraction": 0.1285714285714286
+    },
+    {
+      "atom": "H",
+      "n_shells": 10,
+      "shells_empty": 4,
+      "shells_full": 0,
+      "shells_partial": 6,
+      "mean_partial_fraction": 0.1519047619047619
+    }
+  ]
+}

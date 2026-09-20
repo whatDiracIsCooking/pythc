@@ -1,0 +1,93 @@
+{
+  "meta": {
+    "molecule": "methanol",
+    "natm": 6,
+    "nao": 48,
+    "basis": "cc-pvdz",
+    "auxbasis": "cc-pvdz-ri",
+    "mp2_ri_reference": -0.3434019270939828
+  },
+  "rows": [
+    {
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 3288,
+      "rmsd_S": 0.00026867542665599576,
+      "e_corr": -0.34339917766853695,
+      "err_uha": 2.7494254458693135,
+      "fit_seconds": 63.27513599395752
+    },
+    {
+      "mode": "global",
+      "threshold": 0.001,
+      "n_points": 180,
+      "rmsd_S": 0.005612512406108855,
+      "e_corr": -0.34328123693668733,
+      "err_uha": 120.69015729548882,
+      "fit_seconds": 7.477081060409546
+    },
+    {
+      "mode": "global",
+      "threshold": 0.0001,
+      "n_points": 240,
+      "rmsd_S": 0.0015990909135283461,
+      "e_corr": -0.3433992729575732,
+      "err_uha": 2.6541364095966635,
+      "fit_seconds": 12.675490617752075
+    },
+    {
+      "mode": "global",
+      "threshold": 1e-05,
+      "n_points": 333,
+      "rmsd_S": 0.00045520581731491315,
+      "e_corr": -0.34339913397598165,
+      "err_uha": 2.793118001165329,
+      "fit_seconds": 18.272185802459717
+    },
+    {
+      "mode": "global",
+      "threshold": 1e-06,
+      "n_points": 421,
+      "rmsd_S": 0.00013815689731918986,
+      "e_corr": -0.34339917919297935,
+      "err_uha": 2.747901003463671,
+      "fit_seconds": 48.82415008544922
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 301,
+      "rmsd_S": 0.00751901090897271,
+      "e_corr": -0.34339663560548095,
+      "err_uha": 5.2914885018684465,
+      "fit_seconds": 3.8594541549682617
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 491,
+      "rmsd_S": 0.0017669069677444084,
+      "e_corr": -0.3433991647253942,
+      "err_uha": 2.762368588593578,
+      "fit_seconds": 10.037186861038208
+    },
+    {
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 670,
+      "rmsd_S": 0.0007905040131531934,
+      "e_corr": -0.3433991808947786,
+      "err_uha": 2.746199204206601,
+      "fit_seconds": 16.752291440963745
+    },
+    {
+      "mode": "blocked",
+      "threshold": 1e-06,
+      "n_points": 849,
+      "rmsd_S": 0.0006253765006028961,
+      "e_corr": -0.3433991821967525,
+      "err_uha": 2.744897230344545,
+      "fit_seconds": 19.49423122406006
+    }
+  ]
+}

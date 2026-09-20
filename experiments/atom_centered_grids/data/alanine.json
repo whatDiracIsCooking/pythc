@@ -1,0 +1,111 @@
+{
+  "meta": {
+    "molecule": "alanine",
+    "natm": 13,
+    "nao": 119,
+    "basis": "cc-pvdz",
+    "auxbasis": "cc-pvdz-ri",
+    "mp2_ri_reference": -0.968241509175427
+  },
+  "rows": [
+    {
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 7896,
+      "rmsd_S": 0.00021535480638327595,
+      "e_corr": -0.9682377205684172,
+      "err_uha": 3.7886070097803426,
+      "fit_seconds": 263.8837947845459
+    },
+    {
+      "mode": "global",
+      "threshold": 0.001,
+      "n_points": 460,
+      "rmsd_S": 0.0030219397656367263,
+      "e_corr": -0.9673879319683053,
+      "err_uha": 853.5772071216475,
+      "fit_seconds": 32.65416240692139
+    },
+    {
+      "mode": "global",
+      "threshold": 0.0003,
+      "n_points": 547,
+      "rmsd_S": 0.001677668603119564,
+      "e_corr": -0.96794729754424,
+      "err_uha": 294.2116311869247,
+      "fit_seconds": 61.472078800201416
+    },
+    {
+      "mode": "global",
+      "threshold": 0.0001,
+      "n_points": 637,
+      "rmsd_S": 0.0008404780855094492,
+      "e_corr": -0.9681255232520939,
+      "err_uha": 115.98592333306179,
+      "fit_seconds": 86.10512280464172
+    },
+    {
+      "mode": "global",
+      "threshold": 3e-05,
+      "n_points": 753,
+      "rmsd_S": 0.0005094779339271896,
+      "e_corr": -0.9682205307982392,
+      "err_uha": 20.978377187730324,
+      "fit_seconds": 120.18853712081909
+    },
+    {
+      "mode": "global",
+      "threshold": 1e-05,
+      "n_points": 857,
+      "rmsd_S": 0.0002900058447154757,
+      "e_corr": -0.9682302110971882,
+      "err_uha": 11.298078238741738,
+      "fit_seconds": 163.56310629844666
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 801,
+      "rmsd_S": 0.004158715715108072,
+      "e_corr": -0.9681773553881374,
+      "err_uha": 64.1537872895226,
+      "fit_seconds": 9.929281949996948
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.0003,
+      "n_points": 1033,
+      "rmsd_S": 0.0021863000786358296,
+      "e_corr": -0.9682122736544183,
+      "err_uha": 29.235521008641463,
+      "fit_seconds": 15.34210991859436
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 1298,
+      "rmsd_S": 0.0010277449239599855,
+      "e_corr": -0.9682335972517228,
+      "err_uha": 7.9119237041958,
+      "fit_seconds": 22.261141777038574
+    },
+    {
+      "mode": "blocked",
+      "threshold": 3e-05,
+      "n_points": 1573,
+      "rmsd_S": 0.0006921465380869135,
+      "e_corr": -0.9682372303343245,
+      "err_uha": 4.27884110243415,
+      "fit_seconds": 29.39080572128296
+    },
+    {
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 1817,
+      "rmsd_S": 0.0005713070851744609,
+      "e_corr": -0.9682377348667132,
+      "err_uha": 3.774308713788699,
+      "fit_seconds": 38.68195176124573
+    }
+  ]
+}
