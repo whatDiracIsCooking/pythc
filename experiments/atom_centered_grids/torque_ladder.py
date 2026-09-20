@@ -171,16 +171,23 @@ def metric_diagnostics(mol, mf, per_atom, ridge, n_laplace):
                 below_ridge=int(np.sum(eig < shift)), n_metric=int(len(eig)))
 
 
-def measure(mol, mf, per_atom, ridge, n_laplace, draws, seed):
+def measure(mol, mf, per_atom, ridge, n_laplace, draws, seed, scheme="ridge"):
     """One grid at one ridge: as fitted, then at ``draws`` random per-atom orientations.
 
     The energy and the torque come out of the same call, so the section 4(2) spread and
     the section 4(5) torque are computed on identical draws and the contrast between them
     carries no sampling difference.
+
+    ``scheme`` picks the filter. Section 4(6) showed the ridge hands the metric's null
+    directions the *largest* gain in the operator, `1/mu`, so at any `lambda` small enough
+    to be accurate the gradient is mostly regulariser - and most of a torque measured
+    there belongs to the regulariser too. ``"damped"`` sends those directions to zero
+    instead, which is what makes a torque ladder measure the grid.
     """
     def run(rotations):
         return thc_mp2_gradient(mol, mf, FrozenGrid(mol, per_atom, rotations), AUXBASIS,
-                                n_laplace=n_laplace, metric_ridge=ridge, aux_ridge=ridge)
+                                n_laplace=n_laplace, metric_ridge=ridge, aux_ridge=ridge,
+                                metric_scheme=scheme)
 
     res = run(None)
     net = float(np.linalg.norm(res.torque.sum(axis=0)))
@@ -207,7 +214,8 @@ def measure(mol, mf, per_atom, ridge, n_laplace, draws, seed):
     return row
 
 
-def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent, out_path):
+def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent,
+         out_path, scheme="ridge"):
     mol = gto.M(atom=MOLECULES[name](), basis=BASIS, verbose=0)
     mf = scf.RHF(mol).density_fit(auxbasis=AUXBASIS)
     mf.verbose = 0
@@ -217,7 +225,7 @@ def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent, o
 
     print(f"== {name}: {mol.natm} atoms, {mol.nao_nr()} AOs, DF-MP2 ref {ref:.8f}")
     print(f"   modes {', '.join(modes)}; {draws} random per-atom orientations per grid; "
-          f"ridges {', '.join(f'{r:.0e}' for r in ridges)}")
+          f"{scheme} lambdas {', '.join(f'{r:.0e}' for r in ridges)}")
     print("   weight footing: blocked/ghostw/parent carry fitted weights, "
           "blocked1/ghost/parent1 are w = 1", flush=True)
 
@@ -240,9 +248,9 @@ def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent, o
 
         for ridge in ridges:
             t1 = time.time()
-            row = measure(mol, mf, per_atom, ridge, n_laplace, draws, seed)
+            row = measure(mol, mf, per_atom, ridge, n_laplace, draws, seed, scheme)
             row.update(metric_diagnostics(mol, mf, per_atom, ridge, n_laplace))
-            row.update(mode=mode, threshold=threshold, n_points=n_points,
+            row.update(mode=mode, threshold=threshold, n_points=n_points, scheme=scheme,
                        err_uha=1e6 * (row["energy"] - ref), seconds=time.time() - t1)
             rows.append(row)
 
@@ -255,7 +263,7 @@ def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent, o
 
     result = dict(molecule=name, n_ao=int(mol.nao_nr()), natm=mol.natm, basis=BASIS,
                   auxbasis=AUXBASIS, mp2_ri_reference=ref, n_laplace=n_laplace,
-                  draws=draws, seed=seed, rows=rows)
+                  draws=draws, seed=seed, scheme=scheme, rows=rows)
     if out_path:
         with open(out_path, "w") as fh:
             json.dump(result, fh, indent=2)
@@ -321,6 +329,9 @@ if __name__ == "__main__":
     p.add_argument("--draws", type=int, default=4,
                    help="random per-atom orientations; 0 for the as-fitted row only")
     p.add_argument("--seed", type=int, default=7)
+    p.add_argument("--scheme", default="ridge", choices=["ridge", "damped"],
+                   help="metric filter; section 4(6) says a torque must be quoted "
+                        "with the regularisation that produced it")
     p.add_argument("--parent", action="store_true",
                    help="add the unpruned atomic grid as the top of the ladder")
     p.add_argument("--out")
@@ -340,4 +351,4 @@ if __name__ == "__main__":
 
     main(a.molecule, modes, thresholds,
          [float(r) for r in a.ridges.split(",") if r.strip()],
-         a.n_laplace, a.draws, a.seed, a.parent, a.out)
+         a.n_laplace, a.draws, a.seed, a.parent, a.out, a.scheme)

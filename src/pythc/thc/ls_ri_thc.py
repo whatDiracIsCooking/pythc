@@ -35,6 +35,7 @@ class LS_RI_THC(THC):
                  metric_ridge: float = None,
                  aux_ridge: float = None,
                  ridge_scale: str = "trace",
+                 metric_scheme: str = "ridge",
                  ):
         """
         :param metric_ridge: Regularise the LS-THC metric inversion as
@@ -47,6 +48,11 @@ class LS_RI_THC(THC):
         :param aux_ridge: The same, for the auxiliary Coulomb metric ``J^(-1/2)``.
         :param ridge_scale: How the two strengths above become absolute shifts; see
             :func:`pythc.lib.ridge_shift`.
+        :param metric_scheme: Which regularised inverse the two strengths above select:
+            ``"ridge"`` for ``(S + lambda I)^-1``, ``"damped"`` for the Tikhonov-filtered
+            ``S (S^2 + mu^2 I)^-1``, which suppresses the numerically null directions
+            instead of handing them the largest gain in the operator. See
+            :func:`pythc.lib.damped_inv`.
         """
         self.N = mol.nao_nr()
         self.mol = mol
@@ -56,6 +62,7 @@ class LS_RI_THC(THC):
         self.metric_ridge = metric_ridge
         self.aux_ridge = aux_ridge
         self.ridge_scale = ridge_scale
+        self.metric_scheme = metric_scheme
 
     @abstractmethod
     def build_pruned_X(self, mode: Mode, mo_coeff: np.ndarray, auxmol: gto.Mole) -> np.ndarray:
@@ -112,7 +119,8 @@ class LS_RI_THC(THC):
 
         D = build_coulomb_matrix(mode, self.mol, auxmol, X, self.mo_coeff,
                                  metric_ridge=self.metric_ridge, aux_ridge=self.aux_ridge,
-                                 ridge_scale=self.ridge_scale)
+                                 ridge_scale=self.ridge_scale,
+                                 metric_scheme=self.metric_scheme)
         Z = D.T @ D
         if active: active.checkpoint(FITTING_MATRIX)
 
