@@ -10,8 +10,7 @@ should not re-derive machinery that turned out to be unnecessary.
 **In one sentence:** run NNLS per atom (with ghost atoms to keep bonding-region points
 alive) to select a point set per element, **discard the fitted weights and keep only the
 points**, build a molecule's grid as the union of its atoms' point sets, and - given
-sections 4(1), now done, and 4(2), not - get analytic nuclear gradients and a smooth PES
-for free.
+section 4(1), now done - get analytic nuclear gradients and a smooth PES for free.
 
 Fit a THC grid once per element, offline, and translate it rigidly into any molecule - the
 acCD move (atomic Cholesky decomposition: do the pivoted selection once per element
@@ -24,14 +23,16 @@ freeze the selection at the reference geometry and differentiate the rest. A gri
 *per element* needs no such assumption at all - nothing is re-selected as nuclei move.
 
 The price is compactness: per-atom grids cannot share bonding-region points between
-neighbours, must cover bond directions the atom may not have, and may need coarser
-orbit-wise pruning to stay isotropic. Since `Z` is `n_P x n_P`, the point-count penalty is
-what decides the programme.
+neighbours and must cover bond directions the atom may not have. (They were also expected
+to need coarser orbit-wise pruning to stay isotropic; section 4(2) measured that and it
+turned out not to be necessary.) Since `Z` is `n_P x n_P`, the point-count penalty is what
+decides the programme.
 
 ## 2. What was attempted
 
-Six experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke parent
-grid, `ov` mode, 10 Laplace points, against DF-MP2. Geometries from RDKit ETKDG + MMFF.
+Seven experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke
+parent grid, `ov` mode, 10 Laplace points, against DF-MP2. Geometries from RDKit ETKDG +
+MMFF.
 
 | script | question | headline |
 | --- | --- | --- |
@@ -41,6 +42,7 @@ grid, `ov` mode, 10 Laplace points, against DF-MP2. Geometries from RDKit ETKDG 
 | `weights.py` | do the fitted weights matter, or only the selection? | **only the selection**; all-ones weights are bit-identical or better |
 | `ridge.py` | what does ridge cost against the truncated pseudoinverse? | **0.1-2.2 uHa at `lambda = 1e-8`**; the truncation threshold itself changes nothing |
 | `scan.py` | does the truncation actually put steps in the PES? | **yes, ~0.5 uHa, exactly at the eigenvalue crossings**; ridge removes them |
+| `orbits.py` | does fitting whole orbits fix the orientation dependence? | **no.** Exact under the octahedral group, but never better than point-wise at matched size |
 
 The key methodological move: `NNLSGrid(blocked=True)` already fits each atomic sub-grid
 independently, so the penalty for giving up molecular pruning is measurable today. Because
@@ -62,8 +64,8 @@ conclusions are listed here with their current status, so they are not re-derive
 | Add `sum_P w_P = 1`; equality constraints differentiate cleanly | **Moot** for the same reason. |
 | Isolated-atom NNLS will discard exactly the tail points a bond needs; fix with ghost atoms | **Still the central untested idea.** Highest-value next experiment. |
 | Octahedral ghosts suffice because p orbitals are octahedral | **Rejected in the discussion itself, correctly** - points are sampling locations, not functions, and do not superpose. |
-| Frozen per-atom grids risk orientation-dependent energies | **Confirmed by measurement**: no angular shell survives intact (8-20% of each kept), and rank-limited grids shift 27-39 uHa under random per-atom rotation. This is a **rotational-invariance** failure (spurious torques), not merely an accuracy tax - see section 4(2). |
-| Fix isotropy with orbit-wise (group-sparsity) pruning over (radial shell, Lebedev orbit) blocks | **Endorsed, unimplemented.** The parent grid is already orbit-structured via `treutler_prune`, so the structure exists to exploit. |
+| Frozen per-atom grids risk orientation-dependent energies | **Confirmed, then deflated.** No angular shell survives intact, and rank-limited grids shift 27-39 uHa under random per-atom rotation. But the shift **converges away with grid size**: methanol's spread runs 218 -> 7.1 -> 0.01 uHa from 175 to 670 points. It is a symptom of a rank-limited grid, not a separate defect - see section 4(2). |
+| Fix isotropy with orbit-wise (group-sparsity) pruning over (radial shell, Lebedev orbit) blocks | **Implemented, measured, and rejected as a fix.** It delivers exactly what it promised - whole orbits, exact octahedral invariance - and that turns out not to be the useful property. At matched point count a point-wise grid is better on both accuracy and rotation spread. See section 4(2) and FINDINGS section 7. |
 | Grid inflation will be 2-3x, i.e. 4-9x on the `n_P^2` parts | **Too pessimistic.** Measured 1.2-1.7x, i.e. ~1.5-2.9x. |
 | Unioned per-atom grids will wreck metric conditioning; use ridge, not eigenvalue truncation | **Confirmed, and now implemented and measured** - see section 4(1). Min eigenvalue 1e-20 vs 1e-8; the truncation does put ~0.5 uHa steps in the PES at the eigenvalue crossings, and ridge removes them. One correction: ridge was expected to be a pure improvement, but it has a **floor** the truncation does not - too small a `lambda` inverts the null space's rounding noise. |
 | The overlap-metric target inherits a decade of validation from the 2013 DVR paper | **Substantially undermined.** `rmsd_S` is close to orthogonal to THC accuracy: it degraded 125x under rotation and ~2000x under all-ones weights with no loss (sometimes a gain) in MP2 accuracy. |
@@ -83,11 +85,15 @@ but as a *point selector*, not a weight fitter.
 
 ## 4. Next directions, in order
 
-**(1) is done.** It was a prerequisite, not an improvement: the metric truncation was the
-last remaining source of PES non-smoothness, and it is now measured and fixed. **(2) is
-still a prerequisite** - it is what makes "attach the atomic grid rigidly" a well-defined
-operation at all. (3) is the thing you actually want, but measuring it before (2) exists
-measures an object you would not ship.
+**(1) and (2) are both done, and they landed differently.** (1) was a real prerequisite:
+the metric truncation was the last remaining source of PES non-smoothness, and it is now
+measured and fixed. (2) was believed to be a prerequisite too - the thing that makes
+"attach the atomic grid rigidly" well-defined - and it is not. It is built and measured,
+and the measurement says orientation dependence is a grid-size problem, not a structural
+one.
+
+**So (3), the ghost gap, is now the next thing and the only one that can still kill the
+idea.** Nothing stands in front of it any more.
 
 The target pipeline, for orientation:
 
@@ -98,8 +104,10 @@ The target pipeline, for orientation:
 | build `X = phi(r_P)` - no weights | per geometry | AO derivative + point translation |
 | fit `Z` by least squares against exact ERIs | per geometry | smooth, RI-like chain rule |
 
-Nothing discrete happens at runtime. That is the whole point; (1) has now made it true of
-the `Z` fit, and (2) is what remains.
+Nothing discrete happens at runtime. That is the whole point, and (1) has now made it true
+of the `Z` fit as well. What is left is not a missing mechanism but a missing measurement:
+whether the offline per-element selection, fitted against ghosts instead of real
+neighbours, is good enough. That is (3).
 
 **(1) Ridge instead of truncation. DONE** - `lib.ridge_inv`, `lib.ridge_inv_sqrt`, and
 `metric_ridge` / `aux_ridge` on `LS_RI_THC`, reaching the inversion through
@@ -170,7 +178,7 @@ Re-run `sweep.py` and `rotate.py` afterwards - expect a larger grid and a smalle
 spread, and quantify that trade, since the extra points come straight off the 1.2-1.7x
 budget in FINDINGS.md section 1.
 
-**(3) The ghost gap - the only thing that can still kill the idea.** Build ghost-augmented
+**(3) The ghost gap - now the next step, and the only thing that can still kill the idea.** Build ghost-augmented
 per-element point sets for H/C/N/O and measure how much worse than `blocked` they are.
 Simpler than originally conceived: since weights do not matter, the offline object is just a
 **point set** per element. Stack several ghost radii (and ideally several partner elements)
@@ -198,8 +206,22 @@ a frozen grid along a bond at fixed ridge, which is the reference curve such a c
   eigenvalue wholesale?
 * Should `metric_ridge` become the default rather than an opt-in? It costs a few uHa and
   removes a discontinuity, which is the right trade for gradient work and the wrong one
-  for reproducing published single-point energies. The case for flipping it gets stronger
-  if 4(2)'s larger, more redundant grids make the near-null crowd worse.
+  for reproducing published single-point energies. (The argument that 4(2)'s larger, more
+  redundant grids would make the near-null crowd worse no longer applies, since those
+  grids are not the recommended path - but the orbit-grouped grids do exist and were not
+  run through `rank.py`, so what they do to the metric is unmeasured.)
+* How small does the rotation spread have to be? Section 4(2) reports it falling to 0.01
+  uHa on methanol's 670-point grid, which looks like enough - but nothing here converts a
+  spread into a torque, and a spurious torque that is negligible for a single point energy
+  may still spoil angular-momentum conservation over an AIMD trajectory. The quantity that
+  matters is `dE/dtheta` at the attachment orientation, not the peak-to-peak over draws.
+* The orbit-grouped fit's octahedral invariance is exact in the algebra but lands at
+  0.00-0.01 uHa in practice, and ridge does *not* remove it (methanol's 732-point grid:
+  -0.0071 uHa truncated, -0.0170 uHa at `metric_ridge = 1e-8`). That is round-off
+  amplified by the metric's ~1e-20 smallest eigenvalue, so it is a conditioning floor on
+  how exact *any* symmetry of a unioned per-atom grid can be. Whether it also floors the
+  gradient at a comparable relative size is unmeasured, and matters more than the energy
+  does.
 * Is a *fixed* `lambda` right, or should it track the grid? `shift/maxeig` at
   `lambda = 1e-8` came out at 1.7e-10 to 3.3e-10 across three systems - close enough that
   fixed looks defensible, but three systems in one basis is not a strong test. A much
@@ -247,6 +269,8 @@ uv run python experiments/atom_centered_grids/rotate.py ethanol 1e-3
 uv run python experiments/atom_centered_grids/weights.py methanol 1e-4
 uv run python experiments/atom_centered_grids/ridge.py methanol 1e-3 --blocked --out ridge_methanol.json
 uv run python experiments/atom_centered_grids/scan.py methanol 1e-3 --out scan_methanol.json
+uv run python experiments/atom_centered_grids/rotate.py ethanol 1e-3 --orbits
+uv run python experiments/atom_centered_grids/orbits.py methanol --out orbits_methanol.json
 ```
 
 Runtimes on 4 cores: water seconds, methanol ~3 min, ethanol ~10 min, alanine ~40 min
@@ -255,5 +279,14 @@ seconds to a couple of minutes. `scan.py` rebuilds the SCF and the fit at every 
 so it runs (number of steps) x (number of inversion schemes) single-point THC calculations:
 about 4 min for methanol's 61-step scan, 25 min for ethanol's 31-step one. Cut
 `--half-width` or raise `--step` to trade resolution for time, but note that the crossings
-are what the scan is looking for and a coarse scan can step over one. Raw output from the
-runs behind `FINDINGS.md` is in [`data/`](data).
+are what the scan is looking for and a coarse scan can step over one.
+
+`orbits.py` runs one fit plus `2 + n_rot` single points per row, so it costs about what a
+`rotate.py` run costs per threshold: minutes on methanol, tens of minutes on ethanol. Its
+two threshold ladders are on different scales - the orbit-grouped KKT gradient sums over
+the whole orbit - so the defaults are `1e-3..1e-5` point-wise against `1e-2..1e-4`
+grouped, and both need widening per molecule. Calibrate with `blocked_fit_per_atom` alone,
+which needs no SCF, before spending single points on a threshold that lands off the
+interesting range.
+
+Raw output from the runs behind `FINDINGS.md` is in [`data/`](data).

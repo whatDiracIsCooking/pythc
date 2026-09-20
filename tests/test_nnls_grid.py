@@ -13,17 +13,22 @@ Fitting a grid is the expensive part, so each distinct grid is built once in a
 module-scoped fixture and shared by every test that needs it.
 """
 
+import itertools
 import os
 
 import numpy as np
 import pytest
 from pyscf import gto, scf
+from pyscf.dft import gen_grid, treutler_prune
 from pyscf.mp.dfmp2 import DFMP2
 from scipy.optimize import nnls
+from scipy.spatial.transform import Rotation
 
-from pythc.decomp.nnls import OverlapFitOperator, _IncrementalQR, lawson_hanson
-from pythc.grid import BeckeGrid, GridProvider, NNLSGrid, _eval_basefuncs, _rmsd_overlap
+from pythc.decomp.nnls import GroupOperator, OverlapFitOperator, _IncrementalQR, lawson_hanson
+from pythc.grid import (BeckeGrid, GridProvider, NNLSGrid, _eval_basefuncs, _rmsd_overlap,
+                        octahedral_orbits)
 from pythc.methods.mp2 import LaplaceRMP2
+from pythc.thc.ls_ri_becke import LS_RI_Becke
 from pythc.thc.ls_ri_nnls import LS_RI_NNLS
 from pythc.tracking.experiment_run import ExperimentRun
 
@@ -346,3 +351,170 @@ def test_mp2_on_a_reweighted_grid_matches_the_ri_reference(mol):
 
     assert eri.X.shape[0] < 200
     assert abs(e_thc - e_ref) < 1e-4
+
+
+# --------------------------------------------------------------------------------------
+# Orbit grouping: selecting whole symmetry orbits instead of individual points.
+# --------------------------------------------------------------------------------------
+
+# The 48 signed permutation matrices of the octahedral group, as index/sign pairs.
+_OCTAHEDRAL = [(perm, signs)
+               for perm in itertools.permutations(range(3))
+               for signs in itertools.product((1.0, -1.0), repeat=3)]
+
+
+def test_group_operator_is_the_column_summed_problem():
+    """
+    Tying variables into groups is not an approximation: it is the original problem
+    restricted to weight vectors constant on each group, whose fitting matrix is the
+    group-summed one. If that identity slips, the solver is quietly fitting something
+    else.
+    """
+    rng = np.random.default_rng(0)
+    A = rng.normal(size=(40, 24))
+    # Interleaved rather than contiguous, so a wrong assumption about the members being
+    # adjacent would show up.
+    labels = np.tile(np.arange(6), 4)
+    A_grouped = np.stack([A[:, labels == g].sum(axis=1) for g in range(6)], axis=1)
+
+    op = GroupOperator(A, labels)
+    r = rng.normal(size=40)
+
+    assert op.shape == (40, 6)
+    np.testing.assert_allclose(np.stack([op.column(g) for g in range(6)], axis=1),
+                               A_grouped, atol=1e-13)
+    np.testing.assert_allclose(op.gradient(r), A_grouped.T @ r, atol=1e-12)
+
+    b = np.abs(rng.normal(size=40))
+    v_ref, _ = nnls(A_grouped, b)
+    np.testing.assert_allclose(lawson_hanson(op, b, weight_threshold=1e-12), v_ref,
+                               atol=1e-9)
+
+
+def test_group_operator_expands_to_constant_weights_per_group():
+    """Every member of a group is kept with a common weight, or dropped with it."""
+    rng = np.random.default_rng(1)
+    A = rng.normal(size=(30, 18))
+    labels = np.repeat(np.arange(6), 3)
+
+    op = GroupOperator(A, labels)
+    w = op.expand(lawson_hanson(op, np.abs(rng.normal(size=30)), weight_threshold=1e-12))
+
+    for g in range(6):
+        assert len(np.unique(w[labels == g])) == 1
+
+
+def test_group_operator_rejects_a_mismatched_label_count():
+    with pytest.raises(ValueError):
+        GroupOperator(np.zeros((4, 5)), np.zeros(4, dtype=int))
+
+
+def test_orbits_of_an_atomic_grid_have_octahedral_sizes(mol):
+    """
+    A Lebedev grid is a union of octahedral orbits of 6, 8, 12, 24 or 48 points. If the
+    labelling produced anything else it has merged or split orbits, and the invariance
+    the grouping exists to buy would be gone.
+    """
+    g = gen_grid.Grids(mol)
+    atom_grids = g.gen_atomic_grids(mol, level=0, prune=treutler_prune)
+    coords = atom_grids['O'][0]
+
+    labels = octahedral_orbits(coords)
+    sizes = np.bincount(labels)
+
+    assert set(sizes.tolist()) <= {6, 8, 12, 24, 48}
+    # Each orbit lies on one radial shell.
+    radii = np.linalg.norm(coords, axis=1)
+    for label in np.unique(labels):
+        shell = radii[labels == label]
+        assert np.ptp(shell) <= 1e-9 * shell.mean()
+
+
+def test_orbit_labels_are_invariant_under_the_octahedral_group(mol):
+    """
+    The defining property: applying any signed axis permutation to the grid permutes
+    the points within their orbits and leaves the labelling unchanged.
+    """
+    g = gen_grid.Grids(mol)
+    coords = g.gen_atomic_grids(mol, level=0, prune=treutler_prune)['O'][0]
+    labels = octahedral_orbits(coords)
+
+    for perm, signs in _OCTAHEDRAL:
+        rotated = coords[:, perm] * np.array(signs)
+        np.testing.assert_array_equal(octahedral_orbits(rotated), labels)
+
+
+def test_a_general_rotation_destroys_the_orbit_structure(mol):
+    """
+    The counterpart of the test above: the labelling is not vacuously constant. A
+    rotation outside the group scrambles the keys, so equality there would mean the
+    function is not looking at the angular structure at all.
+    """
+    g = gen_grid.Grids(mol)
+    coords = g.gen_atomic_grids(mol, level=0, prune=treutler_prune)['O'][0]
+
+    tilted = coords @ Rotation.from_rotvec([0.3, -0.4, 0.2]).as_matrix().T
+
+    assert len(np.unique(octahedral_orbits(tilted))) > len(np.unique(octahedral_orbits(coords)))
+
+
+@pytest.mark.parametrize("blocked", [False, True])
+def test_orbit_grouped_fits_keep_whole_orbits(mol, blocked):
+    """
+    End to end through ``NNLSGrid``: every retained point belongs to an orbit that was
+    retained entire, and carries that orbit's common weight. This is the property that
+    makes each atom's grid invariant under the octahedral group about its own nucleus.
+    """
+    coords, weights = NNLSGrid(mol, weight_threshold=1e-3, blocked=blocked,
+                               group_orbits=True).build()
+
+    g = gen_grid.Grids(mol)
+    atom_grids = g.gen_atomic_grids(mol, level=0, prune=treutler_prune)
+
+    matched = 0
+    for ia in range(mol.natm):
+        parent = atom_grids[mol.atom_symbol(ia)][0]
+        labels = octahedral_orbits(parent)
+
+        # Map this atom's retained points back onto its parent sub-grid.
+        distance = np.linalg.norm(coords[:, None, :] - (parent + mol.atom_coord(ia))[None, :, :],
+                                  axis=2)
+        mine = distance.min(axis=1) < 1e-9
+        onto = distance[mine].argmin(axis=1)
+        matched += int(mine.sum())
+
+        for label in np.unique(labels[onto]):
+            assert np.count_nonzero(labels[onto] == label) == np.count_nonzero(labels == label)
+            assert len(np.unique(weights[mine][labels[onto] == label])) == 1
+
+    assert matched == len(coords)
+
+
+def test_orbit_grouping_refuses_a_point_cap(mol):
+    """``max_points`` counts points, which an orbit-grouped fit cannot honour."""
+    with pytest.raises(ValueError):
+        NNLSGrid(mol, group_orbits=True, max_points=100)
+
+
+def test_orbit_grouped_grids_still_reproduce_the_ri_reference(mol):
+    """
+    The grouping is a constraint on the fit, so it has to be checked that it does not
+    cost the energy: a grid that is invariant but wrong is no use.
+    """
+    mf = scf.RHF(mol).density_fit(auxbasis=AUXBASIS)
+    mf.verbose = 0
+    mf.kernel()
+
+    grid = NNLSGrid(mol, weight_threshold=1e-3, blocked=True, group_orbits=True)
+    thc = LS_RI_Becke(mol=mol, auxbasis=AUXBASIS, mo_coeff=mf.mo_coeff, grid=grid)
+
+    e_thc = LaplaceRMP2(mol, mf, thc.build(mode='ov'), n_laplace=10).kernel()
+
+    assert abs(e_thc - DFMP2(mf).kernel()[0]) < 1e-4
+
+
+def test_orbit_grouped_grid_names_itself(mol):
+    grid = NNLSGrid(mol, weight_threshold=1e-4, blocked=True, group_orbits=True)
+
+    assert str(grid) == "nnls_0.0001_blocked_orbits"
+    assert "group_orbits=True" in repr(grid)
