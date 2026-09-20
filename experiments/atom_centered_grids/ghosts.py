@@ -219,16 +219,21 @@ def fit_element(element, threshold, screening=1e-8, max_points=None, free=False,
     return np.flatnonzero(w), len(parent), len(envs)
 
 
-def element_supports(elements, threshold, free=False, **kwargs):
-    """Fit every element once. This is the whole offline stage of the scheme."""
+def element_supports(elements, threshold, free=False, quiet=False, **kwargs):
+    """Fit every element once. This is the whole offline stage of the scheme.
+
+    :param quiet: Suppress the per-element line. For callers that fit many ensembles in
+        a loop and print their own table.
+    """
     supports = {}
     for symbol in elements:
         t0 = time.time()
         idx, n_parent, n_env = fit_element(symbol, threshold, free=free, **kwargs)
         supports[symbol] = idx
-        print(f"    {symbol}: {len(idx):4d} of {n_parent} points from {n_env} "
-              f"environment{'s' if n_env != 1 else ''}  ({time.time() - t0:.1f}s)",
-              flush=True)
+        if not quiet:
+            print(f"    {symbol}: {len(idx):4d} of {n_parent} points from {n_env} "
+                  f"environment{'s' if n_env != 1 else ''}  ({time.time() - t0:.1f}s)",
+                  flush=True)
     return supports
 
 

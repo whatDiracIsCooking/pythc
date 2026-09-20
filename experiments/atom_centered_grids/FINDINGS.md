@@ -568,6 +568,144 @@ accuracy. Support agreement is the same kind of diagnostic: it measures whether 
 grids are the same grid, which is not the question. Only the point count at matched
 energy is.
 
+## 9. The ghost ensemble matters on small systems, and imposes a hard accuracy ceiling
+
+`ensemble.py`. §8 fitted every element against one ghost ensemble - 12 icosahedral
+directions, partners H/C/O at 0.90/1.05/1.45 times the covalent bond length, one
+(partner, scale) combination cycled per direction, 13 environments - chosen once and
+never varied. HANDOFF.md called varying it the cheapest open question in the programme.
+It is. The answer is mixed, and the durable half of it is not the one the question
+anticipated.
+
+Two axes, both already implemented in `ghosts.py` and neither previously run: 12
+icosahedral directions against 6 octahedral, and one cycled (partner, scale) per
+direction against `--full-cross`, every combination in every direction:
+
+| ensemble | directions | combinations | environments |
+| --- | --- | --- | --- |
+| `icosa-cycled` | 12 | cycled | 13 (this is §8's) |
+| `icosa-full` | 12 | full cross | 109 |
+| `octa-cycled` | 6 | cycled | 7 |
+| `octa-full` | 6 | full cross | 55 |
+
+Every grid at `w = 1` and `metric_ridge = 1e-8`. The `icosa-cycled` rows reproduce §8's
+tables exactly on both molecules, so this is the same measurement with the ensemble
+swapped underneath it.
+
+```
+methanol, floor +2.79 uHa    points: error above floor (uHa)
+blocked          301:  13.6   491:   2.5   670:   1.4
+icosa-cycled     223: 275.1   414:  17.0   512:  27.5   627: 6.1   702: 3.1   816: 2.9
+icosa-full       318:  73.3   554:   2.6   726:   1.4   916: 0.6  1066: 0.4  1178: 0.5
+octa-cycled      195: 422.2   269: 153.8   351:  80.1   408:13.2   454: 6.0   528: 4.0
+octa-full        288: 133.5   414:  30.0   523:   7.5   690: 3.0   782: 1.5   816: 1.4
+
+ethanol, floor +5.97 uHa
+blocked          477:  60.7   765:   8.9  1090:   3.2
+icosa-cycled     330: 761.3   620: 113.3   765:  55.5   927:10.8  1043: 4.7  1208: 5.0
+icosa-full       473: 134.9   829:  18.9  1074:   4.2  1355: 1.7  1580: 1.0  1743: 1.0
+octa-cycled      285:1209.6   400: 189.0   522: 164.0   606:29.6   673:13.8   783:16.0
+octa-full        425: 640.5   619:  31.4   787:  23.2  1035: 3.8  1166: 2.5  1218: 3.3
+```
+
+`analyse.py`, interpolating each curve to a fixed distance above its floor, as a ratio
+against the in-molecule `blocked` grid:
+
+| target | methanol blocked | icosa-cycled | icosa-full | octa-cycled | octa-full |
+| --- | --- | --- | --- | --- | --- |
+| 50 uHa | 301 | 326 (1.08x) | 339 (1.13x) | 365 (1.21x) | 366 (1.22x) |
+| 20 uHa | 301 | 399 (1.33x) | 395 (1.31x) | 394 (1.31x) | 443 (1.47x) |
+| 10 uHa | 329 | 586 (**1.78x**) | 443 (1.35x) | 424 (**1.29x**) | 498 (1.51x) |
+| 5 uHa | 402 | 647 (**1.61x**) | 497 (1.24x) | 486 (**1.21x**) | 591 (1.47x) |
+| 2 uHa | 551 | n/a | 620 (1.12x) | n/a | 742 (1.35x) |
+
+| target | ethanol blocked | icosa-cycled | icosa-full | octa-cycled | octa-full |
+| --- | --- | --- | --- | --- | --- |
+| 50 uHa | 500 | 774 (1.55x) | 628 (1.26x) | 579 (1.16x) | 584 (1.17x) |
+| 20 uHa | 627 | 863 (1.38x) | 816 (1.30x) | 639 (1.02x) | 805 (1.28x) |
+| 10 uHa | 743 | 938 (1.26x) | 925 (1.25x) | **n/a** | 895 (1.20x) |
+| 5 uHa | 932 | 1034 (1.11x) | 1042 (1.12x) | **n/a** | 994 (1.07x) |
+
+### The sensitivity is real on methanol and amortises away by ethanol
+
+On methanol the spread across the 2x2 is 1.29x to 1.78x at 10 uHa and 1.21x to 1.61x at
+5 uHa - a factor of ~1.35 between best and worst ensemble, the same magnitude as the
+entire ghost gap §8 set out to measure. On ethanol, among the ensembles that reach the
+target at all, it is 1.20x to 1.26x at 10 uHa and 1.07x to 1.12x at 5 uHa: a spread of
+1.05x. **Ensemble sensitivity is a fixed per-atom overhead that amortises with system
+size**, the same shape as §1's ratio, §8's ghost gap and §4's rotation spread.
+
+This matters for how §8 should be read. `icosa-cycled` is the *worst* of the four on
+methanol, so §8's methanol figures (1.78x at 10 uHa, 1.60x at 5 uHa) are an upper bound
+and the achievable number there is 1.21-1.35x. On ethanol it is mid-pack, and §8's
+ethanol figures stand as measured. The programme-level headline - 1.6-2.7x against a
+global fit, improving with system size - survives, with its small-molecule end revised
+down: compounding the best methanol ensemble with §1 gives 1.51 x 1.29 = **1.9x** at
+10 uHa rather than 2.7x. Since the number that matters is the large-system limit, and
+that end of the range is unaffected, this is a clarification rather than a correction.
+
+### Ensembles run out of rank, and that caps the reachable accuracy
+
+This is the durable result, and it is the one the question did not anticipate.
+`octa-cycled` is the *best* ensemble on methanol at 5 and 10 uHa - and on ethanol it
+cannot reach 10 uHa at any threshold. Driving the KKT threshold to zero shows why: the
+support saturates far below the parent grid, at a size that is a property of the
+ensemble alone (`ensemble.py --saturate`).
+
+| element | parent | octa-cycled (7 env) | icosa-cycled (13) | octa-full (55) | icosa-full (109) |
+| --- | --- | --- | --- | --- | --- |
+| H | 392 | 80 | 131 | 130 | 204 |
+| C | 858 | 110 | 155 | 160 | 246 |
+| O | 858 | 140 | 201 | 219 | 318 |
+
+Summing over a molecule's atoms gives a hard ceiling on its transferable grid, computable
+with no SCF. `octa-cycled` allows methanol `110 + 4x80 + 140` = 570 points, which is just
+enough - it reaches 5 uHa at 486. It allows ethanol `2x110 + 6x80 + 140` = 840, and
+ethanol's `blocked` grid already needs 743 points for 10 uHa; a transferable grid needs
+more than `blocked`, so 840 cannot get there. The measured curve tops out at 783 points
+and 13.8 uHa above the floor, exactly as that arithmetic predicts.
+
+This is §8's free-atom failure again, at a much higher ceiling and for a different
+reason. The free atom ran out of **equations**: an isolated hydrogen's overlap target
+supplies `n_AO(n_AO+1)/2` = 15 of them in cc-pVDZ. The ghost ensembles supply equations
+in the thousands - 750 for `octa-cycled` on H, 36177 for `icosa-full` on C - far more
+than the 392 or 858 parent points, so `min(n_equations, n_variables)` binds nowhere. What
+they run out of is *independent* equations: Lawson-Hanson halts once the residual is
+orthogonal to every remaining column, so the support saturates at the **effective rank of
+the stacked target**. §8's lesson should be restated accordingly: a ghost ensemble has to
+supply rank, and counting environments is not counting rank - `octa-full` has four times
+the environments of `icosa-cycled` and essentially the same ceiling.
+
+So the ensemble question is not "which corner of the 2x2 is best", which is worth ~5% by
+ethanol. It is **"does this ensemble supply enough rank for the target system and
+accuracy"**, which is a go/no-go and gets harder as the molecule grows. Check the
+saturation table against the expected point count before fitting anything.
+
+### The supports barely overlap between ensembles
+
+The SCF-free diagnostic (`ensemble.py --calibrate`) puts the Jaccard overlap between each
+ensemble's support and `icosa-cycled`'s at **0.01 to 0.48** across elements and
+thresholds - lower, in places, than the 24-31% agreement §8 measured between the ghost
+and `blocked` fits. Even `icosa-full` against `icosa-cycled`, which differ only in how
+densely the same 12 directions are sampled, shares J = 0.24-0.48.
+
+Consistent with §2, §5 and §8, this is not a defect: four largely disjoint point sets
+land within 1.05x of each other on ethanol. It is one more piece of evidence that LS-THC
+wants *a* spanning set rather than any particular nodes, and that support overlap remains
+useless as a quality metric.
+
+### The curves are not monotone
+
+Adding points sometimes makes the error worse - `icosa-cycled` on methanol between 414
+and 512 points (17.0 -> 27.5 uHa above floor), `octa-cycled` on ethanol between 673 and
+783 (13.8 -> 16.0), and three other cases across the two molecules. A tighter KKT
+threshold does not give a superset of the looser one's support: NNLS re-solves and can
+drop points it previously kept, so nothing forces the error down. Re-running the
+interpolation on a monotone envelope (best error at or below each size) moves methanol's
+`icosa-cycled` at 10 uHa from 1.78x to 1.73x and changes nothing else, so this does not
+explain the ensemble spread - but a threshold ladder is a coarse instrument, the same
+warning §7 gave for the orbit-grouped fits.
+
 ---
 
 ## Verdict
@@ -593,16 +731,25 @@ PES steps were real, and ridge at `lambda = 1e-8` removes them. §7: the missing
 orientation needed no structural fix at all - it converges away with grid size, and
 whole-orbit pruning is not the way to buy it.
 
+§9 adds a third of the same kind. The one arbitrary choice inside §8 - which ghost
+ensemble to fit against - turns out to matter by 1.35x on methanol and 1.05x on ethanol,
+so it amortises like everything else here; but it leaves a hard constraint behind, since
+an ensemble's effective rank caps the accuracy its grids can ever reach. The cheapest
+ensemble tested is the best on methanol and cannot reach 10 uHa on ethanol at all.
+
 What remains to be measured, in order:
 
 1. ~~**The ghost gap.**~~ **Done - see §8, and the answer is yes.** 1.1-1.8x over
    `blocked`, shrinking with system size; free-atom fits fail structurally.
-2. **Transferability.** Now the leading question. §8 fits each element against one fixed
-   ghost ensemble and never checks whether a *different* ensemble would give a materially
-   different support, nor whether one ensemble serves O in water, methanol and
-   formaldehyde equally. The 24-31% support agreement between the ghost and `blocked`
-   fits (§8) says the fit has a lot of freedom in which points it picks, which cuts both
-   ways: it may mean the choice hardly matters, or it may mean the answer is unstable.
+2. **Transferability.** Still the leading question, with its first half now done. §9
+   varied the ghost ensemble: the choice is worth ~1.35x on methanol and ~1.05x by
+   ethanol, so it amortises, and §8's methanol ratios are upper bounds. What it left
+   behind is a sharper constraint - each ensemble has a **rank ceiling** that caps the
+   reachable accuracy regardless of threshold, and the cheapest ensemble fails ethanol
+   outright on it. The untouched half is whether one element's point set serves
+   environments it was not fitted in: O in water, methanol and formaldehyde; C in sp3,
+   sp2 and sp. That must now be run on a deliberately chosen ensemble, since §9 showed
+   the default is not a neutral one.
 3. **A gradient.** Nothing in this directory computes one. Every smoothness claim here is
    a finite-difference statement about the energy curve; none of them tests an
    implementation. §8's grids are the first ones a gradient would actually be run on.

@@ -34,6 +34,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `ridge.py` | what ridge regularisation of the metric costs in accuracy, against truncation |
 | `scan.py` | whether the metric truncation puts steps in the PES, and whether ridge removes them |
 | `ghosts.py` | what an offline, per-element grid fitted against ghost neighbours costs against `blocked` |
+| `ensemble.py` | whether the *choice* of ghost ensemble changes that cost, and the accuracy ceiling each ensemble imposes |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -49,11 +50,13 @@ uv run python ridge.py methanol 1e-3 --blocked
 uv run python scan.py methanol 1e-3
 uv run python ghosts.py --calibrate H,C,O          # threshold ladder, no SCF, seconds
 uv run python ghosts.py methanol --out ghosts_methanol.json
+uv run python ensemble.py --saturate H,C,O         # each ensemble's ceiling, no SCF
+uv run python ensemble.py methanol --out ensemble_methanol.json
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Five headlines:
+See [`FINDINGS.md`](FINDINGS.md). Six headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -77,5 +80,13 @@ See [`FINDINGS.md`](FINDINGS.md). Five headlines:
   global molecular fit. Fitting the *free* atom instead does not work and cannot be made
   to: an isolated atom's overlap matrix supplies only `n_AO (n_AO + 1) / 2` equations, so
   NNLS can never retain more than 15 points per hydrogen in cc-pVDZ, at any threshold.
+* **Which ghost ensemble is used matters by ~1.35x on methanol and ~1.05x on ethanol**,
+  so the sensitivity amortises with system size and §8's methanol ratios are upper
+  bounds. What does not amortise is that each ensemble has a **rank ceiling**: the
+  support saturates at the effective rank of its stacked target, which caps the accuracy
+  its grids can ever reach at any threshold. The cheapest ensemble tested is the best on
+  methanol and cannot reach 10 uHa on ethanol at all. Sum the per-element saturation
+  sizes (`ensemble.py --saturate`, no SCF) against the expected point count before
+  fitting.
 
 Raw sweep output is under [`data/`](data).

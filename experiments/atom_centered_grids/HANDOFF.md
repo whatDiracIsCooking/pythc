@@ -28,7 +28,10 @@ to need coarser orbit-wise pruning to stay isotropic; section 4(2) measured that
 turned out not to be necessary.) Since `Z` is `n_P x n_P`, the point-count penalty is what
 decides the programme. **It is now measured end to end: 1.6-2.7x the points of a global
 molecular fit, i.e. 2.6-7.3x on the `n_P^2` parts, improving with system size** - see
-section 4(3), which is done.
+section 4(3), which is done. Section 4(4) then showed the 2.7x end of that range is an
+artefact of an unlucky ghost ensemble on the smallest molecule; with the best ensemble
+tested methanol is 1.9x. The large-system end, which is the one that matters, is
+unaffected.
 
 ## 2. What was attempted
 
@@ -46,6 +49,7 @@ MMFF.
 | `scan.py` | does the truncation actually put steps in the PES? | **yes, ~0.5 uHa, exactly at the eigenvalue crossings**; ridge removes them |
 | `orbits.py` | does fitting whole orbits fix the orientation dependence? | **no.** Exact under the octahedral group, but never better than point-wise at matched size |
 | `ghosts.py` | what does an offline, ghost-fitted per-element grid cost? | **1.1-1.8x over `blocked`**, shrinking with size; free-atom fits fail structurally |
+| `ensemble.py` | does the *choice* of ghost ensemble change that? | **1.35x on methanol, 1.05x on ethanol** - it amortises; but each ensemble has a hard **rank ceiling** |
 
 The key methodological move: `NNLSGrid(blocked=True)` already fits each atomic sub-grid
 independently, so the penalty for giving up molecular pruning is measurable today. Because
@@ -221,19 +225,45 @@ What it settled, and what it did not:
   nodes. Do not use support overlap as a quality metric; only point count at matched
   energy means anything.
 
-Left undone here: the ghost ensemble was chosen once and never varied. `--full-cross`
-(every direction x partner x distance) and `--directions octahedron` exist and were not
-run, so nothing establishes that the answer is insensitive to the choice - which is the
-first thing (4) should check. N was never fitted; the grids cover H/C/O. Water was run
+Left undone here, and **since done in 4(4)**: the ghost ensemble was chosen once and
+never varied. `--full-cross` and `--directions octahedron` have now been run
+(`ensemble.py`), and the choice is worth 1.35x on methanol and 1.05x on ethanol - so the
+methanol ratios below are upper bounds, and the ethanol ones stand. N was never fitted; the grids cover H/C/O. Water was run
 and is not quoted, because at 24 AOs every grid in the comparison is rank-saturated and
 all three modes reach the floor. And no molecule outside the fitting set was tried, which
 is the whole of what (4) means.
 
-**(4) Transferability - now the leading question.** Two halves, and (3) left both open.
-First: does the *ensemble* matter? Re-run `ghosts.py` with `--full-cross` and
-`--directions octahedron` and see whether the supports or the point counts move. If they
-do not, one cheap ensemble suffices and the offline stage is finished. Second: does one
-element's point set serve environments it was not fitted in? Fit O once and use it in
+**(4) Transferability - the leading question, first half DONE.** Two halves. The first -
+does the *ensemble* matter? - is answered in `ensemble.py` and FINDINGS section 9, and
+the answer is "less than feared, but it leaves a constraint behind".
+
+* **The sensitivity amortises.** Across the 2x2 of {12 icosahedral, 6 octahedral} x
+  {cycled, full cross}, the spread at matched accuracy is 1.29-1.78x on methanol and
+  1.20-1.26x on ethanol. Like §1's ratio, §8's ghost gap and §4's rotation spread, it is
+  a fixed per-atom overhead that shrinks with system size.
+* **Section 4(3)'s ensemble is the worst of four on methanol and mid-pack on ethanol.**
+  So the 1.78x / 1.60x methanol figures in FINDINGS section 8 are upper bounds - the
+  achievable number there is 1.21-1.35x, compounding with section 1 to **1.9x** against a
+  global fit rather than 2.7x. The ethanol figures stand as measured, and since the
+  large-system end is what matters, the programme headline is unchanged.
+* **The durable result is a rank ceiling, and it was not what the question was looking
+  for.** Driving the threshold to zero saturates each element's support at the effective
+  rank of its stacked target - a property of the ensemble alone. Summing per-element
+  saturation sizes gives a hard cap on a molecule's grid, computable with no SCF
+  (`ensemble.py --saturate`). `octa-cycled` is the *best* ensemble on methanol and
+  **cannot reach 10 uHa on ethanol at any threshold**, because its ceiling (840 points)
+  is below what ethanol needs. So the question to ask of an ensemble is not "is it the
+  best" but "does it supply enough rank", and that gets harder as molecules grow.
+* **Do not read the supports.** Jaccard overlap between ensembles is 0.01-0.48 - lower in
+  places than the ghost-vs-blocked agreement - while the energies land within 1.05x on
+  ethanol. Section 4(3) already said support overlap is not a quality metric; this is the
+  second independent confirmation.
+* **The error curves are not monotone in point count.** A tighter KKT threshold re-solves
+  rather than extending the support, so adding points can make the error worse (five
+  cases across the two molecules). A threshold ladder is a coarse instrument.
+
+The second half is untouched and is now the whole of what (4) means: **does one element's
+point set serve environments it was not fitted in?** Fit O once and use it in
 water, methanol and formaldehyde; fit C once and use it in an sp3, an sp2 and an sp
 environment. The low support agreement with `blocked` (24-31%) cuts both ways here - it
 may mean the choice of points hardly matters, or it may mean the answer is unstable, and
@@ -262,10 +292,13 @@ one has no re-selection term to omit and no excuse for disagreeing with the curv
   property of the *target*, not of the selector. A selector working directly on the
   co-density would not have that ceiling, and might not need ghosts at all - or might
   need them for a completely different reason.
-* Does the ghost ensemble matter? 12 icosahedral directions, partners H/C/O at three
-  bond-length multiples, one combination cycled per direction, chosen once and never
-  varied. `--full-cross` and `--directions octahedron` are implemented and unrun. This is
-  the cheapest open question in the list and it gates 4(4).
+* ~~Does the ghost ensemble matter?~~ **Answered - `ensemble.py`, FINDINGS section 9.**
+  1.35x on methanol, 1.05x on ethanol, so it amortises; but each ensemble has a rank
+  ceiling that caps reachable accuracy at any threshold, and the cheapest one tested
+  fails ethanol on it. What remains open is whether the *rank* of a ghost ensemble can be
+  raised cheaply - more directions and more (partner, scale) combinations both help, but
+  `octa-full` has four times the environments of `icosa-cycled` for the same ceiling, so
+  environment count is the wrong knob and nothing here identifies the right one.
 * How far can the offline object be pushed before it stops being a point set? Right now
   it is a list of indices into the element's level-0 atomic grid. Nothing forces that -
   the points could come from a finer parent grid, or from several parent grids unioned -
@@ -353,6 +386,9 @@ uv run python experiments/atom_centered_grids/rotate.py ethanol 1e-3 --orbits
 uv run python experiments/atom_centered_grids/orbits.py methanol --out orbits_methanol.json
 uv run python experiments/atom_centered_grids/ghosts.py --calibrate H,C,O
 uv run python experiments/atom_centered_grids/ghosts.py methanol --out ghosts_methanol.json
+uv run python experiments/atom_centered_grids/ensemble.py --saturate H,C,O
+uv run python experiments/atom_centered_grids/ensemble.py --calibrate H,C,O
+uv run python experiments/atom_centered_grids/ensemble.py methanol --out ens_methanol.json
 uv run python experiments/atom_centered_grids/ghosts.py methanol --out ghosts_rot_methanol.json \
     --thresholds 3e-4,3e-5,1e-12 --blocked-thresholds 1e-3,1e-4,1e-5 --rotate 4
 ```
@@ -372,6 +408,14 @@ the whole orbit - so the defaults are `1e-3..1e-5` point-wise against `1e-2..1e-
 grouped, and both need widening per molecule. Calibrate with `blocked_fit_per_atom` alone,
 which needs no SCF, before spending single points on a threshold that lands off the
 interesting range.
+
+`ensemble.py` runs the same fits across four ghost ensembles. `--saturate` is the one to
+run first: it needs no SCF, takes a couple of minutes, and its per-element numbers summed
+over a molecule give a hard ceiling on the grid that ensemble can produce. If that
+ceiling is below what `blocked` needs for the target accuracy, no threshold will save it
+and there is no point running the single points. `--calibrate` is the threshold ladder on
+top of that. Stage B costs four ensembles' worth of single points - about 15 min on
+methanol, an hour on ethanol.
 
 `ghosts.py` fits each element in seconds - the offline stage is genuinely cheap, and
 independent of the molecule - so its cost is all in the single points: 16 of them on the
