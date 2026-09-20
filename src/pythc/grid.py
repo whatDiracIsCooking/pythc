@@ -62,6 +62,15 @@ def _rmsd_overlap(R: np.ndarray, weights: np.ndarray, S: np.ndarray) -> float:
 
     This is the diagnostic of eq 11 in Hillers-Bendtsen, Lu, Martinez (2026) and the
     quantity the NNLS reweighting minimizes.
+
+    Note on conventions when comparing against that paper. Eq 11 reads
+    ``sqrt(O_S) / n_AO`` with ``O_S = 1/2 ||S - S_numerical||^2`` from eq 9, which is
+    what this function computes. The values plotted in their Figure 1A are a factor of
+    sqrt(2) larger, i.e. consistent with ``||S - S_numerical||_F / n_AO``, as though the
+    1/2 were not carried through. Scaling this function's output by sqrt(2) reproduces
+    their alanine curve to within about 1% at thresholds of 1e-4, 1e-6 and 1e-8, so the
+    factor is a reporting convention rather than a difference in the fit - the fit
+    itself is unaffected, and the grid sizes agree without any such adjustment.
     """
     S_num = (R * weights[:, np.newaxis]).T @ R
     return float(np.sqrt(0.5 * np.sum((S_num - S) ** 2)) / S.shape[0])
