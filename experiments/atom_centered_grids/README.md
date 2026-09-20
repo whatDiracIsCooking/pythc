@@ -39,6 +39,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `gradient.py` | whether the analytic nuclear gradient agrees with the curve, where the ridge floor is for a derivative, and how much torque a frozen point set exerts |
 | `window.py` | what sets that floor, whether a different filter moves it, and what the torque is once the regulariser is taken out of it |
 | `torque_ladder.py` | whether the torque `window.py` is left holding converges away with grid size, the way the energy spread did |
+| `trajectory.py` | what that torque does over a trajectory, and whether it is worse than the quadrature the grid is pruned from |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -67,12 +68,19 @@ uv run python scan.py methanol 1e-3 --damped-lambdas 1e-8,1e-10  # still smooth?
 uv run python torque_ladder.py methanol --scheme damped --ridges 1e-8,1e-10 --draws 4 \
     --out torque_ladder_methanol_damped.json                     # the torque, vs grid size
 uv run python torque_ladder.py water --scheme damped --parent    # with the complete-grid floor
-uv run python torque_ladder.py --report data/torque_ladder_*.json
+uv run python torque_ladder.py --report data/torque_ladder_*.json --report-ridge pinv
+uv run python torque_ladder.py methanol --modes parent,parent1 --scheme damped \
+    --ridges 1e-8 --pinv --draws 2          # the complete-grid floor
+uv run python trajectory.py methanol --modes hf,blocked,ghost --steps 5000 \
+    --torque-every 4 --feedback ghost --out data/traj_methanol_tumbling.json
+uv run python trajectory.py methanol --modes hf --reference rks --xc pbe \
+    --grid-level 0 --steps 2000 --out data/traj_methanol_rks.json   # the DFT control
+uv run python trajectory.py --report data/traj_*.json
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Eleven headlines:
+See [`FINDINGS.md`](FINDINGS.md). Fourteen headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -132,6 +140,31 @@ See [`FINDINGS.md`](FINDINGS.md). Eleven headlines:
   varies by 2.28 uHa along a bond scan - a constant offset, which does nothing to a
   trajectory. Every scheme, and the bare frozen grid itself, biases the O-H force constant
   by under **1.7 cm^-1**. The case against the ridge is the gradient noise alone.
+* **The torque converges away with grid size - in every mode.** The ladder that said
+  otherwise was taken at `ridge 1e-4`, three decades outside where §12 says a torque means
+  anything; `--scheme` did not exist when that data was produced. Re-run damped against a
+  `--pinv` control, methanol goes `blocked` **357 -> 0.02** uHa/rad over 235 -> 670 points
+  and `ghost` **969 -> 27** over 223 -> 702. Water is 0.00 on every rung of every mode and
+  on its unpruned parent.
+* **The orientation gap is the weight footing - not the transfer, and not the pruning.**
+  `ghost` converges like `blocked1` (35.6x against 39.6x) and not like weighted `blocked`
+  (17667x). The complete 3284-point parent grid sits at **0.24** uHa/rad and the *pruned*
+  670-point weighted grid at **0.02**, so pruning is a benefit rather than a cost. What a
+  transferable support cannot do is carry in-molecule weights - which makes fitting
+  per-element weights for that objective the highest-leverage thing left.
+* **Over a trajectory the leak reorients rather than heats, and it is smaller than the
+  grid it is pruned from.** 2.5 ps of thermal tumbling on methanol: the torque is 95%
+  incoherent, the spin-up component is pinned by energy conservation at the size of the
+  orientational potential itself, and what accumulates is **4.5 degrees of rotation-axis
+  tilt**. Meanwhile RKS/PBE on the same level-0 Becke grid loses **9.25 hbar in 1 ps**
+  against the frozen support's **1.49 in 2.5 ps** - lab-fixed atom-centred quadrature is
+  what the whole family does, and the pruned reweighted support is six times better at it
+  than its own parent. A level-3 grid is 2-3 decades better still, on 163x the points.
+* **The orbital response is now a prerequisite, not a refinement.** On the fixed-orbital
+  surface the force is not the gradient of the propagated energy, and that alone breaks
+  rotational invariance at **~8300 uHa/rad** - fifty times the transferable grid's own
+  torque, and identical on a grid with five thousand times less. No AIMD runs on the
+  present gradient whatever the grid does.
 * **The gradient exists and verifies to machine precision** (`pythc.grad`, driven by
   `gradient.py`): quadratic convergence against a finite difference, and forces that sum
   to zero to 2.4e-15 with no finite difference involved. Two things came back with it
