@@ -42,40 +42,44 @@ def points_for(pts, floor, target):
     return None
 
 
-for path in sys.argv[1:] or sorted(glob.glob('*.json')):
-    d = json.load(open(path))
-    if 'rows' not in d:
-        continue
-    meta, rows = d['meta'], d['rows']
-    becke = next((r for r in rows if r.get('mode') == 'becke'), None)
-    if becke is None:
-        continue
-    floor = becke['err_uha']              # converged value on the full parent grid
-    # Whichever modes this file actually holds, in a fixed order. Anything the fixed
-    # order does not name - ensemble.py labels its rows by ensemble, not by mode - is
-    # appended in the order it first appears, so a file of unknown modes still ranks
-    # against whichever of them came first.
-    known = ('global', 'blocked', 'global_orbits', 'blocked_orbits', 'free', 'ghost')
-    modes = [m for m in known if curve(rows, m)]
-    for r in rows:
-        m = r.get('mode')
-        if m and m != 'becke' and m not in known and m not in modes:
-            modes.append(m)
-    curves = {m: curve(rows, m) for m in modes}
+def main(paths):
+    for path in paths or sorted(glob.glob('*.json')):
+        d = json.load(open(path))
+        if 'rows' not in d:
+            continue
+        meta, rows = d['meta'], d['rows']
+        becke = next((r for r in rows if r.get('mode') == 'becke'), None)
+        if becke is None:
+            continue
+        floor = becke['err_uha']              # converged value on the full parent grid
+        # Whichever modes this file actually holds, in a fixed order. Anything the fixed
+        # order does not name - ensemble.py labels its rows by ensemble, not by mode - is
+        # appended in the order it first appears, so a file of unknown modes still ranks
+        # against whichever of them came first.
+        known = ('global', 'blocked', 'global_orbits', 'blocked_orbits', 'free', 'ghost')
+        modes = [m for m in known if curve(rows, m)]
+        for r in rows:
+            m = r.get('mode')
+            if m and m != 'becke' and m not in known and m not in modes:
+                modes.append(m)
+        curves = {m: curve(rows, m) for m in modes}
 
-    print(f"\n=== {meta['molecule']}: {meta['natm']} atoms, {meta['nao']} AOs "
-          f"(parent grid {becke['n_points']} pts, converged err {floor:+.2f} uHa)")
-    header = f"  {'target':>9s}" + "".join(f" {m:>14s}" for m in modes)
-    print(header)
-    for t in TARGETS:
-        need = {m: points_for(curves[m], floor, t) for m in modes}
-        base = need.get(modes[0])
-        cells = []
-        for m in modes:
-            if need[m] is None:
-                cells.append(f" {'n/a':>14s}")
-            elif base and m != modes[0]:
-                cells.append(f" {need[m]:8.0f} ({need[m] / base:4.2f}x)")
-            else:
-                cells.append(f" {need[m]:14.0f}")
-        print(f"  {t:7.0f}uHa" + "".join(cells))
+        print(f"\n=== {meta['molecule']}: {meta['natm']} atoms, {meta['nao']} AOs "
+              f"(parent grid {becke['n_points']} pts, converged err {floor:+.2f} uHa)")
+        header = f"  {'target':>9s}" + "".join(f" {m:>14s}" for m in modes)
+        print(header)
+        for t in TARGETS:
+            need = {m: points_for(curves[m], floor, t) for m in modes}
+            base = need.get(modes[0])
+            cells = []
+            for m in modes:
+                if need[m] is None:
+                    cells.append(f" {'n/a':>14s}")
+                elif base and m != modes[0]:
+                    cells.append(f" {need[m]:8.0f} ({need[m] / base:4.2f}x)")
+                else:
+                    cells.append(f" {need[m]:14.0f}")
+            print(f"  {t:7.0f}uHa" + "".join(cells))
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

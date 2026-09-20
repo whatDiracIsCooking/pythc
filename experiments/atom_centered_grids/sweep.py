@@ -47,10 +47,19 @@ def geom_from_smiles(smiles, seed=0xf00d):
 
 
 MOLECULES = {
-    'water':    lambda: WATER,
-    'methanol': lambda: geom_from_smiles('CO'),
-    'ethanol':  lambda: geom_from_smiles('CCO'),
-    'alanine':  lambda: geom_from_smiles('C[C@@H](N)C(=O)O'),
+    'water':        lambda: WATER,
+    'methanol':     lambda: geom_from_smiles('CO'),
+    'ethanol':      lambda: geom_from_smiles('CCO'),
+    'alanine':      lambda: geom_from_smiles('C[C@@H](N)C(=O)O'),
+    # Added for transfer.py. These exist to put an element into bonding it was never
+    # fitted in: multiple bonds (shorter than any ghost shell) and nitrogen (absent
+    # from the ghost partner list entirely). See the SUITE table in transfer.py.
+    'ethane':       lambda: geom_from_smiles('CC'),
+    'ethene':       lambda: geom_from_smiles('C=C'),
+    'acetylene':    lambda: geom_from_smiles('C#C'),
+    'formaldehyde': lambda: geom_from_smiles('C=O'),
+    'methylamine':  lambda: geom_from_smiles('CN'),
+    'hcn':          lambda: geom_from_smiles('C#N'),
 }
 
 
