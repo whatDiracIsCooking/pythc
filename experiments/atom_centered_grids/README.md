@@ -1,5 +1,9 @@
 # Are per-atom THC grids affordable?
 
+**Picking this up fresh? Start with [`HANDOFF.md`](HANDOFF.md)** - it records what was
+tried, which parts of the prior design reasoning the measurements overturned, and the
+ordered list of next steps.
+
 The atom-centered proposal is to fit a THC grid once per element, offline, and translate it
 rigidly into any molecule. That buys unconditionally smooth potential energy surfaces —
 the fitted weights carry no geometry dependence at all, so `dw/dR = 0` and the only
