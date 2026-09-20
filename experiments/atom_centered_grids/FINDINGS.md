@@ -1035,6 +1035,14 @@ gradient scale.
 
 ### The spread does not track the torque, and the transferable grid is where it shows
 
+**[SUPERSEDED by section 13. This subsection generalises from one pair of water grids
+under the ridge, and both halves of that are the worst available choice: water is the one
+molecule whose torque is identically zero, and the ridge is the one filter that
+manufactures a torque where none exists. Over a 20-rung ladder at `pinv`, `log|tau|`
+tracks the rotation spread at Spearman +0.89 and the grid's own accuracy at +0.86, against
+-0.54 for the point count. The spread is a serviceable proxy for the torque; what neither
+tracks is the point count.]**
+
 Running the same script on the actual proposed object - a ghost-fitted per-element
 support, transferred onto water's nuclei, 208 points at threshold `3e-4` - reproduces
 every verification result (quadratic convergence, 6.9e-8 -> 7.1e-10; forces summing to
@@ -1296,6 +1304,236 @@ such crowd, agree to within noise (ethanol: 103.1 against 103.4).
 Nothing here integrates a trajectory, which is still the measurement that would settle
 what any of these torques do over time.
 
+## 13. The ladder under the right filter, and a trajectory: the leak is real, bounded in the part that matters, and smaller than the grid it is pruned from
+
+`torque_ladder.py --scheme damped --pinv`, `trajectory.py`. Section 12 ended by
+naming two measurements. The first was a ladder: it had continued the torque to small
+`lambda` on one grid per mode and could not say whether what was left converges with grid
+size. The second was a trajectory - "nothing here integrates a trajectory, which is still
+the measurement that would settle what any of these torques do over time". Both are done
+here, and a third measurement that neither section asked for turns out to reframe both.
+
+### The committed ladder measured the regulariser
+
+The ladder in `data/torque_ladder_{methanol,water}.json` was run at `ridge` `1e-3` and
+`1e-4`. Section 12's whole point is that a torque at that `lambda` is mostly the
+regulariser, and the README says in terms that the ladder "must be run with
+`--scheme damped`". It was not: `--scheme` entered `torque_ladder.py` in the merge that
+*followed* those files, so the data predates the option. The reading taken from them -
+that the in-molecule grid converges and the transferable one does not - is therefore a
+statement about `(S + lambda I)^-1`, not about either grid.
+
+`--pinv` is new here and is what makes the re-run interpretable. Both filters reduce to
+the truncated pseudoinverse as `lambda` falls, so `pinv` is the torque they converge on;
+`window.py` already carries that control for one grid per mode, and without it on a
+ladder there is no way to attribute a trend down the rungs to the grid rather than to the
+filter.
+
+### Every mode converges
+
+Methanol, `pinv`, net torque in uHa/rad:
+
+| mode | 223-235 | 301 | 410-414 | 491-512 | 627 | 670-702 | factor |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `blocked` (NNLS weights) | 357.4 | 39.0 | 0.90 | 0.12 | - | **0.02** | 17667x |
+| `blocked1` (`w = 1`) | 357.4 | 121.3 | 63.8 | 3.15 | - | **9.02** | 39.6x |
+| `ghost` (`w = 1`, transferable) | 968.6 | - | 175.1 | 792.8 | 79.4 | **27.2** | 35.6x |
+| `ghostw` (ghost-fitted weights) | 698.2 | - | 42.5 | 143.1 | 1.4 | **52.3** | 13.4x |
+
+**The torque converges away with grid size, in every mode, and section 12's open question
+closes the other way from the ridge ladder's reading.** `blocked` does it cleanly and
+monotonically over four orders of magnitude. The other three do it noisily and over one
+to two.
+
+Water does it before the ladder starts: 0.00 uHa/rad on all five rungs of all four modes
+*and* on the unpruned 1642-point parent, against ridge values reaching 28993. At 24 AOs
+its co-density manifold saturates, the fit is exact, and an exact fit cannot depend on the
+grid. Sections 8 and 10 both decline to quote water; section 11 quoted it for the torque
+and should not have.
+
+### The gap is the weight footing, not the transfer
+
+The ghost grid does not converge like an in-molecule fit. It converges like an in-molecule
+fit **at its own weight footing**: 35.6x against `blocked1`'s 39.6x, where weighted
+`blocked` manages 17667x. A transferable support can carry `w = 1` or the weights its
+ghost fit produced and nothing else, so it inherits `blocked1`'s convergence, and that -
+not the transfer - is what the orientation dependence costs.
+
+At the top rung all four modes land within 2.7-3.6 uHa of the reference, so this is a
+matched-accuracy comparison. The robust statistic (rms over random per-atom orientations)
+reads 0.13, 9.28, 22.01, 9.22 uHa/rad in the table's order. The transferable object is
+roughly a hundred times noisier in orientation than the weighted in-molecule fit and
+within a factor of two of the same fit stripped of its weights.
+
+This is the third time the weights have turned out to be the live variable after section 3
+wrote them off, and the second time the correction has been in the same direction: a
+positive diagonal rescaling is absorbed exactly by the *pseudoinverse*, and nothing in
+this programme is evaluated at the pseudoinverse except these control rows.
+
+### The rotation spread does track the torque
+
+Section 11 put the spread on the list of metrics that do not measure what they are used
+for, on the strength of one pair of water grids: 1.9x the spread, 30x the torque. Over all
+20 `pinv` rungs here, `log|tau|` tracks
+
+| against | Pearson | Spearman |
+| --- | --- | --- |
+| the rotation spread | +0.88 | **+0.89** |
+| the grid's own `err_uHa` | +0.67 | **+0.86** |
+| the point count | -0.55 | -0.54 |
+
+**The torque tracks how good the grid is, not how big it is**, and the spread is a
+perfectly serviceable proxy for it. Section 11's counterexample was two grids on the one
+molecule whose torque is identically zero, under the one filter that manufactures one.
+That also explains the non-monotonicity above: the ghost ladder's torque spikes at exactly
+the rung where its *accuracy* spikes (512 points, 20.8 uHa), which is the coarse,
+non-monotone threshold ladder section 9 already documented, not a defect of the torque.
+
+### What a trajectory has to be propagated on, and why it is not the THC surface
+
+`pythc.grad` returns the correlation gradient at a fixed SCF reference. That force is not
+the gradient of `E_HF + E_corr^THC`, and the first attempt to propagate on it says what the
+inconsistency costs: methanol on the 414-point ghost grid reaches **32.4 hbar** of angular
+momentum in 0.1 ps with a 3826 uHa energy drift, while the grid's own torque integrates to
+0.15 over the same window.
+
+That is not the frozen grid, and the control proves it. The same coupled dynamics on a
+670-point `blocked` grid - whose own torque along that run is **0.05 uHa/rad** rms against
+the ghost grid's 242, some five thousand times smaller - gains **8.63 hbar in 25 fs**,
+where the ghost grid gains 8.41. Both
+correspond to about **8300 uHa/rad** of spurious torque. **The omitted orbital response
+breaks rotational invariance roughly fifty times harder than the transferable grid does**,
+and it does so identically whatever grid it is paired with. Section 11 prices the response
+at 4.7e-4 relative in the rotational identity and calls it standard machinery left undone;
+for dynamics it is not a refinement but a prerequisite, and it is the larger of the two
+symmetry violations in the pipeline by a wide margin.
+
+So the trajectory is driven by the DF-RHF gradient instead, and the frozen grid's
+`tau_net` is evaluated along it and integrated: `dL = int tau dt`. Density-fitted
+Hartree-Fock has no quadrature grid at all, so that surface is exactly rotationally
+invariant as well as exactly consistent - methanol's 1.5 ps run conserves `L` to
+**2.3e-5 hbar** from an initial zero - and a leak measured along it is the frozen grid's
+and nothing else's. The leaked angular momentum is fed back as a real rotation of the
+molecule against the lab-fixed grids (`FrozenGrid` already takes per-atom rotations, and
+turning every grid by `Q^-1` about its nucleus is the same configuration as turning the
+molecule by `Q`), so the torque is evaluated where the leak has actually put the molecule
+rather than where it started.
+
+### The leak, decomposed
+
+The decomposition is the result. A leak **along** `L` changes how fast the molecule spins
+and therefore does work, so the orientational potential's own amplitude - section 7's
+rotation spread, tens of uHa - bounds it. A leak **across** `L` does no work at leading
+order, so nothing bounds it a priori; it tilts the rotation axis instead. Only the first
+could heat a trajectory, and a bare `|leak|` conflates them.
+
+Methanol at 300 K carrying thermal rotation, `|L| = 18.24 hbar`, 2.5 ps - between one and
+three turns about each principal axis, so every orientation the molecule visits has been
+swept:
+
+| grid | points | coherence | leak | along `L` | across `L` | axis tilt |
+| --- | --- | --- | --- | --- | --- | --- |
+| `blocked` | 301 | 0.04 | 0.316 | -0.191 | 0.252 | 0.79 deg |
+| `ghost` | 414 | 0.05 | 1.487 | +0.357 | 1.444 | **4.53 deg** |
+
+in hbar. **Coherence - the norm of the torque's time average over the rms of its
+instantaneous norm - is 0.05.** The torque averages to five percent of itself over a
+tumble, which is the quantitative form of the claim that a conservative orientational
+potential cannot drive a molecule that turns through it. The component along `L` sits at
++0.36 hbar, a rotational energy of tens of uHa against that grid's 31 uHa rotation
+spread, which is where energy conservation says it has to be.
+
+What is left should not be quoted as bounded. Across the run the leak goes
+0 -> 1.16 (0.9 ps) -> 1.02 (1.5 ps) -> 1.49 (2.5 ps): it rises to a plateau and then
+wanders on it, and the straight-line slope of 0.42 hbar/ps is dominated by the initial
+rise rather than by anything secular. **The failure mode is slow artificial reorientation
+of the rotation axis - 4.5 degrees in 2.5 ps - not heating and not spin-up.**
+
+Water is the null control and behaves like one: rank-saturated, torque 0.00 on every rung
+of the ladder, and a leak of **0.0027 hbar over 2 ps**, 0.03 degrees of tilt, against
+methanol's 1.487. The leak tracks the torque, which is the one thing a trajectory had to
+demonstrate before any number it produced could be attributed to the freeze.
+
+The companion arm, `--project-rotation`, removes `L` from the initial velocities so that
+`L(0) = 0` exactly and there is nothing to subtract. It is the worst case by construction:
+a molecule that is not turning never lets the torque reverse. The ghost grid leaks
+1.787 hbar over 1.5 ps there and spins the molecule through 116 degrees. It should be read
+as an upper bound rather than as a trajectory - it is the one arm whose rotational kinetic
+energy has no legitimate source, since the RHF trajectory generating its geometries does
+not pay for it, and by the end that energy is about twice what the orientational potential
+can supply.
+
+### Against the quadrature it is pruned from
+
+None of the above says whether the defect is acTHC's. A Becke grid is Lebedev shells
+generated in **lab axes** and translated onto nuclei; rotate the molecule and the points
+move relative to it. That is exactly what a frozen per-element support does, and it is
+what every atom-centred-grid method does, DFT included. The trajectories above do not show
+it only because their reference is density-fitted Hartree-Fock, which has no grid.
+
+`trajectory.py --reference rks` puts an ordinary grid back in. Same molecule, same initial
+condition, same level-0 Becke grid every THC fit in this directory is pruned from,
+`grid_response=True` so the Becke weight derivatives are in the force - they are 12% of
+its norm, and without them this would measure PySCF's default rather than what DFT can do
+- and the energy conserved to tens of uHa:
+
+| surface | grid | `|L - L0|` | over |
+| --- | --- | --- | --- |
+| RKS/PBE | level-0 Becke, 2328 pts | **9.25 hbar** | 1.0 ps |
+| frozen `ghost` THC | pruned from level 0, 414 pts | **1.49 hbar** | 2.5 ps |
+| RKS/PBE | level-3 Becke | **0.005 hbar** | 38 fs |
+| DF-RHF | none | 2.3e-5 hbar | 1.5 ps |
+
+all on methanol from the same initial condition. The level-0 row is not an integrator
+artefact: its energy drifts 21.7 uHa over the whole picosecond while `|L|` swings
+18.24 -> 10.07 -> 15.61, so the force is consistent with the energy and the angular
+momentum is going into the grid.
+
+Two things follow, and they point in opposite directions.
+
+**Against the quadrature it is actually built from, the frozen support wins.** A level-0
+DFT calculation on the same molecule loses six times more angular momentum in 40% of the
+time, and keeps going. The frozen per-element support is not merely no worse than its
+parent grid - it is quieter than it. The ladder predicted this without anyone noticing:
+torque tracks grid accuracy at Spearman +0.86, and the NNLS reweighting `NNLSGrid`
+performs makes the pruned grid a better quadrature than its parent, which is the property
+the README already advertises for the overlap matrix and which turns out to buy
+orientation quality as well.
+
+**Against a production DFT grid, it does not.** Level 3 conserves `L` to `0.005 hbar`,
+some two to three orders of magnitude better than the frozen support. So "acTHC is no
+worse than DFT" is true of a matched, coarse parent grid and false of the grids anyone
+actually runs DFT on. The right reading is that **orientation quality is inherited from
+the parent grid and improved on, not created**: everything in this directory is pruned
+from a level-0 Becke grid, which is a bad grid to be rotationally invariant on, and the
+ladder's convergence with point count is the same statement from the other side. A frozen
+support built from a finer parent should inherit the finer parent's invariance; nothing
+here tests that, and it is the cheapest remaining experiment in the programme.
+
+### What this does not settle
+
+cc-pVDZ, `ov` mode, MP2, fixed-orbital, methanol and water, one initial condition per arm,
+gas phase, 1.5-2.5 ps. The saturation argument is physics and should generalise, but the
+*size* of the plateau on a larger molecule with smaller rotational constants - where
+tumbling is slower and the torque has longer to act coherently - is untested, and that is
+the obvious next run.
+
+The DFT comparison is against acTHC's own parent grid, which is the right control for "is
+this defect acTHC's fault" and the wrong one for "is this defect tolerable". Level 0 is
+very coarse by production standards.
+
+The leak is integrated along a trajectory the frozen grid does not itself generate. The
+feedback closes the loop that matters - the torque is evaluated at the orientation the leak
+has produced - but the internal coordinates are those of the RHF trajectory, so the
+treatment is first order in the leak. The tumbling arm turns the molecule through 133
+degrees of spurious rotation by the end, which is not small, and a fully coupled run would
+need the orbital response first.
+
+`trajectory.py` carries several grids along one trajectory so that the comparison between
+them has no sampling difference in it, but only the grid named by `--feedback` gets its
+own orientation; the others are measured at that grid's. On the tumbling arm that is a
+few degrees of difference and the `blocked` row should be read with it in mind.
+
 ## Verdict
 
 The proposed object exists: §8 builds genuine offline per-element point sets, fits
@@ -1351,6 +1589,25 @@ rank-saturated, so its torque was always going to be zero - and the ghost-to-blo
 on a molecule that does not saturate is **4.5x, not 30x**. The angular-momentum leak on
 the real object is **3.1e-3 bohr/rad**, not 1.35e-1.
 
+**§13 closes the orientation question and moves it off the critical path.** The ladder
+§12 asked for, run under the filter §12 mandated and against a `pinv` control, says the
+torque converges away with grid size in every mode - the committed ladder that said
+otherwise was taken at `ridge 1e-4`, three decades outside where a torque means anything.
+What separates the transferable grid from the in-molecule one is the **weight footing**,
+not the transfer: `ghost` converges like `blocked1` and not like weighted `blocked`. The
+trajectory then says what the residue costs. Over 2.5 ps of thermal tumbling the torque is
+**95% incoherent**; the component along `L` that could spin the molecule up is pinned by
+energy conservation at tens of uHa, the size of the orientational potential itself; what
+accumulates is **4.5 degrees of rotation-axis tilt**, which is artificial rotational
+diffusion rather than heating. And the control that reframes the whole question:
+**RKS/PBE on the level-0 Becke grid these fits are pruned from loses angular momentum
+twenty times faster and to twice the excursion.** Lab-fixed atom-centred quadrature is not
+an acTHC defect - it is what every atom-centred grid does, and the pruned, reweighted
+support is quieter at it than its own parent. The one thing §13 does make urgent is the
+**orbital response**: on the fixed-orbital surface the force is not the gradient of the
+propagated energy, and that alone breaks rotational invariance at ~8300 uHa/rad, fifty
+times the frozen grid's own torque and identical on a grid with five thousand times less.
+
 What remains to be measured, in order:
 
 1. ~~**The ghost gap.**~~ **Done - see §8, and the answer is yes.** 1.1-1.8x over
@@ -1382,11 +1639,29 @@ What remains to be measured, in order:
    in the PES, exactly at the eigenvalue crossings; ridge at `lambda = 1e-8` removes them
    for 0.1-2.2 uHa. Ridge has a floor of its own, and smoothness finds it before accuracy
    does.
-6. **Does the torque §12 is left holding converge away with grid size?** §12 continued
-   the torque to small `lambda` on one grid per mode and found most of §11's number was
-   the regulariser; it did not vary the grid size, so §7's convergence claim is still
-   untested in `dE/dtheta`. `torque_ladder.py` runs that ladder and must be run under the
-   damped filter - a ladder taken at `lambda = 1e-4` measures the ridge, not the grid.
+6. ~~**Does the torque §12 is left holding converge away with grid size?**~~ **Done -
+   see §13, and the answer is yes, in every mode.** Methanol at `pinv`, over 223-235 to
+   670-702 points: `blocked` 357 -> 0.02 uHa/rad, `blocked1` 357 -> 9.0, `ghost`
+   969 -> 27, `ghostw` 698 -> 52. Water is 0.00 everywhere including its unpruned parent.
+   The ladder that said otherwise was taken at `ridge` `1e-4`, which §12 disqualifies -
+   `--scheme` did not exist when that data was produced. §13 also settles what the gap
+   between the transferable grid and the in-molecule one is made of: the **weight
+   footing**, since `ghost` converges like `blocked1` (35.6x against 39.6x) and not like
+   weighted `blocked` (17667x).
+7. ~~**What does the torque do over a trajectory?**~~ **Done - see §13.** It reorients
+   rather than heats. Over 2.5 ps of thermal tumbling the torque is 95% incoherent, the
+   component along `L` that could spin the molecule up is held at +0.36 hbar by energy
+   conservation, and what accumulates is 4.5 degrees of rotation-axis tilt. Water, which
+   saturates, leaks 0.0027 hbar. And the comparison nobody had made: **plain RKS/PBE on
+   the same level-0 Becke grid the THC fits are pruned from loses angular momentum about
+   twenty times faster and to twice the excursion**, so the frozen support is quieter in
+   orientation than its own parent quadrature.
+8. **Implement the orbital response.** §13 promotes this from the standard machinery §11
+   left undone to a prerequisite. On the fixed-orbital surface the force is not the
+   gradient of the propagated energy, and the resulting violation of rotational invariance
+   is **~8300 uHa/rad** - about fifty times the transferable grid's own torque, and
+   identical on a grid with five thousand times less torque of its own. No AIMD is
+   possible on the present gradient whatever the grid does.
 
 
 ## Caveats
