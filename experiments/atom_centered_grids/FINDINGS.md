@@ -568,6 +568,124 @@ accuracy. Support agreement is the same kind of diagnostic: it measures whether 
 grids are the same grid, which is not the question. Only the point count at matched
 energy is.
 
+## 9. The ghost ensemble matters, and §8 picked the worst of four
+
+`ensemble.py`. §8 fitted every element against one ghost ensemble - 12 icosahedral
+directions, partners H/C/O at 0.90/1.05/1.45 times the covalent bond length, one
+(partner, scale) combination cycled per direction, 13 environments - chosen once and
+never varied. HANDOFF.md called varying it the cheapest open question in the programme.
+It is, and it does not give the reassuring answer.
+
+Two axes, both already implemented in `ghosts.py` and neither previously run: 12
+icosahedral directions against 6 octahedral, and one cycled (partner, scale) per
+direction against `--full-cross`, every combination in every direction. The 2x2, by
+environment count:
+
+| ensemble | directions | combinations | environments |
+| --- | --- | --- | --- |
+| `icosa-cycled` | 12 | cycled | 13 (this is §8's) |
+| `icosa-full` | 12 | full cross | 109 |
+| `octa-cycled` | 6 | cycled | 7 |
+| `octa-full` | 6 | full cross | 55 |
+
+Methanol, parent-grid floor `+2.79` uHa, every grid at `w = 1` and `metric_ridge = 1e-8`.
+The `icosa-cycled` rows reproduce §8's table exactly, so this is the same measurement
+with the ensemble swapped underneath it:
+
+```
+ensemble        points: error above floor (uHa), along the threshold ladder
+blocked          301:  13.6   491:   2.5   670:   1.4
+icosa-cycled     223: 275.1   414:  17.0   512:  27.5   627: 6.1   702: 3.1   816: 2.9
+icosa-full       318:  73.3   554:   2.6   726:   1.4   916: 0.6  1066: 0.4  1178: 0.5
+octa-cycled      195: 422.2   269: 153.8   351:  80.1   408:13.2   454: 6.0   528: 4.0
+octa-full        288: 133.5   414:  30.0   523:   7.5   690: 3.0   782: 1.5   816: 1.4
+```
+
+`analyse.py`, interpolating each curve to a fixed distance above the floor, as a ratio
+against the in-molecule `blocked` grid:
+
+| target | blocked | icosa-cycled | icosa-full | octa-cycled | octa-full |
+| --- | --- | --- | --- | --- | --- |
+| 50 uHa | 301 | 326 (1.08x) | 339 (1.13x) | 365 (1.21x) | 366 (1.22x) |
+| 20 uHa | 301 | 399 (1.33x) | 395 (1.31x) | 394 (1.31x) | 443 (1.47x) |
+| 10 uHa | 329 | 586 (**1.78x**) | 443 (1.35x) | 424 (**1.29x**) | 498 (1.51x) |
+| 5 uHa | 402 | 647 (**1.61x**) | 497 (1.24x) | 486 (**1.21x**) | 591 (1.47x) |
+| 2 uHa | 551 | n/a | 620 (1.12x) | n/a | 742 (1.35x) |
+
+### The answer is no: one cheap ensemble does not simply suffice
+
+The spread across the 2x2 is **1.29x to 1.78x at 10 uHa and 1.21x to 1.61x at 5 uHa** -
+a factor of ~1.35 between the best and worst ensemble, which is the same size as the
+entire ghost gap §8 set out to measure. The ensemble is not a detail.
+
+Worse for §8's headline: **`icosa-cycled` is the worst of the four** at both of the
+targets anyone would quote. The 1.78x and 1.60x in §8 are not "the cost of a
+transferable grid"; they are the cost of one arbitrary ensemble that happens to be the
+weakest corner tested. On methanol the achievable figure is **1.21-1.35x**, and
+compounding the best ensemble with §1's blocked/global ratio gives 1.51 x 1.29 =
+**1.9x** at 10 uHa and 1.47 x 1.21 = **1.8x** at 5 uHa, against §8's 2.7x and 2.4x. That is a revision in the programme's favour, but it is a revision, and every
+ratio in §8 should now be read as an upper bound rather than an estimate.
+
+The ranking is not the obvious one either. `octa-cycled` - the *cheapest* ensemble in
+the set, 7 environments against `icosa-full`'s 109 - is the best grid at 5 and 10 uHa.
+More sampling of the neighbour's position is not monotonically better, so this cannot be
+tuned by simply spending more environments.
+
+### Ensembles run out of rank, and that sets an accuracy ceiling
+
+The cycled ensembles never reach 2 uHa at any threshold. Driving the KKT threshold to
+zero shows why - the support saturates far below the parent grid, at a size that is a
+property of the ensemble alone (`ensemble.py --saturate`):
+
+| element | parent | octa-cycled (7) | icosa-cycled (13) | octa-full (55) | icosa-full (109) |
+| --- | --- | --- | --- | --- | --- |
+| H | 392 | 80 | 131 | 130 | 204 |
+| C | 858 | 110 | 155 | 160 | 246 |
+| O | 858 | 140 | 201 | 219 | 318 |
+
+This is the same shape as §8's free-atom result, at a much higher ceiling and for a
+different reason. The free atom ran out of **equations**: an isolated hydrogen's overlap
+target supplies `n_AO(n_AO+1)/2` = 15 of them in cc-pVDZ, so NNLS can retain at most 15
+points. The ghost ensembles supply equations in the thousands - 750 for `octa-cycled` on
+H, 36177 for `icosa-full` on C - far more than the 392 or 858 parent points, so
+`min(n_equations, n_variables)` is not binding anywhere. What they run out of is
+*independent* equations: Lawson-Hanson halts once the residual is orthogonal to every
+remaining column, so the support saturates at the **effective rank of the stacked
+target**. §8's lesson should be restated accordingly - a ghost ensemble has to supply
+rank, and counting environments is not the same as counting rank. `octa-full` has four
+times the environments of `icosa-cycled` and essentially the same ceiling.
+
+The practical consequence is that **the ensemble caps the accuracy**, not just the point
+count. No threshold tuning gets `octa-cycled` below ~4 uHa on methanol, because its
+element grids cannot hold more than 80/110/140 points. An ensemble must be chosen for the
+accuracy target before a threshold is chosen within it.
+
+### The supports barely overlap between ensembles
+
+The SCF-free diagnostic (`ensemble.py --calibrate`) puts the Jaccard overlap between
+each ensemble's support and `icosa-cycled`'s at **0.01 to 0.48** across elements and
+thresholds - lower, in places, than the 24-31% agreement §8 measured between the ghost
+and `blocked` fits. Even `icosa-full` against `icosa-cycled`, which differ only in how
+densely the same 12 directions are sampled, shares J = 0.24-0.48.
+
+Consistent with §2, §5 and §8, this is not itself a defect: four largely disjoint point
+sets land within 1.35x of each other on accuracy, which is one more piece of evidence
+that LS-THC wants *a* spanning set rather than any particular nodes. It does mean support
+overlap remains useless as a quality metric, in this comparison as in §8's.
+
+### The curves are not monotone
+
+`icosa-cycled` gets *worse* between 414 and 512 points (17.0 -> 27.5 uHa above the
+floor), and `icosa-full` between 1066 and 1178 (0.36 -> 0.45). A tighter KKT threshold
+does not give a superset of the looser one's support - NNLS re-solves and can drop points
+it previously kept - so nothing forces the error to fall. Re-running the interpolation on
+a monotone envelope (best error at or below each size) moves `icosa-cycled` at 10 uHa
+from 1.78x to 1.73x and changes nothing else, so this does not explain the ensemble
+spread; but it does mean a threshold ladder is a coarse instrument, the same warning §7
+gave for the orbit-grouped fits.
+
+---
+
 ---
 
 ## Verdict

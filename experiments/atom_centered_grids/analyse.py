@@ -51,10 +51,16 @@ for path in sys.argv[1:] or sorted(glob.glob('*.json')):
     if becke is None:
         continue
     floor = becke['err_uha']              # converged value on the full parent grid
-    # Whichever modes this file actually holds, in a fixed order.
-    modes = [m for m in ('global', 'blocked', 'global_orbits', 'blocked_orbits',
-                         'free', 'ghost')
-             if curve(rows, m)]
+    # Whichever modes this file actually holds, in a fixed order. Anything the fixed
+    # order does not name - ensemble.py labels its rows by ensemble, not by mode - is
+    # appended in the order it first appears, so a file of unknown modes still ranks
+    # against whichever of them came first.
+    known = ('global', 'blocked', 'global_orbits', 'blocked_orbits', 'free', 'ghost')
+    modes = [m for m in known if curve(rows, m)]
+    for r in rows:
+        m = r.get('mode')
+        if m and m != 'becke' and m not in known and m not in modes:
+            modes.append(m)
     curves = {m: curve(rows, m) for m in modes}
 
     print(f"\n=== {meta['molecule']}: {meta['natm']} atoms, {meta['nao']} AOs "

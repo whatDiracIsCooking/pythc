@@ -34,6 +34,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `ridge.py` | what ridge regularisation of the metric costs in accuracy, against truncation |
 | `scan.py` | whether the metric truncation puts steps in the PES, and whether ridge removes them |
 | `ghosts.py` | what an offline, per-element grid fitted against ghost neighbours costs against `blocked` |
+| `ensemble.py` | whether the *choice* of ghost ensemble changes that cost, and the accuracy ceiling each ensemble imposes |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -49,11 +50,13 @@ uv run python ridge.py methanol 1e-3 --blocked
 uv run python scan.py methanol 1e-3
 uv run python ghosts.py --calibrate H,C,O          # threshold ladder, no SCF, seconds
 uv run python ghosts.py methanol --out ghosts_methanol.json
+uv run python ensemble.py --saturate H,C,O         # each ensemble's ceiling, no SCF
+uv run python ensemble.py methanol --out ensemble_methanol.json
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Five headlines:
+See [`FINDINGS.md`](FINDINGS.md). Six headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
