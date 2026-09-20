@@ -1,0 +1,74 @@
+{
+  "molecule": "methanol",
+  "threshold": 0.003,
+  "n_points": 243,
+  "e_fitted": -0.3433768283801961,
+  "e_rotated": [
+    -0.3433409849828235,
+    -0.3433339053497966,
+    -0.3433693873089211,
+    -0.34336364813451126,
+    -0.34337000366023984,
+    -0.34337289759547784
+  ],
+  "mp2_ref": -0.34340192709398265,
+  "rmsd_fitted": 0.010791731394088178,
+  "rmsd_rotated": [
+    0.10845293638533393,
+    0.09272101253403392,
+    0.10590416099626211,
+    0.14276654877123882,
+    0.15459333237296924,
+    0.07734127503717435
+  ],
+  "shells": [
+    {
+      "atom": "C",
+      "n_shells": 15,
+      "shells_empty": 7,
+      "shells_full": 0,
+      "shells_partial": 8,
+      "mean_partial_fraction": 0.08969516027655562
+    },
+    {
+      "atom": "O",
+      "n_shells": 15,
+      "shells_empty": 6,
+      "shells_full": 0,
+      "shells_partial": 9,
+      "mean_partial_fraction": 0.0925790907186256
+    },
+    {
+      "atom": "H",
+      "n_shells": 10,
+      "shells_empty": 5,
+      "shells_full": 0,
+      "shells_partial": 5,
+      "mean_partial_fraction": 0.07567567567567568
+    },
+    {
+      "atom": "H",
+      "n_shells": 10,
+      "shells_empty": 5,
+      "shells_full": 0,
+      "shells_partial": 5,
+      "mean_partial_fraction": 0.07567567567567568
+    },
+    {
+      "atom": "H",
+      "n_shells": 10,
+      "shells_empty": 5,
+      "shells_full": 0,
+      "shells_partial": 5,
+      "mean_partial_fraction": 0.07837837837837838
+    },
+    {
+      "atom": "H",
+      "n_shells": 10,
+      "shells_empty": 5,
+      "shells_full": 0,
+      "shells_partial": 5,
+      "mean_partial_fraction": 0.0931891891891892
+    }
+  ]
+}

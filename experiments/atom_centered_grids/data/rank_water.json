@@ -1,0 +1,101 @@
+[
+  {
+    "n_points": 1648,
+    "rmsd_S": 0.00033761241005472015,
+    "rank_1e6": 95,
+    "rank_1e8": 95,
+    "rank_1e10": 95,
+    "metric_rank_1e8": 94,
+    "metric_min_eig": 0.0,
+    "metric_cond_log10": 300.0,
+    "grid": "becke (unpruned)"
+  },
+  {
+    "n_points": 91,
+    "rmsd_S": 0.008249529193117775,
+    "rank_1e6": 91,
+    "rank_1e8": 91,
+    "rank_1e10": 91,
+    "metric_rank_1e8": 88,
+    "metric_min_eig": 2.3391257667999736e-09,
+    "metric_cond_log10": 8.630946427032725,
+    "grid": "global 1e-03"
+  },
+  {
+    "n_points": 124,
+    "rmsd_S": 0.002272960534138257,
+    "rank_1e6": 95,
+    "rank_1e8": 95,
+    "rank_1e10": 95,
+    "metric_rank_1e8": 94,
+    "metric_min_eig": 1.0323235021742117e-19,
+    "metric_cond_log10": 18.986184185273583,
+    "grid": "global 1e-04"
+  },
+  {
+    "n_points": 153,
+    "rmsd_S": 0.0004169524418335206,
+    "rank_1e6": 95,
+    "rank_1e8": 95,
+    "rank_1e10": 95,
+    "metric_rank_1e8": 94,
+    "metric_min_eig": 1.582331761026823e-21,
+    "metric_cond_log10": 20.80070245454399,
+    "grid": "global 1e-05"
+  },
+  {
+    "n_points": 186,
+    "rmsd_S": 0.00017742378370036902,
+    "rank_1e6": 95,
+    "rank_1e8": 95,
+    "rank_1e10": 95,
+    "metric_rank_1e8": 94,
+    "metric_min_eig": 1.0687394487169324e-20,
+    "metric_cond_log10": 19.971128159876994,
+    "grid": "global 1e-06"
+  },
+  {
+    "n_points": 156,
+    "rmsd_S": 0.011144541428170925,
+    "rank_1e6": 95,
+    "rank_1e8": 95,
+    "rank_1e10": 95,
+    "metric_rank_1e8": 93,
+    "metric_min_eig": 6.739460199131061e-21,
+    "metric_cond_log10": 20.171374887133368,
+    "grid": "blocked 1e-03"
+  },
+  {
+    "n_points": 204,
+    "rmsd_S": 0.0025223940298043247,
+    "rank_1e6": 95,
+    "rank_1e8": 95,
+    "rank_1e10": 95,
+    "metric_rank_1e8": 94,
+    "metric_min_eig": 1.8911819567590244e-21,
+    "metric_cond_log10": 20.723266684261915,
+    "grid": "blocked 1e-04"
+  },
+  {
+    "n_points": 273,
+    "rmsd_S": 0.0013914863617992988,
+    "rank_1e6": 95,
+    "rank_1e8": 95,
+    "rank_1e10": 95,
+    "metric_rank_1e8": 94,
+    "metric_min_eig": 1.3606403345913987e-21,
+    "metric_cond_log10": 20.866256659032636,
+    "grid": "blocked 1e-05"
+  },
+  {
+    "n_points": 331,
+    "rmsd_S": 0.0012298918163934811,
+    "rank_1e6": 95,
+    "rank_1e8": 95,
+    "rank_1e10": 95,
+    "metric_rank_1e8": 94,
+    "metric_min_eig": 2.5379398050777847e-22,
+    "metric_cond_log10": 21.59551868272696,
+    "grid": "blocked 1e-06"
+  }
+]

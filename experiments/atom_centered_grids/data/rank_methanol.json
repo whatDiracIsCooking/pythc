@@ -1,0 +1,145 @@
+[
+  {
+    "n_points": 3288,
+    "rmsd_S": 0.00026867542665599576,
+    "rank_1e6": 351,
+    "rank_1e8": 351,
+    "rank_1e10": 351,
+    "metric_rank_1e8": 320,
+    "metric_min_eig": 0.0,
+    "metric_cond_log10": 300.0,
+    "grid": "becke (unpruned)"
+  },
+  {
+    "n_points": 150,
+    "rmsd_S": 0.00942084134089709,
+    "rank_1e6": 150,
+    "rank_1e8": 150,
+    "rank_1e10": 150,
+    "metric_rank_1e8": 150,
+    "metric_min_eig": 1.1074094380210497e-06,
+    "metric_cond_log10": 5.9556917794849165,
+    "grid": "global 3e-03"
+  },
+  {
+    "n_points": 180,
+    "rmsd_S": 0.005612512406108855,
+    "rank_1e6": 180,
+    "rank_1e8": 180,
+    "rank_1e10": 180,
+    "metric_rank_1e8": 180,
+    "metric_min_eig": 3.813971321958759e-07,
+    "metric_cond_log10": 6.418622576828001,
+    "grid": "global 1e-03"
+  },
+  {
+    "n_points": 213,
+    "rmsd_S": 0.002839784892287723,
+    "rank_1e6": 213,
+    "rank_1e8": 213,
+    "rank_1e10": 213,
+    "metric_rank_1e8": 213,
+    "metric_min_eig": 4.1326653801818794e-08,
+    "metric_cond_log10": 7.383769757898493,
+    "grid": "global 3e-04"
+  },
+  {
+    "n_points": 240,
+    "rmsd_S": 0.0015990909135283461,
+    "rank_1e6": 240,
+    "rank_1e8": 240,
+    "rank_1e10": 240,
+    "metric_rank_1e8": 240,
+    "metric_min_eig": 1.6109519280112696e-08,
+    "metric_cond_log10": 7.79291741905374,
+    "grid": "global 1e-04"
+  },
+  {
+    "n_points": 288,
+    "rmsd_S": 0.0008681637470833219,
+    "rank_1e6": 288,
+    "rank_1e8": 288,
+    "rank_1e10": 288,
+    "metric_rank_1e8": 272,
+    "metric_min_eig": 6.135477462999204e-10,
+    "metric_cond_log10": 9.212151634815168,
+    "grid": "global 3e-05"
+  },
+  {
+    "n_points": 333,
+    "rmsd_S": 0.00045520581731491315,
+    "rank_1e6": 333,
+    "rank_1e8": 333,
+    "rank_1e10": 333,
+    "metric_rank_1e8": 290,
+    "metric_min_eig": 2.9550122086322077e-12,
+    "metric_cond_log10": 11.529440720491476,
+    "grid": "global 1e-05"
+  },
+  {
+    "n_points": 235,
+    "rmsd_S": 0.010977518343699757,
+    "rank_1e6": 235,
+    "rank_1e8": 235,
+    "rank_1e10": 235,
+    "metric_rank_1e8": 221,
+    "metric_min_eig": 7.758556149150708e-10,
+    "metric_cond_log10": 9.11021909250468,
+    "grid": "blocked 3e-03"
+  },
+  {
+    "n_points": 301,
+    "rmsd_S": 0.00751901090897271,
+    "rank_1e6": 301,
+    "rank_1e8": 301,
+    "rank_1e10": 301,
+    "metric_rank_1e8": 256,
+    "metric_min_eig": 2.0306708505060014e-11,
+    "metric_cond_log10": 10.69236046526751,
+    "grid": "blocked 1e-03"
+  },
+  {
+    "n_points": 410,
+    "rmsd_S": 0.0037587848958071223,
+    "rank_1e6": 345,
+    "rank_1e8": 351,
+    "rank_1e10": 351,
+    "metric_rank_1e8": 283,
+    "metric_min_eig": 5.269127006515607e-21,
+    "metric_cond_log10": 20.27826133310986,
+    "grid": "blocked 3e-04"
+  },
+  {
+    "n_points": 491,
+    "rmsd_S": 0.0017669069677444084,
+    "rank_1e6": 350,
+    "rank_1e8": 351,
+    "rank_1e10": 351,
+    "metric_rank_1e8": 294,
+    "metric_min_eig": 8.107841164666539e-22,
+    "metric_cond_log10": 21.09109476787056,
+    "grid": "blocked 1e-04"
+  },
+  {
+    "n_points": 587,
+    "rmsd_S": 0.001157150954304927,
+    "rank_1e6": 351,
+    "rank_1e8": 351,
+    "rank_1e10": 351,
+    "metric_rank_1e8": 299,
+    "metric_min_eig": 5.971046680992054e-23,
+    "metric_cond_log10": 22.22394953353803,
+    "grid": "blocked 3e-05"
+  },
+  {
+    "n_points": 670,
+    "rmsd_S": 0.0007905040131531934,
+    "rank_1e6": 351,
+    "rank_1e8": 351,
+    "rank_1e10": 351,
+    "metric_rank_1e8": 303,
+    "metric_min_eig": 1.4742155498637786e-22,
+    "metric_cond_log10": 21.831439012221598,
+    "grid": "blocked 1e-05"
+  }
+]
