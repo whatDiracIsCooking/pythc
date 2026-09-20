@@ -31,11 +31,14 @@ molecular fit, i.e. 2.6-7.3x on the `n_P^2` parts, improving with system size** 
 section 4(3), which is done. Section 4(4) then showed the 2.7x end of that range is an
 artefact of an unlucky ghost ensemble on the smallest molecule; with the best ensemble
 tested methanol is 1.9x. The large-system end, which is the one that matters, is
-unaffected.
+unaffected. **Section 4(4) is now finished in full: one frozen point set per element,
+handed unchanged to ten molecules spanning sp3/sp2/sp carbon, sp3/sp2 oxygen, nitrogen,
+and bonds shorter than any the fit ever saw, costs the same 1.2-1.8x everywhere - 1.49x
+in-range against 1.50x out-of-range. The transferable grid transfers.**
 
 ## 2. What was attempted
 
-Eight experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke
+Nine experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke
 parent grid, `ov` mode, 10 Laplace points, against DF-MP2. Geometries from RDKit ETKDG +
 MMFF.
 
@@ -50,6 +53,7 @@ MMFF.
 | `orbits.py` | does fitting whole orbits fix the orientation dependence? | **no.** Exact under the octahedral group, but never better than point-wise at matched size |
 | `ghosts.py` | what does an offline, ghost-fitted per-element grid cost? | **1.1-1.8x over `blocked`**, shrinking with size; free-atom fits fail structurally |
 | `ensemble.py` | does the *choice* of ghost ensemble change that? | **1.35x on methanol, 1.05x on ethanol** - it amortises; but each ensemble has a hard **rank ceiling** |
+| `transfer.py` | does one element's grid serve bonding it was never fitted in? | **yes.** 1.49x in-range vs **1.50x** out-of-range; an unseen partner element costs nothing, and adding one makes things worse |
 
 The key methodological move: `NNLSGrid(blocked=True)` already fits each atomic sub-grid
 independently, so the penalty for giving up molecular pruning is measurable today. Because
@@ -74,6 +78,7 @@ conclusions are listed here with their current status, so they are not re-derive
 | Octahedral ghosts suffice because p orbitals are octahedral | **Rejected in the discussion itself, correctly** - points are sampling locations, not functions, and do not superpose. |
 | Frozen per-atom grids risk orientation-dependent energies | **Confirmed, then deflated, and the deflation now holds for the real object.** No angular shell survives intact, and rank-limited grids shift 27-39 uHa under random per-atom rotation, but the shift converges away with grid size (methanol 218 -> 7.1 -> 0.01 uHa from 175 to 670 points). Ghost-fitted grids are 2-5x more orientation-dependent than `blocked` **at matched point count** - and identical **at matched accuracy** (882 ghost points: +5.14 uHa, 0.94 uHa spread; 491 blocked points: +5.29 uHa, 0.91 uHa spread). Still a symptom of rank limitation, not a separate defect. |
 | Fix isotropy with orbit-wise (group-sparsity) pruning over (radial shell, Lebedev orbit) blocks | **Implemented, measured, and rejected as a fix.** It delivers exactly what it promised - whole orbits, exact octahedral invariance - and that turns out not to be the useful property. At matched point count a point-wise grid is better on both accuracy and rotation spread. See section 4(2) and FINDINGS section 7. |
+| One element's grid will need refitting per bonding environment | **Rejected. Section 4(4), second half.** In-range and out-of-range molecules are indistinguishable, and the worst two in a ten-molecule suite are an sp-nitrile and methanol - the molecule the ensemble was designed around. |
 | Grid inflation will be 2-3x, i.e. 4-9x on the `n_P^2` parts | **Roughly right after all.** The 1.2-1.7x of section 4 priced only *blocked vs global* - one of the two things a transferable grid gives up. Adding the ghost gap gives **1.6-2.7x, i.e. 2.6-7.3x**, improving with system size. Do not quote the 1.2-1.7x figure as the cost of the scheme; it is the cost of half of it. |
 | Unioned per-atom grids will wreck metric conditioning; use ridge, not eigenvalue truncation | **Confirmed, and now implemented and measured** - see section 4(1). Min eigenvalue 1e-20 vs 1e-8; the truncation does put ~0.5 uHa steps in the PES at the eigenvalue crossings, and ridge removes them. One correction: ridge was expected to be a pure improvement, but it has a **floor** the truncation does not - too small a `lambda` inverts the null space's rounding noise. |
 | The overlap-metric target inherits a decade of validation from the 2013 DVR paper | **Substantially undermined.** `rmsd_S` is close to orthogonal to THC accuracy: it degraded 125x under rotation and ~2000x under all-ones weights with no loss (sometimes a gain) in MP2 accuracy. |
@@ -93,15 +98,22 @@ but as a *point selector*, not a weight fitter.
 
 ## 4. Next directions, in order
 
-**(1), (2) and (3) are all done.** (1) was a real prerequisite: the metric truncation was
-the last remaining source of PES non-smoothness, and it is now measured and fixed. (2) was
+**(1), (2), (3) and (4) are all done.** (1) was a real prerequisite: the metric
+truncation was the last remaining source of PES non-smoothness, and it is now measured
+and fixed. (2) was
 believed to be a prerequisite too - the thing that makes "attach the atomic grid rigidly"
 well-defined - and it is not; orientation dependence is a grid-size problem, not a
 structural one. (3) was the one that could still have killed the idea, and it did not:
 ghost-fitted per-element grids exist, they work, and they cost 1.1-1.8x over `blocked`.
 
-**Nothing left can kill the idea cheaply.** (4) transferability and (5) a gradient are now
-the work, and they are ordinary development rather than go/no-go experiments.
+(4) is now done too, in both halves, and it was the last question that could still have
+sent the programme back to the drawing board: if a per-element grid had needed refitting
+per bonding environment, "which environment is this atom in" is a discrete function of
+geometry, putting a discrete step back at runtime and undoing (1) and the whole smooth-PES
+argument. It does not. See section 4(4) and FINDINGS section 10.
+
+**Nothing is left that can kill the idea, and nothing is left to measure. (5) a gradient
+is the only remaining work, and it is ordinary development.**
 
 The target pipeline, for orientation:
 
@@ -225,17 +237,27 @@ What it settled, and what it did not:
   nodes. Do not use support overlap as a quality metric; only point count at matched
   energy means anything.
 
-Left undone here, and **since done in 4(4)**: the ghost ensemble was chosen once and
-never varied. `--full-cross` and `--directions octahedron` have now been run
-(`ensemble.py`), and the choice is worth 1.35x on methanol and 1.05x on ethanol - so the
-methanol ratios below are upper bounds, and the ethanol ones stand. N was never fitted; the grids cover H/C/O. Water was run
-and is not quoted, because at 24 AOs every grid in the comparison is rank-saturated and
-all three modes reach the floor. And no molecule outside the fitting set was tried, which
-is the whole of what (4) means.
+Left undone here, and **all of it since done in 4(4)**:
 
-**(4) Transferability - the leading question, first half DONE.** Two halves. The first -
-does the *ensemble* matter? - is answered in `ensemble.py` and FINDINGS section 9, and
-the answer is "less than feared, but it leaves a constraint behind".
+* the ghost ensemble was chosen once and never varied. `--full-cross` and `--directions
+  octahedron` have now been run (`ensemble.py`), and the choice is worth 1.35x on
+  methanol and 1.05x on ethanol - so the methanol ratios below are upper bounds, and the
+  ethanol ones stand;
+* N was never fitted, so the grids covered H/C/O only. `transfer.py` fits it, and it
+  behaves exactly like C and O (44 to 159 points across the same ladder);
+* no molecule outside the fitting set was tried, which was the whole of what (4) meant.
+  Ten of them have now been, and the ratio does not move - see 4(4).
+
+The one item that stands: water was run and is not quoted, because at 24 AOs every grid
+in the comparison is rank-saturated and all three modes reach the floor. 4(4) reproduces
+that and generalises it - anything below about 40 AOs saturates, which is why its
+`transfer.py` report marks such cells rather than ratioing them.
+
+**(4) Transferability. DONE, both halves.** Two halves. The first - does the *ensemble*
+matter? - is answered in `ensemble.py` and FINDINGS section 9, and the answer is "less
+than feared, but it leaves a constraint behind". The second - does one element's point set
+serve environments it was not fitted in? - is answered in `transfer.py` and FINDINGS
+section 10, and the answer is yes.
 
 * **The sensitivity amortises.** Across the 2x2 of {12 icosahedral, 6 octahedral} x
   {cycled, full cross}, the spread at matched accuracy is 1.29-1.78x on methanol and
@@ -262,23 +284,66 @@ the answer is "less than feared, but it leaves a constraint behind".
   rather than extending the support, so adding points can make the error worse (five
   cases across the two molecules). A threshold ladder is a coarse instrument.
 
-The second half is untouched and is now the whole of what (4) means: **does one element's
-point set serve environments it was not fitted in?** Fit O once and use it in
-water, methanol and formaldehyde; fit C once and use it in an sp3, an sp2 and an sp
-environment. The low support agreement with `blocked` (24-31%) cuts both ways here - it
-may mean the choice of points hardly matters, or it may mean the answer is unstable, and
-those predict opposite outcomes for this experiment. Also worth adding N, which was
-skipped, and checking whether a partner element the fit never saw costs anything.
+**The second half is DONE** - `transfer.py`, FINDINGS section 10 - and the answer is that
+one element's point set serves environments it was not fitted in at no measurable cost.
 
-**(5) Actually compute a gradient.** Still nothing here computes one, and this is now the
-other half of the remaining work. `scan.py` measures the *curve* rather than arguing about
-it structurally, so the smoothness claim is no longer purely theoretical - but a
+One support per element is fitted once, frozen, fingerprinted, and handed unchanged to ten
+molecules: O in water, methanol and formaldehyde; C in sp3 (ethane, methanol, propene), sp2
+(ethene, propene, formaldehyde) and sp (acetylene, hcn, acetonitrile); N in two bonding
+modes. Four of the heavy-atom bonds are *shorter than the tightest ghost shell* - the
+closest C-C ghost is 1.37 A against acetylene's 1.20, and the closest C-O is 1.28 against
+formaldehyde's 1.22 - so they are extrapolations below the training range, not
+interpolations inside it.
+
+* **In-range 1.49x, out-of-range 1.50x at 10 uHa** (1.41x vs 1.46x at 5 uHa). The suite
+  spans 1.20-1.80x, which is the band section 4(3) already reported from methanol and
+  ethanol alone. There is no transferability penalty to find, and the low support
+  agreement with `blocked` turns out to have meant the first thing, not the second: the
+  choice of points hardly matters.
+* **The worst molecules are not the exotic ones.** Acetonitrile (1.80x) and methanol
+  (1.78x) bracket the suite, and methanol is the molecule the ensemble was designed
+  around. Acetylene, a 12% extrapolation below anything ever fitted, is 1.34x. Propene at
+  72 AOs is the best of the set at 1.23x, so this overhead amortises with size like every
+  other one here.
+* **An unseen partner element costs nothing.** Methylamine puts a C-N bond in front of a
+  carbon grid fitted only against H/C/O and is 1.22x / 1.10x, among the best in the suite.
+* **Adding the partner makes it worse, which is the surprise.** Refitting with N in the
+  partner list degrades both nitrogen-free controls (propene 1.23x -> 1.48x, methanol
+  1.78x -> 1.85x) and degrades acetonitrile - which contains the very C#N bond the partner
+  was meant to describe - furthest of all, 1.80x -> 2.33x. Both ensembles hold 13
+  environments; the baseline draws them from 10 distinct (partner, distance) combinations
+  and the N-partner one from 13. So the equation supply is unchanged and only the variety
+  rises. **Environments supply rank and more of them help (section 4(4) first half);
+  variety at fixed environment count is a different knob and turning it up costs.** Do not
+  add a partner element to cover a molecule - add environments.
+* **The one apparent counter-example is a saturation artefact, and was caught.** hcn
+  appears to gain from the added partner (1.49x -> 1.05x), but at 33 AOs it is the most
+  rank-saturated molecule in the suite. Acetonitrile carries the same C#N bond at 57 AOs
+  with ladders widened until neither curve is saturated, and says the opposite. Do not
+  read the 33-38 AO molecules on their own.
+
+Left undone here: the in-range group is thin - methanol and ethane are the only in-range
+molecules large enough to read, since water saturates (section 4(3) said as much). Seven
+of the 33-38 AO cells are unreadable for the same reason, so the sp-carbon case rests on
+acetonitrile alone, and acetonitrile's own error curve crosses the 10 uHa target three
+times, which makes its point count a first-crossing estimate. And transferability across
+*basis sets* is untouched: the offline object is a list of indices into an element's
+level-0 atomic grid, and nothing asks what becomes of it in cc-pVTZ.
+
+**(5) Actually compute a gradient. THE ONLY REMAINING WORK.** Still nothing here computes
+one, and with (4) closed it is no longer half of what is left - it is all of it.
+`scan.py` measures the *curve* rather than arguing about it structurally, so the
+smoothness claim is no longer purely theoretical - but a
 finite-difference-vs-analytic check would test the implementation, which the scan cannot.
 `scan.py` is the natural harness: it already walks a frozen grid along a bond at fixed
 ridge, which is the reference curve such a check needs. What (3) adds is that the grids to
 run it on now exist: `ghosts.py`'s per-element supports are the first point sets in this
 directory that are genuinely frozen with respect to geometry, so a gradient computed on
-one has no re-selection term to omit and no excuse for disagreeing with the curve.
+one has no re-selection term to omit and no excuse for disagreeing with the curve. What
+(4) adds is that those supports do not have to be chosen per environment either: section
+4(4) measured a single frozen support across sp3, sp2 and sp bonding and found no penalty,
+so there is no lurking "refit when the bonding changes" step that a gradient would have to
+differentiate through or silently omit.
 
 ## 5. Open questions
 
@@ -296,16 +361,32 @@ one has no re-selection term to omit and no excuse for disagreeing with the curv
   1.35x on methanol, 1.05x on ethanol, so it amortises; but each ensemble has a rank
   ceiling that caps reachable accuracy at any threshold, and the cheapest one tested
   fails ethanol on it. What remains open is whether the *rank* of a ghost ensemble can be
-  raised cheaply - more directions and more (partner, scale) combinations both help, but
-  `octa-full` has four times the environments of `icosa-cycled` for the same ceiling, so
-  environment count is the wrong knob and nothing here identifies the right one.
+  raised cheaply. Section 4(4)'s second half narrows this usefully: raising the *variety*
+  at fixed environment count is not merely neutral but actively harmful (a fourth partner
+  element costs 1.23x -> 1.48x on propene), so the knob to turn is the number of
+  environments, not the number of distinct neighbours among them. Nothing yet says how
+  many environments buy how much rank.
+* ~~Does one element's point set serve environments it was not fitted in?~~ **Answered -
+  `transfer.py`, FINDINGS section 10.** Yes: 1.49x in-range against 1.50x out-of-range
+  over ten molecules, with bonds up to 12% shorter than any ghost the fit saw. What is
+  still open is the same question across *basis sets* rather than across molecules - the
+  offline object is a list of indices into an element's level-0 atomic grid, and whether
+  a cc-pVDZ-fitted support means anything in cc-pVTZ is untested.
+* Does the overlap residual of a frozen support on a real in-molecule block predict
+  anything? **No, and it is worth not re-deriving:** it is *anti*-correlated with the
+  energy (Pearson -0.75, Spearman -0.60 over the section 4(4) suite). That is the third
+  independent confirmation, after section 5's `rmsd_S` result and section 4(3)'s support
+  agreement, that overlap-metric quantities carry no information about THC accuracy. A
+  cheap SCF-free screen for grid quality cannot be built on the overlap target.
 * How far can the offline object be pushed before it stops being a point set? Right now
   it is a list of indices into the element's level-0 atomic grid. Nothing forces that -
   the points could come from a finer parent grid, or from several parent grids unioned -
   but indexing into a fixed element grid is what makes the object trivially portable, and
   giving that up should be a deliberate choice.
 * Does `rmsd_S` ever track accuracy, or should grid comparisons move to rank + min
-  eigenvalue wholesale?
+  eigenvalue wholesale? Three independent results now say no (section 5, section 4(3)'s
+  support agreement, section 4(4)'s residual), and the third is *anti*-correlated, so the
+  answer is looking like "move wholesale".
 * Does the parent-grid floor move between identical runs? Methanol's came out `+2.68` uHa
   in one `ghosts.py` run and `+2.86` in another differing only in its threshold list.
   0.18 uHa does not threaten any conclusion here, but section 4(1) says ridge inverts
@@ -391,6 +472,16 @@ uv run python experiments/atom_centered_grids/ensemble.py --calibrate H,C,O
 uv run python experiments/atom_centered_grids/ensemble.py methanol --out ens_methanol.json
 uv run python experiments/atom_centered_grids/ghosts.py methanol --out ghosts_rot_methanol.json \
     --thresholds 3e-4,3e-5,1e-12 --blocked-thresholds 1e-3,1e-4,1e-5 --rotate 4
+uv run python experiments/atom_centered_grids/transfer.py --residual
+uv run python experiments/atom_centered_grids/transfer.py --out transfer.json
+uv run python experiments/atom_centered_grids/transfer.py --partners H,C,N,O \
+    --molecules hcn,methylamine,methanol --out transfer_npartner.json
+uv run python experiments/atom_centered_grids/transfer.py --molecules propene,acetonitrile \
+    --out transfer_large.json
+uv run python experiments/atom_centered_grids/transfer.py --molecules acetonitrile \
+    --thresholds 1e-3,3e-4,2e-4,1e-4,6e-5,3e-5,2e-5,1e-5 \
+    --blocked-thresholds 3e-2,1e-2,3e-3,1e-3,1e-4 --out transfer_acn.json
+uv run python experiments/atom_centered_grids/transfer.py --report transfer*.json
 ```
 
 Runtimes on 4 cores: water seconds, methanol ~3 min, ethanol ~10 min, alanine ~40 min
@@ -416,6 +507,18 @@ ceiling is below what `blocked` needs for the target accuracy, no threshold will
 and there is no point running the single points. `--calibrate` is the threshold ladder on
 top of that. Stage B costs four ensembles' worth of single points - about 15 min on
 methanol, an hour on ethanol.
+
+`transfer.py` fits every element once up front and then only translates, so its cost is
+all in the single points - one parent grid, a blocked ladder and a frozen ladder per
+molecule, about 10 of them. The default eight-molecule suite is roughly two hours on 4
+cores. `--residual` needs no SCF and runs in seconds; run it first to see the ghost shells
+printed against nothing, then the suite. Two ladder traps, both hit in the runs behind
+FINDINGS section 10: the default `--blocked-thresholds` starts too tight for molecules
+with a large parent-grid floor (acetonitrile's loosest blocked grid is already 1.4 uHa
+from its floor, which makes every matched-accuracy cell degenerate - widen to `3e-2,1e-2`),
+and molecules below ~40 AOs saturate, so their rows are unreadable however the ladder is
+set. The report marks degenerate cells `*` and leaves them out of the statistics; if a
+molecule is all `*`, widen the blocked ladder rather than believing the ratio.
 
 `ghosts.py` fits each element in seconds - the offline stage is genuinely cheap, and
 independent of the molecule - so its cost is all in the single points: 16 of them on the

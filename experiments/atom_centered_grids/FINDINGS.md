@@ -708,6 +708,179 @@ warning §7 gave for the orbit-grouped fits.
 
 ---
 
+## 10. The frozen grid transfers: bonding it never saw costs nothing
+
+`transfer.py`. §8 built the transferable object and §9 varied the ensemble it is fitted
+against, but both measured it only on methanol and ethanol - one sp3 carbon bonded to one
+sp3 oxygen, twice. Nothing in either distinguishes *"a transferable grid works"* from
+*"a grid fitted against single bonds works on molecules made of single bonds"*. This is
+that distinction, and it is the whole of what HANDOFF.md 4(4) had left.
+
+One support per element is fitted **once**, frozen, and handed to every molecule below.
+Each support's fingerprint is recorded in the output, and the four runs behind this
+section produced **byte-identical supports** from separate processes (`C:8af372306cb1`,
+`H:e7acfa9a8b2c`, `N:6c237bdd6424`, `O:2d1e3ff45e6c` at `3e-5`). The object really is one
+point set, not one recipe run four times.
+
+### What the suite is built to break
+
+The ensemble places one ghost at `(r_cov(A) + r_cov(B)) * s` for `s` in 0.90, 1.05, 1.45,
+with partners H, C, O. Two kinds of environment lie outside that by construction:
+
+| ghost shell | tightest ghost | real bond in the suite | |
+| --- | --- | --- | --- |
+| C-C | 1.37 | ethane 1.51, propene 1.49 | inside |
+| C-C | 1.37 | ethene / propene 1.34, acetylene 1.20 | **below** |
+| C-O | 1.28 | methanol 1.42 | inside |
+| C-O | 1.28 | formaldehyde 1.22 | **below** |
+| C-N | *none at all* | methylamine 1.45, acetonitrile / hcn 1.16 | **never fitted** |
+
+Multiple bonds are shorter than the shortest ghost, so they are extrapolations *below* the
+training range rather than interpolations inside it - and keeping alive the tail points a
+bond needs is precisely what the ghost is for. Nitrogen is not a partner at all; §8
+justified that on the grounds that N's basis resembles C's and O's, which was an argument,
+not a measurement.
+
+### The answer: the ratio does not care
+
+Points to reach a given accuracy, frozen grid against that molecule's own in-molecule
+`blocked` fit. `sat` marks a cell whose ladder already began inside the target, so that it
+compares two ladder start points rather than two grids - water is `sat` everywhere, as
+HANDOFF.md predicted it would be at 24 AOs.
+
+| molecule | probes | AOs | in range | 10 uHa | 5 uHa |
+| --- | --- | --- | --- | --- | --- |
+| water | O sp3 | 24 | yes | `sat` | `sat` |
+| methanol | O sp3 + C sp3 | 48 | yes | 329/586 **1.78x** | 402/647 **1.61x** |
+| ethane | C sp3, C-C 1.51 | 58 | yes | 401/484 1.20x | 451/543 1.20x |
+| ethene | C sp2, C=C 1.34 | 48 | **no** | 315/482 1.53x | 352/549 1.56x |
+| acetylene | C sp, C#C 1.20 | 38 | **no** | `sat` | 228/306 1.34x |
+| formaldehyde | O sp2, C=O 1.22 | 38 | **no** | 233/399 1.72x | 267/447 1.68x |
+| methylamine | N sp3, C-N 1.45 unseen | 53 | **no** | 409/501 1.22x | 503/553 1.10x |
+| hcn | C sp + N, C#N 1.16 | 33 | **no** | 204/305 1.49x | 236/350 1.48x |
+| acetonitrile | C sp + N, C#N 1.16 | 57 | **no** | 320/575 **1.80x** | 337/609 **1.81x** |
+| propene | C sp2 + sp3, C=C 1.34 | 72 | **no** | 622/764 1.23x | 729/912 1.25x |
+
+**In-range mean 1.49x, out-of-range mean 1.50x at 10 uHa; 1.41x against 1.46x at 5 uHa.**
+The two groups are indistinguishable. The whole suite spans 1.20-1.80x at 10 uHa and
+1.10-1.81x at 5 uHa, which is the band §8 already reported from methanol and ethanol
+alone. **There is no transferability penalty to find.**
+
+Three details sharpen that:
+
+* **Methanol, at 1.78x, is all but the worst molecule in the suite** - and it is *in
+  range*, and is the molecule §8 and §9 were measured on. Its curve here reproduces §9's
+  `icosa-cycled` row at all six thresholds, so this is the same measurement with the
+  molecule swapped rather than a re-tuned one. §8's headline is the top of the range, not
+  a floor that unfamiliar bonding breaks through.
+* **The most extreme extrapolation is among the better results.** Acetylene's C#C is
+  1.20 A against a tightest C-C ghost of 1.37 - a 12% extrapolation below anything ever
+  fitted - and it costs 1.34x, comfortably better than methanol.
+* **The largest molecule is the best.** Propene, 72 AOs, carrying an in-range C-C at 1.49
+  and an out-of-range C=C at 1.34 in the same molecule, is 1.23-1.25x. That is the
+  expected direction: like §1's ratio, §8's ghost gap and §9's ensemble spread, this is a
+  fixed per-atom overhead that amortises with system size.
+
+What does *not* correlate with the ratio is how exotic the bonding is. Acetonitrile and
+methanol bracket the suite at 1.80x and 1.78x, and one of them is an sp-carbon nitrile
+that the ensemble never saw while the other is the molecule it was designed around.
+
+### A partner element the fit never saw costs nothing - and supplying it makes things worse
+
+Methylamine puts a C-N bond at 1.45 A in front of a carbon grid fitted only against H, C
+and O, and comes out at 1.22x / 1.10x - **among the best in the suite**. Whatever a
+nitrogen neighbour does to a carbon's co-density manifold, a grid fitted against H/C/O
+spans it already.
+
+Refitting every element with N added to the partner list tests the other direction. The
+controls are what make it readable, because adding a fourth partner also changes the
+sampling: both ensembles hold **13 environments**, but the baseline draws them from 10
+distinct `(partner, distance)` combinations - three of the nine repeat across the twelve
+icosahedral directions - and the N-partner one from 13. The equation supply is unchanged;
+only the variety rises.
+
+| molecule | N present | AOs | baseline (H,C,O) | with N as partner |
+| --- | --- | --- | --- | --- |
+| methanol | no (control) | 48 | 1.78x | 1.85x |
+| propene | no (control) | 72 | **1.23x** | **1.48x** |
+| methylamine | yes | 53 | 1.22x | 1.19x |
+| acetonitrile | yes | 57 | **1.80x** | **2.33x** |
+| hcn | yes | 33 | 1.49x | 1.05x |
+
+Every properly resolved row gets worse or stays put. Both nitrogen-free controls degrade,
+propene - the largest and least saturated molecule in the set - by a lot. Methylamine is
+unchanged. **Acetonitrile, which contains the very C#N bond the added partner was supposed
+to describe, degrades furthest of all**, from 1.80x to 2.33x.
+
+The single apparent gain, hcn's 1.49x to 1.05x, is the one row that cannot be trusted: at
+33 AOs it is the most rank-saturated molecule in the suite. Acetonitrile exists in this
+table to settle exactly that, carrying the same C#N bond at 57 AOs with ladders widened
+until neither curve is saturated, and it says the opposite. hcn's gain was saturation, not
+nitrogen.
+
+So the useful conclusion is not about nitrogen at all. It is that **partner variety at
+fixed environment count dilutes**: the same 13 solves spread over 13 distinct neighbours
+instead of 10 give a support that serves each one less well, and molecules that never
+needed the extra neighbour pay for it anyway. That is a sharper form of §9's finding that
+`octa-full` buys nothing with four times `icosa-cycled`'s environments. Put together:
+**environments supply rank and more of them help; variety at fixed environment count is a
+different knob, and turning it up costs.** Do not add a partner element to cover a
+molecule - add environments.
+
+### The overlap residual does not merely fail to track accuracy; it tracks it backwards
+
+`transfer.py --residual` fits each atom's **real in-molecule** overlap block by
+unconstrained least squares over the frozen support's points only, with no SCF. It was
+included as a candidate cheap screen, and reported beside the energies so that whether it
+tracks them could be checked rather than assumed. It does not:
+
+| molecule | mean heavy-atom residual | ghost gap at 10 uHa |
+| --- | --- | --- |
+| hcn | 2.9e-2 | 1.49x |
+| formaldehyde | 3.3e-2 | 1.72x |
+| methanol | 3.3e-2 | 1.78x |
+| ethene | 4.5e-2 | 1.53x |
+| methylamine | 4.6e-2 | 1.22x |
+| ethane | 5.2e-2 | 1.20x |
+
+Pearson `r = -0.75`, Spearman `rho = -0.60`. The correlation is not weak, it is
+**inverted**: the molecules whose real overlap blocks the frozen support reproduces worst
+are the ones where it performs best. §5 found `rmsd_S` close to orthogonal to THC accuracy;
+§8 and §9 found support overlap useless as a quality metric. This is the third independent
+confirmation and the sharpest, because it holds the point set and the element fixed and
+varies only the environment. **A cheap SCF-free transferability screen cannot be built on
+the overlap target**, and the residual column survives in the output as a negative result
+rather than a tool.
+
+The mechanism is the one §2 and §3 give. What LS-THC needs is a point set spanning the
+co-density manifold, with `Z` fitted by least squares against exact ERIs afterwards. How
+well those same points support a *quadrature* of the overlap is a different question, and
+its answer carries no information about the first.
+
+### What this does not settle
+
+The in-range group is thin - methanol and ethane are the only two molecules whose heavy
+bonding lies inside the ghost shells and which are large enough to read, since water
+saturates. §8's ethanol, fitted from the same ensemble, is 1.11-1.55x and sits in the same
+band, which supports the comparison without being part of it.
+
+The small molecules are the problem the suite was always going to have: the bonding that
+most needs probing lives in small molecules, and small molecules saturate. Acetylene,
+formaldehyde and hcn are 33-38 AOs, and 7 of their 30 cells are unreadable for that
+reason. Propene and acetonitrile were added to answer the same questions at 57 and 72 AOs,
+and they do, but the sp-carbon case rests on acetonitrile alone.
+
+Acetonitrile is also the strongest instance of the non-monotonicity §9 flagged. Its error
+runs -2.60, -3.30, -13.97, -12.61, -2.48 uHa across five adjacent thresholds at 506 to 704
+points - a 15 uHa swing that crosses the 10 uHa target three times. The quoted
+matched-accuracy point count is a first-crossing estimate on a curve that does not stay
+crossed, so its two decimal places are not meaningful even though its magnitude is.
+
+Everything here is one geometry per molecule, cc-pVDZ, `ov` mode, MP2, and one ghost
+ensemble (plus its N-partner variant). Transferability across *basis sets* is untouched:
+the offline object is a list of indices into an element's level-0 atomic grid, and nothing
+here asks what happens to it in cc-pVTZ.
+
 ## Verdict
 
 **Every objection that could have killed this has now been measured, and none of them
@@ -737,22 +910,39 @@ so it amortises like everything else here; but it leaves a hard constraint behin
 an ensemble's effective rank caps the accuracy its grids can ever reach. The cheapest
 ensemble tested is the best on methanol and cannot reach 10 uHa on ethanol at all.
 
+**§10 closes the last go/no-go question, and it closes it cleanly.** One frozen support
+per element, handed unchanged to ten molecules spanning sp3, sp2 and sp carbon, sp3 and
+sp2 oxygen, nitrogen in two bonding modes, and four heavy-atom bonds shorter than any
+ghost the fit ever saw: in-range molecules average **1.49x** at 10 uHa and out-of-range
+molecules average **1.50x**. The whole suite spans 1.20-1.80x, which is the band §8
+reported from methanol and ethanol alone. Bonding the ensemble never saw costs nothing
+measurable, an unseen *partner element* costs nothing either, and the largest molecule in
+the study - propene at 72 AOs, carrying an unseen C=C - is the best of the set at 1.23x.
+The transferable grid is transferable.
+
+That leaves the programme with **no unmeasured objection and no unbuilt component except
+the gradient.**
+
 What remains to be measured, in order:
 
 1. ~~**The ghost gap.**~~ **Done - see §8, and the answer is yes.** 1.1-1.8x over
    `blocked`, shrinking with system size; free-atom fits fail structurally.
-2. **Transferability.** Still the leading question, with its first half now done. §9
-   varied the ghost ensemble: the choice is worth ~1.35x on methanol and ~1.05x by
-   ethanol, so it amortises, and §8's methanol ratios are upper bounds. What it left
-   behind is a sharper constraint - each ensemble has a **rank ceiling** that caps the
-   reachable accuracy regardless of threshold, and the cheapest ensemble fails ethanol
-   outright on it. The untouched half is whether one element's point set serves
-   environments it was not fitted in: O in water, methanol and formaldehyde; C in sp3,
-   sp2 and sp. That must now be run on a deliberately chosen ensemble, since §9 showed
-   the default is not a neutral one.
-3. **A gradient.** Nothing in this directory computes one. Every smoothness claim here is
-   a finite-difference statement about the energy curve; none of them tests an
-   implementation. §8's grids are the first ones a gradient would actually be run on.
+2. ~~**Transferability.**~~ **Done - see §9 and §10, and the answer is yes.** §9 did
+   the first half: the ghost ensemble is worth ~1.35x on methanol and ~1.05x by ethanol,
+   so the choice amortises, and it leaves a **rank ceiling** behind that caps reachable
+   accuracy regardless of threshold. §10 did the second and larger half - whether one
+   element's point set serves environments it was not fitted in - across ten molecules,
+   and found in-range and out-of-range indistinguishable (1.49x against 1.50x at 10 uHa).
+   It also settles the sub-question about a partner element the fit never saw: nitrogen
+   costs nothing, and *adding* it to the partner list makes every properly resolved
+   molecule worse, including the nitrile it was meant to help. Environment count supplies
+   rank; partner variety at fixed environment count only dilutes.
+3. **A gradient. The only thing left.** Nothing in this directory computes one. Every
+   smoothness claim here is a finite-difference statement about the energy curve; none of
+   them tests an implementation. §8's grids are the first ones a gradient would actually
+   be run on, and §10 has now shown those grids need no refitting per bonding
+   environment - so there is no discrete runtime step left for a gradient to have to
+   omit, and no remaining reason to defer it.
 4. ~~**The isotropy tax.**~~ **Done - see §7 and §8.** Whole-orbit fitting makes each
    atomic grid exactly invariant under the octahedral group for 1.2-1.6x the points, and
    never reduces the spread under *general* rotations. §7 flagged one case as untested -
@@ -767,8 +957,9 @@ What remains to be measured, in order:
 
 ## Caveats
 
-cc-pVDZ only; four small molecules; MMFF geometries; `ov` mode and MP2 only. The rank and
-weight analyses are on methanol and ethanol.
+cc-pVDZ only; MMFF geometries; `ov` mode and MP2 only. The rank and weight analyses are
+on methanol and ethanol; §10 widens the molecule set to twelve but widens neither the
+basis, the method, nor the one-geometry-per-molecule sampling.
 
 §8 rests on two molecules. Water was run and is not quoted for the ratio: at 24 AOs its
 co-density manifold saturates at ~95 points, so every grid in the comparison is
@@ -778,9 +969,16 @@ directions, partners H/C/O at 0.90/1.05/1.45 bond lengths, cycled one combinatio
 direction) was chosen once and never varied; `--full-cross` and `--directions octahedron`
 exist to test that choice and were not run. N was never fitted, so the ghost grids cover
 H/C/O only, and no molecule outside the fitting set was tried - which is the whole of
-what transferability means and is why it is now the leading open question. The
-orientation rows are 4 random draws per grid, a coarser statistic than §7's 5-6, and the
-matched-accuracy comparison is matched to 0.15 uHa in energy but not in point count.
+what transferability means and is why it was, at the time, the leading open question -
+**§10 has since done both**, fitting N and running ten molecules outside the fitting set.
+The orientation rows are 4 random draws per grid, a coarser statistic than §7's 5-6, and
+the matched-accuracy comparison is matched to 0.15 uHa in energy but not in point count.
+
+§10 carries its own caveats, recorded at the end of that section: a thin in-range group
+(methanol and ethane alone, since water saturates), seven unreadable cells among the
+33-38 AO molecules, an sp-carbon case resting on acetonitrile alone, and an acetonitrile
+error curve that crosses the 10 uHa target three times, so that its matched-accuracy point
+count is a first-crossing estimate rather than a converged one.
 
 `blocked` appears in §8 with `w = 1` under ridge and in §1 and §7 with NNLS weights under
 the truncated pseudoinverse, and the two do not give identical numbers - ethanol's

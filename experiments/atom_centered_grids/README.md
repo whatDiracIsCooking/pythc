@@ -35,6 +35,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `scan.py` | whether the metric truncation puts steps in the PES, and whether ridge removes them |
 | `ghosts.py` | what an offline, per-element grid fitted against ghost neighbours costs against `blocked` |
 | `ensemble.py` | whether the *choice* of ghost ensemble changes that cost, and the accuracy ceiling each ensemble imposes |
+| `transfer.py` | whether one element's frozen point set serves bonding it was never fitted in - sp2/sp carbon, sp2 oxygen, nitrogen, and bonds shorter than any ghost |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -52,11 +53,14 @@ uv run python ghosts.py --calibrate H,C,O          # threshold ladder, no SCF, s
 uv run python ghosts.py methanol --out ghosts_methanol.json
 uv run python ensemble.py --saturate H,C,O         # each ensemble's ceiling, no SCF
 uv run python ensemble.py methanol --out ensemble_methanol.json
+uv run python transfer.py --residual                # ghost shells + no-SCF screen
+uv run python transfer.py --out transfer.json       # the ten-molecule suite
+uv run python transfer.py --report transfer*.json
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Six headlines:
+See [`FINDINGS.md`](FINDINGS.md). Seven headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -88,5 +92,15 @@ See [`FINDINGS.md`](FINDINGS.md). Six headlines:
   methanol and cannot reach 10 uHa on ethanol at all. Sum the per-element saturation
   sizes (`ensemble.py --saturate`, no SCF) against the expected point count before
   fitting.
+* **The frozen grid transfers.** One point set per element, fitted once and handed
+  unchanged to ten molecules spanning sp3/sp2/sp carbon, sp3/sp2 oxygen and nitrogen -
+  including four heavy-atom bonds *shorter than the tightest ghost the fit ever saw* -
+  costs **1.49x** on molecules inside the training range and **1.50x** on molecules
+  outside it. Indistinguishable, and the whole suite lands in the 1.1-1.8x band already
+  reported from methanol and ethanol. A partner element the fit never saw (N) costs
+  nothing, and *adding* it to the ghost partner list makes every properly resolved
+  molecule worse - environment count supplies rank, but variety at fixed environment
+  count only dilutes. With this the programme has no unmeasured objection left; the
+  gradient is the only remaining work.
 
 Raw sweep output is under [`data/`](data).
