@@ -1099,6 +1099,203 @@ accuracy - 156 points at -0.204575 against 208 at -0.204006, both at `lambda = 1
 is measured on the same two grids so the *contrast* between them is internal, but a
 matched-accuracy version of this table is the obvious next run and has not been done.
 
+## 12. The gradient's ridge floor is the filter's shape, not the metric's rank - and most of section 11's torque was the regulariser
+
+`window.py`, plus `scan.py --damped-lambdas` and `lib.damped_inv`. Section 11 left a
+gradient that worked and an uncomfortable place to stand in: `lambda` had to be at least
+`1e-5`, costing 23 uHa on water and more elsewhere, because below that the ridge inverts
+the metric's numerically null directions at `1/lambda` and the gradient becomes noise. It
+offered that mechanism as a diagnosis but did not test it, and read the window off one
+system. All three gaps are closed here, and the answer to the first changes what to do
+about the other two.
+
+### A sharper instrument: permutation as a noise probe
+
+Relabelling the points inside an atom's set is an **exact symmetry** of the energy, the
+nuclear gradient and the per-atom torque - the metric's rows and columns are permuted with
+them and every contraction is a sum over all of them. So anything that moves under a
+permutation is floating-point noise and nothing else, and how much of it gets through is
+exactly the amplification the inversion applies to the directions where that noise lives.
+
+That is deterministic where section 11 had to run three processes and hope their
+reductions landed in different orders, and it is quantitative where that comparison could
+only say "these disagree". Every noise figure below is the worst relative change in the
+gradient over a few permutations.
+
+### The diagnosis is right, and it is `1/lambda^2`
+
+Water's 156-point blocked grid, 61 of 156 directions below 1e-14 of the top eigenvalue:
+
+| lambda | 1e-4 | 1e-5 | 1e-6 | 1e-7 | 1e-8 |
+| --- | --- | --- | --- | --- | --- |
+| noise in the gradient | 4.8e-08 | 5.2e-06 | 5.8e-04 | 4.8e-02 | 9.8e-01 |
+
+That is a factor of ~80 per decade of `lambda`, i.e. `lambda^-1.9`. **Essentially
+`1/lambda^2`, which is what "`Z = D^T D` carries `S^-1` twice" predicts and what no other
+explanation would.** At `1e-8` the gradient is 98% noise while the energy in the same row
+is right to 0.05 uHa - section 11's asymmetry, now with a mechanism attached rather than
+a conjecture.
+
+### It is the filter's shape, and `ridge_inv_eigh` is what proves it
+
+`damped_inv` changes two things at once: the filter applied to the spectrum, and the
+algorithm (`eigh` where `ridge_inv` uses a Cholesky factorisation). Those differ by 7.8e-8
+at `lambda = 1e-8` on a matrix conditioned like this one, which is not obviously
+negligible against the effect being chased. `ridge_inv_eigh` applies the ridge's own
+filter spectrally, and is in the comparison for that reason alone:
+
+| scheme | water 1e-6 | water 1e-8 | methanol 1e-6 | methanol 1e-8 |
+| --- | --- | --- | --- | --- |
+| ridge (Cholesky) | 5.8e-04 | 9.8e-01 | 3.3e-04 | 8.7e-02 |
+| ridge (eigh) | 6.2e-04 | 6.7e-01 | 1.8e-04 | 7.3e-02 |
+| **damped** | **1.5e-08** | **6.0e-07** | **3.1e-09** | **1.4e-07** |
+
+The two ridges track each other to within a factor of two everywhere. **The algorithm is
+not what matters; the filter shape is.** Writing the gain applied to an eigenvalue
+`sigma`:
+
+| scheme | gain | `sigma >> mu` | `sigma -> 0` |
+| --- | --- | --- | --- |
+| `pinv` | `1/sigma` or `0` | `1/sigma` | `0` |
+| `ridge_inv` | `1/(sigma + mu)` | `1/sigma` | **`1/mu`** |
+| `damped_inv` | `sigma/(sigma^2 + mu^2)` | `1/sigma` | `sigma/mu^2` |
+
+The ridge hands the null directions the *largest* gain in the whole operator. That is the
+opposite of suppression, and it is the entire problem. The damped filter is analytic in
+`S` exactly as the ridge is - a rational matrix function, no cutoff for an eigenvalue to
+cross - while sending those directions to zero the way the truncation does. Its peak gain
+is `1/(2 mu)` at `sigma = mu`, the same as the ridge's, so `lambda` means the same thing
+on both ladders.
+
+### The window, on five grids
+
+A `lambda` is *usable* if permutation noise in the gradient is below 1e-6 of `|grad|`;
+among those, the best is the one closest to the truncation's energy. That pair is the
+whole trade.
+
+| grid | points | null dirs | ridge: best usable | damped: best usable | gain |
+| --- | --- | --- | --- | --- | --- |
+| water blocked | 156 | 61 | `1e-4`, **166 uHa** | `1e-8`, **0.00 uHa** | >1000x |
+| water ghost | 208 | 113 | `1e-4`, **734 uHa** | `1e-9`, **0.00 uHa** | >1000x |
+| methanol blocked | 301 | 0 | `1e-4`, **280 uHa** | `1e-8`, **1.77 uHa** | 158x |
+| methanol ghost | 414 | 63 | `1e-4`, **1808 uHa** | `1e-8`, **4.32 uHa** | 419x |
+| ethanol blocked | 477 | 0 | `1e-4`, **415 uHa** | `1e-9`, **0.21 uHa** | ~1400x |
+
+Three things to read off it.
+
+* **The ridge is stuck at `lambda = 1e-4` on every grid tested**, and what that costs
+  grows with the system: 166 -> 280 -> 415 uHa across water, methanol and ethanol. The
+  ceiling falls as the floor stays put, which is the closing-window worry, confirmed for
+  the ridge.
+* **The damped filter removes it.** Its usable `lambda` runs three to five decades lower
+  and the penalty is microhartrees or less on every grid. The window does not close.
+* **The null-direction count is not the whole story.** Methanol and ethanol blocked have
+  *no* directions below 1e-12 and the ridge still fails at `1e-6`, because their smallest
+  eigenvalues (2.0e-11, 1.3e-12 relative) are themselves below the shift at small
+  `lambda`. "Numerically null" is relative to `mu`, not absolute - which is why the
+  effect survives on grids that `rank.py` would call healthy.
+
+### It stays smooth, which it had to
+
+The damped filter approaches the truncation as `lambda` falls, and the truncation is what
+put the steps in the PES that section 6 introduced the ridge to remove. A quiet gradient
+bought by reintroducing them would be no use. Methanol's 60-step O-H scan, grid frozen:
+
+| scheme | max\|d2\| | median\|d2\| | ratio | gradient usable? |
+| --- | --- | --- | --- | --- |
+| pinv | **0.511** | 0.006 | 82 | n/a - no derivative at a crossing |
+| ridge 1e-8 | 0.017 | 0.002 | 8.0 | **no** - 81% noise |
+| ridge 1e-4 | 0.006 | 0.005 | 1.4 | yes, at 280 uHa |
+| damped 1e-8 | 0.024 | 0.005 | 5.0 | yes, at 1.8 uHa |
+| **damped 1e-10** | **0.013** | 0.004 | **3.1** | **yes** |
+
+Section 6 reproduced exactly - 2 crossings in 60 steps, the largest second differences
+sitting on them, 82x the background. **Damped at `1e-10` is the smoothest curve in the
+table, at a `lambda` where the ridge's gradient is pure noise.** The two requirements are
+now satisfiable at the same time, which they were not before.
+
+### Most of section 11's torque was the regulariser
+
+This is the result that changes a conclusion rather than an implementation detail. Both
+schemes reduce to the truncated pseudoinverse as `lambda` goes to zero, so **`pinv` is the
+torque they should converge on** - a control section 11 did not have, because it could not
+go to small `lambda` at all.
+
+| grid | pinv | ridge at its best usable `lambda` | damped at its best |
+| --- | --- | --- | --- |
+| water blocked | **0.001** | 188 (section 11's number) | 0.018 |
+| water ghost | **0.002** | **5592** (section 11's number) | 0.006 |
+| methanol blocked | **39.0** | 234 | 45.7 |
+| methanol ghost | **175.1** | 1596 | 109.5 |
+| ethanol blocked | **103.1** | 202 | 103.4 |
+
+in uHa/rad. The harness reproduces section 11's 188 and 5592 exactly at `lambda = 1e-4`,
+so this is not a different measurement of the same thing - it is the same measurement,
+continued to where the regulariser stops contributing.
+
+* **Water's torque is zero, and section 11 should not have been read.** At 24 AOs water is
+  rank-saturated - co-density rank 95 against grids of 156 and 208 points - so the LS-THC
+  fit is exact, therefore grid-independent, therefore orientation-independent. Sections 8
+  and 10 both decline to quote water for exactly this reason; section 11 quoted it for the
+  torque, which is precisely the kind of quantity that vanishes at saturation. **The
+  30x blocked-to-ghost ratio was two regularisation artefacts divided by each other.**
+* **The effect is real on a molecule that does not saturate, and much smaller.** Methanol
+  is 175 vs 39, a **4.5x** ghost-to-blocked ratio rather than 30x. The qualitative
+  conclusion - a transferable per-element support is more orientation-dependent than an
+  in-molecule fit - survives; the magnitude does not.
+* **The number that matters for dynamics falls by a factor of 40.** Methanol's ghost grid
+  at its best usable `lambda` has a net torque of 109.5 uHa/rad against a gradient norm of
+  35636 uHa/bohr, i.e. **3.1e-3 bohr/rad**, against the **1.35e-1** section 11 reports
+  from water's ghost grid. The angular-momentum leak is a few tenths of a percent of the
+  gradient scale, not thirteen.
+* **A torque is not a property of the grid alone.** It moves by two to three orders of
+  magnitude with the inversion scheme and its strength. Section 11 added the rotation
+  spread to the list of metrics that do not measure what they are used for; the torque
+  belongs on a different list, of quantities that must be quoted **with the regularisation
+  that produced them** or not at all.
+
+### The accuracy tax was never the problem it looked like
+
+Worth recording because it cuts against the framing of section 11 and of this section's
+own opening. The ridge's 280 uHa penalty on methanol at `lambda = 1e-4` sounds
+disqualifying beside a 5 uHa THC error. Along the scan it varies by **2.28 uHa, 0.8% of
+itself** - a near-constant offset, which does nothing whatever to a trajectory. Converting
+the curvature of each error curve into a force-constant bias on the O-H stretch
+(`k = 1.76 Ha/A^2` at 3700 cm^-1):
+
+| scheme | curvature bias / uHa A^-2 | shift in nu / cm^-1 |
+| --- | --- | --- |
+| pinv (the grid's own) | 1393 | 1.47 |
+| ridge 1e-4 | 934 | 0.98 |
+| damped 1e-8 | 1555 | 1.64 |
+| damped 1e-10 | 546 | 0.58 |
+
+**Every scheme is inside 1.7 cm^-1, and so is the frozen grid itself with no
+regularisation at all.** The differences between the rows are at the edge of what a curve
+of 1-3 uHa amplitude over 0.12 A resolves and should not be ranked. So the case against
+the ridge rests entirely on the gradient noise, not on the energy it costs - and the
+reason to prefer the damped filter is that it makes the derivative real, not that it makes
+the energy better.
+
+### What this does not settle
+
+cc-pVDZ, `ov` mode, MP2, fixed-orbital gradient, one geometry per molecule, as everywhere
+else here. The torque is one orientation per grid, not a sampling. `damped_inv` costs a
+full eigendecomposition where `ridge_inv` costs a Cholesky - about 3x on that step, which
+is not the pipeline's bottleneck but is not free either, and no attempt was made to reach
+the same filter through a cheaper iteration.
+
+The ghost grids' torque does not converge to `pinv` the way the blocked ones do (methanol
+ghost: 175 at `pinv`, 109 at `1e-8`, 23 at `1e-9`, 7 at `1e-10`). That is not
+inconsistency - `pinv` discards everything below 1e-10 of the top eigenvalue while the
+damped filter at `1e-10` still resolves directions down to ~1e-12, so they are genuinely
+different operators in the limit - but it does mean a ghost grid's torque has no single
+well-defined value, only a value per inversion. The blocked grids, whose metrics have no
+such crowd, agree to within noise (ethanol: 103.1 against 103.4).
+
+Nothing here integrates a trajectory, which is still the measurement that would settle
+what any of these torques do over time.
+
 ## Verdict
 
 **Every objection that could have killed this has now been measured, and none of them
@@ -1141,6 +1338,20 @@ The transferable grid is transferable.
 That leaves the programme with **no unmeasured objection and no unbuilt component except
 the gradient.**
 
+**§12 revises §11 on both of the things §11 brought back.** The ridge floor is not a
+property of the metric's rank but of the ridge's *filter shape*: `(S + lambda I)^-1` hands
+the numerically null directions the largest gain in the operator, `1/lambda`, and `Z =
+D^T D` carries `S^-1` twice, so the gradient noise grows as `1/lambda^2` - measured, on
+water, as `lambda^-1.9`. Replacing it with the damped filter `sigma/(sigma^2 + mu^2)`,
+which is analytic in `S` like the ridge and suppresses those directions like the
+truncation, drops the usable `lambda` by three to five decades and the accuracy it costs
+from 166-1808 uHa to under 5 on all five grids tested, while leaving the PES smoother than
+the ridge did. And §11's torques were mostly the regulariser: continued to small `lambda`
+with a `pinv` control, water's 188 and 5592 uHa/rad go to 0.001 and 0.002 - water is
+rank-saturated, so its torque was always going to be zero - and the ghost-to-blocked ratio
+on a molecule that does not saturate is **4.5x, not 30x**. The angular-momentum leak on
+the real object is **3.1e-3 bohr/rad**, not 1.35e-1.
+
 What remains to be measured, in order:
 
 1. ~~**The ghost gap.**~~ **Done - see §8, and the answer is yes.** 1.1-1.8x over
@@ -1155,12 +1366,12 @@ What remains to be measured, in order:
    costs nothing, and *adding* it to the partner list makes every properly resolved
    molecule worse, including the nitrile it was meant to help. Environment count supplies
    rank; partner variety at fixed environment count only dilutes.
-3. **A gradient. The only thing left.** Nothing in this directory computes one. Every
-   smoothness claim here is a finite-difference statement about the energy curve; none of
-   them tests an implementation. §8's grids are the first ones a gradient would actually
-   be run on, and §10 has now shown those grids need no refitting per bonding
-   environment - so there is no discrete runtime step left for a gradient to have to
-   omit, and no remaining reason to defer it.
+3. ~~**A gradient.**~~ **Done - see §11, and §12 for what it cost to make it usable.**
+   It exists, verifies to machine precision, and after §12 it no longer has to be bought
+   with a hundred-fold worse energy: the damped pseudoinverse puts the usable `lambda`
+   three to five decades below the ridge's, at microhartree accuracy, on a surface that
+   is smoother than the ridge's. What remains unbuilt is the orbital response, which is
+   standard DF-MP2 machinery.
 4. ~~**The isotropy tax.**~~ **Done - see §7 and §8.** Whole-orbit fitting makes each
    atomic grid exactly invariant under the octahedral group for 1.2-1.6x the points, and
    never reduces the spread under *general* rotations. §7 flagged one case as untested -

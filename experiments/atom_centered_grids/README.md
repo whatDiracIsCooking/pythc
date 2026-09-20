@@ -37,6 +37,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `ensemble.py` | whether the *choice* of ghost ensemble changes that cost, and the accuracy ceiling each ensemble imposes |
 | `transfer.py` | whether one element's frozen point set serves bonding it was never fitted in - sp2/sp carbon, sp2 oxygen, nitrogen, and bonds shorter than any ghost |
 | `gradient.py` | whether the analytic nuclear gradient agrees with the curve, where the ridge floor is for a derivative, and how much torque a frozen point set exerts |
+| `window.py` | what sets that floor, whether a different filter moves it, and what the torque is once the regulariser is taken out of it |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -59,11 +60,14 @@ uv run python transfer.py --out transfer.json       # the ten-molecule suite
 uv run python transfer.py --report transfer*.json
 uv run python gradient.py water                     # analytic vs FD, ridge floor, torque
 uv run python gradient.py water --mode ghost --threshold 3e-4
+uv run python window.py methanol --mode ghost --threshold 3e-4   # the lambda window
+uv run python window.py --report data/window_*.json              # the trade, per grid
+uv run python scan.py methanol 1e-3 --damped-lambdas 1e-8,1e-10  # still smooth?
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Eight headlines:
+See [`FINDINGS.md`](FINDINGS.md). Eleven headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -104,6 +108,25 @@ See [`FINDINGS.md`](FINDINGS.md). Eight headlines:
   nothing, and *adding* it to the ghost partner list makes every properly resolved
   molecule worse - environment count supplies rank, but variety at fixed environment
   count only dilutes. With this the programme has no unmeasured objection left.
+* **The ridge floor was the filter's shape, not the metric's rank, and it is now gone.**
+  `(S + lambda I)^-1` gives the numerically null directions the *largest* gain in the
+  operator, `1/lambda`, and `Z = D^T D` carries `S^-1` twice - so gradient noise grows as
+  `1/lambda^2` (measured: `lambda^-1.9`). The damped filter `sigma/(sigma^2 + mu^2)` is
+  analytic in `S` like the ridge and suppresses those directions like the truncation; it
+  drops the usable `lambda` by three to five decades and the accuracy it costs from
+  **166-1808 uHa to under 5** across five grids, on a PES **smoother** than the ridge's.
+  A `ridge_inv_eigh` control rules out the algorithm: it is the filter.
+* **Most of §11's torque was the regulariser.** Continued to small `lambda` against a
+  `pinv` control, water's 188 and 5592 uHa/rad become **0.001 and 0.002** - water is
+  rank-saturated, so its torque was always zero, and §8 and §10 already refuse to quote
+  it. On methanol, which does not saturate, the ghost-to-blocked ratio is **4.5x, not
+  30x**, and the angular-momentum leak on the real transferable object is **3.1e-3
+  bohr/rad against the 1.35e-1** §11 reported. A torque must be quoted with the
+  regularisation that produced it.
+* **The accuracy tax was never the problem.** The ridge's 280 uHa penalty on methanol
+  varies by 2.28 uHa along a bond scan - a constant offset, which does nothing to a
+  trajectory. Every scheme, and the bare frozen grid itself, biases the O-H force constant
+  by under **1.7 cm^-1**. The case against the ridge is the gradient noise alone.
 * **The gradient exists and verifies to machine precision** (`pythc.grad`, driven by
   `gradient.py`): quadratic convergence against a finite difference, and forces that sum
   to zero to 2.4e-15 with no finite difference involved. Two things came back with it
