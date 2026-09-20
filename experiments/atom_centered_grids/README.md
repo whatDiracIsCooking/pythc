@@ -80,5 +80,13 @@ See [`FINDINGS.md`](FINDINGS.md). Six headlines:
   global molecular fit. Fitting the *free* atom instead does not work and cannot be made
   to: an isolated atom's overlap matrix supplies only `n_AO (n_AO + 1) / 2` equations, so
   NNLS can never retain more than 15 points per hydrogen in cc-pVDZ, at any threshold.
+* **Which ghost ensemble is used matters by ~1.35x on methanol and ~1.05x on ethanol**,
+  so the sensitivity amortises with system size and §8's methanol ratios are upper
+  bounds. What does not amortise is that each ensemble has a **rank ceiling**: the
+  support saturates at the effective rank of its stacked target, which caps the accuracy
+  its grids can ever reach at any threshold. The cheapest ensemble tested is the best on
+  methanol and cannot reach 10 uHa on ethanol at all. Sum the per-element saturation
+  sizes (`ensemble.py --saturate`, no SCF) against the expected point count before
+  fitting.
 
 Raw sweep output is under [`data/`](data).
