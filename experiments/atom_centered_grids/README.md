@@ -156,10 +156,12 @@ See [`FINDINGS.md`](FINDINGS.md). Fourteen headlines:
   grid it is pruned from.** 2.5 ps of thermal tumbling on methanol: the torque is 95%
   incoherent, the spin-up component is pinned by energy conservation at the size of the
   orientational potential itself, and what accumulates is **4.5 degrees of rotation-axis
-  tilt**. Meanwhile RKS/PBE on the same level-0 Becke grid loses **9.25 hbar in 1 ps**
-  against the frozen support's **1.49 in 2.5 ps** - lab-fixed atom-centred quadrature is
-  what the whole family does, and the pruned reweighted support is six times better at it
-  than its own parent. A level-3 grid is 2-3 decades better still, on 163x the points.
+  tilt**. Meanwhile, read at matched times, RKS/PBE on the same level-0 Becke grid loses
+  **9.25 hbar in 1 ps** against the frozen support's **1.19** - lab-fixed atom-centred
+  quadrature is what the whole family does, and the pruned reweighted support is eight
+  times better at it than its own parent. A level-3 grid is ~25x better still, on 163x the
+  points; the in-molecule `blocked` grid is within **2.3x of level-3 DFT on 224x fewer
+  points**, which localises the remaining gap to the weights.
 * **The orbital response is now a prerequisite, not a refinement.** On the fixed-orbital
   surface the force is not the gradient of the propagated energy, and that alone breaks
   rotational invariance at **~8300 uHa/rad** - fifty times the transferable grid's own

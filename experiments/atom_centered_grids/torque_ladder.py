@@ -217,6 +217,14 @@ def measure(mol, mf, per_atom, ridge, n_laplace, draws, seed, scheme="ridge"):
     return row
 
 
+def dump(path, name, mol, ref, n_laplace, draws, seed, scheme, rows):
+    """Snapshot the ladder so far."""
+    with open(path, "w") as fh:
+        json.dump(dict(molecule=name, n_ao=int(mol.nao_nr()), natm=mol.natm, basis=BASIS,
+                       auxbasis=AUXBASIS, mp2_ri_reference=ref, n_laplace=n_laplace,
+                       draws=draws, seed=seed, scheme=scheme, rows=rows), fh, indent=2)
+
+
 def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent,
          out_path, scheme="ridge", with_pinv=False):
     mol = gto.M(atom=MOLECULES[name](), basis=BASIS, verbose=0)
@@ -265,6 +273,11 @@ def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent,
                        scheme=row_scheme,
                        err_uha=1e6 * (row["energy"] - ref), seconds=time.time() - t1)
             rows.append(row)
+            # Written per row, not at the end: a parent rung is an eigendecomposition of
+            # a few-thousand-square metric and can be killed by the machine rather than
+            # by itself, which on a write-at-the-end script loses every row before it.
+            if out_path:
+                dump(out_path, name, mol, ref, n_laplace, draws, seed, scheme, rows)
 
             print(f"   {'pinv' if ridge is None else f'{ridge:.0e}':>7s} "
                   f"{row['err_uha']:10.2f} {row['grad_norm']:12.4e} "
@@ -274,13 +287,11 @@ def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent,
                   f"{row.get('spread_uha', np.nan):11.3f} "
                   f"{row['below_ridge']:6d}/{row['n_metric']:<5d}", flush=True)
 
-    result = dict(molecule=name, n_ao=int(mol.nao_nr()), natm=mol.natm, basis=BASIS,
-                  auxbasis=AUXBASIS, mp2_ri_reference=ref, n_laplace=n_laplace,
-                  draws=draws, seed=seed, scheme=scheme, rows=rows)
     if out_path:
-        with open(out_path, "w") as fh:
-            json.dump(result, fh, indent=2)
-    return result
+        dump(out_path, name, mol, ref, n_laplace, draws, seed, scheme, rows)
+    return dict(molecule=name, n_ao=int(mol.nao_nr()), natm=mol.natm, basis=BASIS,
+                auxbasis=AUXBASIS, mp2_ri_reference=ref, n_laplace=n_laplace,
+                draws=draws, seed=seed, scheme=scheme, rows=rows)
 
 
 def report(paths, ridge):

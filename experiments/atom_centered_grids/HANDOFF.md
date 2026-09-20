@@ -518,11 +518,20 @@ third is the one that matters most.
   work, and the orientational potential's 31 uHa amplitude bounds it), and what
   accumulates is 4.5 degrees of rotation-axis tilt.
 * **And it is quieter than the quadrature it is pruned from.** `trajectory.py
-  --reference rks` on methanol, same initial condition: RKS/PBE on the level-0 parent
-  loses **9.25 hbar over 1 ps**, the frozen `ghost` support **1.49 hbar over 2.5 ps**,
-  RKS/PBE at level 3 **0.005 hbar** - on 67432 points against the support's 414. So acTHC
-  beats its own parent grid by 6x and loses to a production grid by 2-3 decades at 163x
-  fewer points, which is what compression costs rather than a defect of the freeze.
+  --reference rks` on methanol, same initial condition, `|L - L0|` in hbar at **matched
+  times** - which matters, because these surfaces do not leak at the same rate:
+
+  | | points | 100 fs | 300 fs | 1000 fs |
+  | --- | --- | --- | --- | --- |
+  | RKS/PBE level-0 Becke | 4656 | 0.638 | 2.380 | 9.250 |
+  | frozen `ghost` | 414 | 0.144 | 0.686 | 1.188 |
+  | frozen `blocked` | 301 | 0.030 | 0.065 | 0.106 |
+  | RKS/PBE level-3 Becke | 67432 | 0.004 | 0.028 | - |
+
+  acTHC beats the grid it is pruned from by 8x at a picosecond and loses to a production
+  grid by ~25x on 163x fewer points. **The in-molecule `blocked` grid is within 2.3x of
+  level-3 DFT on 224x fewer points**, which puts the whole remaining gap on the weights
+  and makes (8) below the most valuable unrun experiment here.
 
 Left undone: the trajectory is driven by DF-RHF, which is grid-free and therefore exactly
 rotationally invariant, with the frozen grid's torque integrated along it and the leaked
