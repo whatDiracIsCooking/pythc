@@ -1099,10 +1099,152 @@ accuracy - 156 points at -0.204575 against 208 at -0.204006, both at `lambda = 1
 is measured on the same two grids so the *contrast* between them is internal, but a
 matched-accuracy version of this table is the obvious next run and has not been done.
 
+## 12. The torque does not converge away, and the ladder says why
+
+`torque_ladder.py`. Section 11 left one question standing: the energy spread converges
+away with grid size, so does the torque? Section 7's deflation of orientation dependence
+rests entirely on the answer being yes, and HANDOFF section 5 called this the cheapest
+useful thing left. It is one analytic gradient per rung - no finite difference, since
+section 11 already checked this torque against one to six figures.
+
+The answer is **no for the object the programme proposes**, yes for the in-molecule grid
+it is benchmarked against, and the gap between those two is not what section 11 thought
+it was.
+
+### The weight footing is a variable, and section 11's comparison straddles it
+
+This has to come first because it changes how every other row is read. `gradient.py`
+builds `blocked` from `blocked_fit_per_atom` **with its NNLS weights**, while a ghost
+support can only be `w = 1` - the offline fit discards its weights by construction. So
+section 11's blocked-against-ghost comparison changed two things at once.
+
+It matters far more than section 3 would predict. The **same 156-point water support**:
+
+| footing | err vs DF-MP2 | net torque | metric directions under the ridge |
+| --- | --- | --- | --- |
+| NNLS weights | 165 uHa | **188 uHa/rad** | 79 / 156 |
+| `w = 1` | 3304 uHa | **7145 uHa/rad** | 97 / 156 |
+
+Identical points, 38x the torque and 20x the error. Section 3's result - that a positive
+diagonal rescaling of `X` is absorbed exactly by the `Z` fit - is a statement about the
+**pseudoinverse**, which is scale-equivariant. Section 11 forces a ridge instead, and
+`(D^2 S D^2 + lam I)^-1` is not `D^-2 (S + lam I)^-1 D^-2`. Inside the gradient's ridge
+window the weights are doing conditioning work again, and the torque is where it shows.
+
+Every ladder below is therefore run in pairs: `blocked` against `blocked1` (`w = 1`), and
+`ghost` against `ghostw` (the same ghost support carrying the weights its own NNLS solve
+produced - frozen weights have `dw/dR = 0` exactly as frozen points do, so this costs the
+scheme nothing structurally).
+
+### The ladders
+
+Methanol, `lambda = 1e-4`, net torque in uHa/rad, with section 7's spread on the *same*
+grids and the *same* four draws beside it:
+
+| points | `blocked` tau | `blocked1` tau | `ghost` tau | `ghostw` tau | `ghost` spread |
+| --- | --- | --- | --- | --- | --- |
+| ~230 | 459 | 1460 | 4410 | 499 | 603 |
+| ~300-410 | 235 / 51 | 484 / 336 | 1596 | 523 | 316 |
+| ~490-510 | 36 | 524 | 883 | 1633 | 384 |
+| ~630 | - | - | 1558 | 1844 | 264 |
+| ~670-700 | **16** | **156** | **2937** | **5316** | **151** |
+| convergence | **28x down** | 9.4x down | **1.5x, non-monotone** | **11x up** | 4.0x down |
+
+Water agrees on the part that matters: `blocked` 116 -> 9.1 uHa/rad over 118 -> 273
+points (12.7x down, monotone), `ghost` 553 -> 5592 -> 4855 -> 2379 -> 2975 over
+116 -> 361 (it ends *worse* than it started).
+
+Read the last two columns of the methanol table together. **On the transferable grid the
+spread falls 4x while the torque does not fall at all.** Section 11 argued from one pair
+of grids that a spread cannot stand in for a derivative; this is that claim run along a
+whole ladder, and the two statistics point in opposite directions on identical grids and
+identical draws. Section 7's deflation of orientation dependence does not survive in the
+form that matters.
+
+### Three controls, and all three hold
+
+* **Not a ridge artifact.** Every row was run at `1e-3` and `1e-4`. The verdict is the
+  same at both: methanol `blocked` falls 21x at `1e-3` against 28x at `1e-4`, and
+  `ghost` plateaus around 1000-1400 uHa/rad at `1e-3` exactly as it plateaus at `1e-4`.
+* **Not noise.** Ghost grids put 74-82% of their metric directions below the ridge, and
+  section 11 showed such directions inverted at `1/lambda` produce gradient noise - so
+  the flat ghost ladder could have been roundoff rather than anisotropy. It is not. The
+  identical calculation in three separate processes, methanol at 702 points:
+  `blocked` 16.2525 / 16.2616 / 16.2568, `ghost` 2938.35 / 2938.39 / 2937.36 uHa/rad.
+  Five significant figures. Both numbers are properties of the grid.
+* **Not structural.** The unpruned atomic grid - 1642 points on water, the top of the
+  ladder - has a net torque of **~1 uHa/rad**, `2.2e-5` of the gradient norm. Rigid,
+  lab-fixed attachment is very nearly rotationally invariant in the limit. So the torque
+  is not a defect of attaching a grid to a nucleus and leaving its orientation alone; it
+  is a property of the **pruned, transferable support**, which is the one thing the
+  programme cannot give up.
+
+### The accuracy the gradient's ridge costs, which nothing had priced
+
+The ladder also prices something sections 8 to 10 never had to. Those sections evaluated
+their `w = 1` grids at `RIDGE = 1e-8`, section 6's value. Section 11 forbids that for a
+gradient. At a gradient-legal ridge the same grids are not close to the same accuracy:
+
+| methanol grid | err at `lambda = 1e-8` (§8) | err at `lambda = 1e-4` |
+| --- | --- | --- |
+| `blocked1`, 670 points | 4.2 uHa | 3119 uHa |
+| `ghost`, 702 points | 5.9 uHa | 1153 uHa |
+| `ghostw`, 702 points | - | 1065 uHa |
+| `blocked` (NNLS weights), 670 points | - | **143 uHa** |
+
+Two to three orders of magnitude. **Every point-count ratio in sections 8, 9 and 10 was
+measured at a ridge a gradient cannot use**, so "1.49x at 10 uHa" is not yet a statement
+about a gradient-capable calculation. Only the NNLS-weighted in-molecule grid stays
+within a few hundred uHa in the window section 11 allows, and that is precisely the grid
+that is not transferable.
+
+### Keeping the weights helps the energy and not the torque
+
+`ghostw` is the obvious repair and was run for that reason. It works on accuracy - water
+at 116 points goes 2067 -> 353 uHa, methanol at 223 points 8719 -> 1689 uHa - and it
+roughly halves the number of metric directions under the ridge. It does **not** fix the
+torque: methanol goes 499 -> 5316 uHa/rad up the ladder, worse than `ghost`. Weights
+fitted against ghost environments condition the *ghost* metric, not the in-molecule one
+the gradient is actually taken through.
+
+### What this does not settle
+
+Two molecules, cc-pVDZ, `ov` mode, MP2, one geometry each, four draws per grid. Water is
+the molecule sections 8 and 10 decline to quote ratios for, so methanol carries the
+verdict and it is a single system - the `ghost` ladder ending *above* its middle rung on
+both molecules is the strongest thing here, and it is still two molecules.
+
+The ladder tops out at 702 ghost points on methanol. Nothing here shows the ghost torque
+never converges, only that it has not begun to by the point count where the scheme's cost
+argument has already been spent - which is the question that was asked. Whether it
+converges by 2000 points is unmeasured and would not help, because a grid that large
+costs more than the global fit it is meant to beat.
+
+`ghostw` weights are the raw NNLS output of the stacked ghost fit, used unmodified. No
+attempt was made to re-fit weights against a better-conditioned target, and section 5's
+open question about projecting the null space out rather than damping it is untouched -
+either could change the accuracy column without touching the torque one.
+
+The net torque is a vector sum over atoms with cancellation, so its magnitude at one
+attachment orientation is not a smooth function of point count; the non-monotonicity in
+the `ghost` rows is partly that. The `rms draw` column is the guard against it and tells
+the same story (methanol `ghost`: 2324 -> 5600 up the ladder).
+
 ## Verdict
 
-**Every objection that could have killed this has now been measured, and none of them
-did.** The proposed object exists: §8 builds genuine offline per-element point sets, fits
+**§12 overturns this section's headline and the verdict now has to be read through it.**
+What follows below was written when every measured objection had come back clean. One has
+not. The torque on the transferable grid does not converge away with grid size - it is
+flat or rising across the whole ladder the cost argument can afford, it reproduces to five
+figures so it is not noise, and the complete-grid asymptote of ~1 uHa/rad proves the
+scheme is not saved by pushing further. Separately, §12 shows that **every point-count
+ratio quoted below was measured at `lambda = 1e-8`, a ridge §11 forbids for gradients**,
+and that at a gradient-legal ridge the same grids are 2-3 orders of magnitude less
+accurate. The energy-side conclusions stand as energy-side conclusions. The claim that
+they carry over to a gradient, and therefore to the AIMD use case the whole smooth-PES
+argument is for, does not.
+
+The proposed object exists: §8 builds genuine offline per-element point sets, fits
 them against nothing but ghosts, translates them rigidly into methanol and ethanol, and
 they land 1.1-1.8x off the in-molecule `blocked` grids at matched accuracy. Compounded
 with §1, a frozen per-element grid costs **1.6-2.7x** the points of a single global
@@ -1139,7 +1281,8 @@ the study - propene at 72 AOs, carrying an unseen C=C - is the best of the set a
 The transferable grid is transferable.
 
 That leaves the programme with **no unmeasured objection and no unbuilt component except
-the gradient.**
+the gradient.** *(Written before §12. The gradient has since been built, and building it
+produced the unmeasured objection: see §12, and item 6 below.)*
 
 What remains to be measured, in order:
 
@@ -1155,12 +1298,9 @@ What remains to be measured, in order:
    costs nothing, and *adding* it to the partner list makes every properly resolved
    molecule worse, including the nitrile it was meant to help. Environment count supplies
    rank; partner variety at fixed environment count only dilutes.
-3. **A gradient. The only thing left.** Nothing in this directory computes one. Every
-   smoothness claim here is a finite-difference statement about the energy curve; none of
-   them tests an implementation. §8's grids are the first ones a gradient would actually
-   be run on, and §10 has now shown those grids need no refitting per bonding
-   environment - so there is no discrete runtime step left for a gradient to have to
-   omit, and no remaining reason to defer it.
+3. ~~**A gradient. The only thing left.**~~ **Done - see §11, and it works.** Machine
+   precision against a finite difference, forces summing to zero at 2.4e-15, and a ridge
+   window three decades above the one §6 recommends. It also produced item 6.
 4. ~~**The isotropy tax.**~~ **Done - see §7 and §8.** Whole-orbit fitting makes each
    atomic grid exactly invariant under the octahedral group for 1.2-1.6x the points, and
    never reduces the spread under *general* rotations. §7 flagged one case as untested -
@@ -1172,6 +1312,14 @@ What remains to be measured, in order:
    in the PES, exactly at the eigenvalue crossings; ridge at `lambda = 1e-8` removes them
    for 0.1-2.2 uHa. Ridge has a floor of its own, and smoothness finds it before accuracy
    does.
+6. ~~**Does the torque converge with grid size?**~~ **Done - see §12, and the answer is
+   no.** This is the first measured objection the programme has failed. It is now the
+   only thing standing between the scheme and its main use case, and the two things worth
+   trying against it are both named in §12 and HANDOFF section 5: make the torque an
+   *objective* of the offline fit rather than a diagnostic (it needs no SCF beyond the
+   reference, so it is cheap to optimise against), or widen the ridge window so the
+   transferable grid can be run where it is accurate. Nothing else here is blocked on it:
+   the energy-side results stand, and the gradient machinery is correct.
 
 ## Caveats
 

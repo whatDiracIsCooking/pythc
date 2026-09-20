@@ -37,6 +37,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `ensemble.py` | whether the *choice* of ghost ensemble changes that cost, and the accuracy ceiling each ensemble imposes |
 | `transfer.py` | whether one element's frozen point set serves bonding it was never fitted in - sp2/sp carbon, sp2 oxygen, nitrogen, and bonds shorter than any ghost |
 | `gradient.py` | whether the analytic nuclear gradient agrees with the curve, where the ridge floor is for a derivative, and how much torque a frozen point set exerts |
+| `torque_ladder.py` | whether that torque converges away with grid size the way the energy spread did, and what the weight footing is worth under a ridge |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -59,11 +60,15 @@ uv run python transfer.py --out transfer.json       # the ten-molecule suite
 uv run python transfer.py --report transfer*.json
 uv run python gradient.py water                     # analytic vs FD, ridge floor, torque
 uv run python gradient.py water --mode ghost --threshold 3e-4
+uv run python torque_ladder.py methanol --draws 4 --out torque_ladder_methanol.json
+uv run python torque_ladder.py water --parent       # with the complete-grid asymptote
+uv run python torque_ladder.py --report data/torque_ladder_*.json
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Eight headlines:
+See [`FINDINGS.md`](FINDINGS.md). Nine headlines - **and read the ninth first, because it
+is the one that does not go the programme's way**:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -115,5 +120,20 @@ See [`FINDINGS.md`](FINDINGS.md). Eight headlines:
   ghost grid has 1.9x the energy spread of its blocked grid but **30x** the net torque
   (5592 against 188 uHa/rad). §7's deflation of orientation dependence rests on spreads
   and does not survive being differentiated.
+* **The torque does not converge away with grid size, and this is the first measured
+  objection the programme has failed.** Run as a ladder (`torque_ladder.py`), the
+  in-molecule `blocked` grid behaves: methanol 459 -> 16 uHa/rad over 235 -> 670 points,
+  monotone, **28x down**. The *transferable* ghost grid does not: 4410 -> 2937 over
+  223 -> 702 points, ending above its own middle rung, on both molecules tested - while
+  its energy **spread falls 4x over the same grids and the same draws**. It is not ridge
+  noise (three separate processes agree to five figures) and it is not structural (the
+  unpruned atomic grid sits at **~1 uHa/rad**, 2e-5 of the gradient norm), so rigid
+  lab-fixed attachment is fine in the limit and the torque is a property of the pruned,
+  transferable support - the one thing the scheme cannot give up. Two corollaries:
+  **§3's "discard the weights" must be reversed** (the exact-absorption argument is about
+  the pseudoinverse, and under §11's ridge the same 156-point support gives 188 uHa/rad
+  weighted against 7145 at `w = 1`), and **every point-count ratio in §8-§10 was measured
+  at `lambda = 1e-8`, which §11 forbids for gradients** - at `1e-4` the same methanol
+  grids are 1153-3119 uHa off rather than 4-6 uHa.
 
 Raw sweep output is under [`data/`](data).

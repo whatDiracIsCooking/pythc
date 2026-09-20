@@ -8,12 +8,21 @@ should not re-derive machinery that turned out to be unnecessary.
 ## 1. The idea
 
 **In one sentence:** run NNLS per atom (with ghost atoms to keep bonding-region points
-alive) to select a point set per element, **discard the fitted weights and keep only the
-points**, build a molecule's grid as the union of its atoms' point sets, and - given
-sections 4(1) and 4(5), both now done - get analytic nuclear gradients and a smooth PES
-for free. The gradient is no longer a promise: it is implemented in `pythc.grad` and
-agrees with a finite difference to machine precision, subject to a ridge window three
-decades tighter than the one 4(1) recommends for energies.
+alive) to select a point set per element, ~~discard the fitted weights and keep only the
+points~~ **keep the points and their weights** (section 4(6): under the ridge a gradient
+needs, the weights are doing conditioning work again), build a molecule's grid as the
+union of its atoms' point sets, and - given sections 4(1) and 4(5), both now done - get
+analytic nuclear gradients and a smooth PES for free. The gradient is no longer a
+promise: it is implemented in `pythc.grad` and agrees with a finite difference to machine
+precision, subject to a ridge window three decades tighter than the one 4(1) recommends
+for energies.
+
+**Read section 4(6) before betting on this.** The energy-side case is as strong as it
+looks below, but the transferable grid carries a spurious torque that does *not* shrink
+with grid size, and the point-count ratios below were all measured at a ridge the
+gradient cannot use. Angular momentum leakage in AIMD - the application the smooth-PES
+argument is for - is the open objection, and it is the first one the programme has
+failed.
 
 Fit a THC grid once per element, offline, and translate it rigidly into any molecule - the
 acCD move (atomic Cholesky decomposition: do the pivoted selection once per element
@@ -58,6 +67,7 @@ MMFF.
 | `ensemble.py` | does the *choice* of ghost ensemble change that? | **1.35x on methanol, 1.05x on ethanol** - it amortises; but each ensemble has a hard **rank ceiling** |
 | `transfer.py` | does one element's grid serve bonding it was never fitted in? | **yes.** 1.49x in-range vs **1.50x** out-of-range; an unseen partner element costs nothing, and adding one makes things worse |
 | `gradient.py` | can the gradient be computed, and does it match the curve? | **yes, to machine precision** - but only for `lambda` in `1e-2..1e-5`; at 4(1)'s `1e-8` it varies 2x between runs. Net torque 188 uHa/rad blocked, **5592 ghost** |
+| `torque_ladder.py` | does the torque converge away with grid size, as the spread did? | **no, not on the transferable grid.** `blocked` 28x down; `ghost` flat/rising. Reproducible to 5 figures, so not noise; unpruned grid ~1 uHa/rad, so not structural. Also: the weights matter again under a ridge |
 
 The key methodological move: `NNLSGrid(blocked=True)` already fits each atomic sub-grid
 independently, so the penalty for giving up molecular pruning is measurable today. Because
@@ -75,12 +85,12 @@ conclusions are listed here with their current status, so they are not re-derive
 | --- | --- |
 | Freeze the discrete point selection, differentiate the smooth remainder (AO derivative + rigid point translation) | **Stands, and is now implemented** - `pythc.grad`, section 4(5). Those are exactly the two terms and there is no third; the gradient verifies to machine precision. The one correction is that the smooth remainder is only *numerically* smooth above `lambda ~ 1e-5`, well short of 4(1)'s `1e-8`. |
 | LS-THC needs no Becke partition function, since `Z` is fitted rather than quadratured | **Confirmed, and then some** - see the weights result below. |
-| NNLS weights need active-set freezing, QP sensitivity theory, strict complementarity | **Superseded.** The weights barely affect the energy at all; there is nothing to freeze. They were doing *conditioning* work, though, so `w = 1` must be paired with ridge - see section 4(1). |
+| NNLS weights need active-set freezing, QP sensitivity theory, strict complementarity | **Superseded, but only the freezing apparatus - and section 4(6) has partly walked the rest back.** There is still nothing to *freeze*: a frozen weight has `dw/dR = 0` like a frozen point, so keeping the weights costs the gradient nothing. What is no longer true is that they do not matter. Section 3's exact-absorption argument is about the **pseudoinverse**; 4(5) forces a ridge, which is not scale-equivariant, and inside its window the same 156-point water support gives 165 uHa and 188 uHa/rad with NNLS weights against 3304 uHa and 7145 uHa/rad at `w = 1`. **Keep the weights in the offline object.** See FINDINGS section 12. |
 | Reparametrise `w = theta^2` to remove the inequality constraint | **Moot**, and it was the wrong power: this codebase builds `X = w^(1/4) phi`, so `theta^2` still leaves `X = |theta|^(1/2) phi`, singular at 0. If a weight fit is ever kept, parametrise the *collocation amplitude* `X = t phi` with `w = t^4`; the whole pipeline is then polynomial in `t`. |
 | Add `sum_P w_P = 1`; equality constraints differentiate cleanly | **Moot** for the same reason. |
 | Isolated-atom NNLS will discard exactly the tail points a bond needs; fix with ghost atoms | **Measured. Right conclusion, wrong mechanism, and the mechanism matters.** Ghosts are indeed necessary and they work (1.1-1.8x over `blocked`). But the free-atom fit does not fail by misplacing points - it fails because its target supplies only `n_AO(n_AO+1)/2` equations, so NNLS cannot retain more than **15 points per hydrogen in cc-pVDZ** at any threshold. The predicted anisotropy is real too (34 uHa rotation spread at the ceiling), it just is not what stops the scheme. See section 4(3) and FINDINGS section 8. |
 | Octahedral ghosts suffice because p orbitals are octahedral | **Rejected in the discussion itself, correctly** - points are sampling locations, not functions, and do not superpose. |
-| Frozen per-atom grids risk orientation-dependent energies | **Confirmed, then deflated, and the deflation now holds for the real object.** No angular shell survives intact, and rank-limited grids shift 27-39 uHa under random per-atom rotation, but the shift converges away with grid size (methanol 218 -> 7.1 -> 0.01 uHa from 175 to 670 points). Ghost-fitted grids are 2-5x more orientation-dependent than `blocked` **at matched point count** - and identical **at matched accuracy** (882 ghost points: +5.14 uHa, 0.94 uHa spread; 491 blocked points: +5.29 uHa, 0.91 uHa spread). Still a symptom of rank limitation, not a separate defect. |
+| Frozen per-atom grids risk orientation-dependent energies | **Confirmed, deflated, and then re-confirmed by section 4(6) in the form that matters - the original worry was right.** Everything in this cell is about energy *spreads*, and FINDINGS section 12 shows the spread converges away on the transferable grid while `dE/dtheta` does not. Read the rest of this cell as a statement about spreads only. No angular shell survives intact, and rank-limited grids shift 27-39 uHa under random per-atom rotation, but the shift converges away with grid size (methanol 218 -> 7.1 -> 0.01 uHa from 175 to 670 points). Ghost-fitted grids are 2-5x more orientation-dependent than `blocked` **at matched point count** - and identical **at matched accuracy** (882 ghost points: +5.14 uHa, 0.94 uHa spread; 491 blocked points: +5.29 uHa, 0.91 uHa spread). Still a symptom of rank limitation, not a separate defect. |
 | Fix isotropy with orbit-wise (group-sparsity) pruning over (radial shell, Lebedev orbit) blocks | **Implemented, measured, and rejected as a fix.** It delivers exactly what it promised - whole orbits, exact octahedral invariance - and that turns out not to be the useful property. At matched point count a point-wise grid is better on both accuracy and rotation spread. See section 4(2) and FINDINGS section 7. |
 | One element's grid will need refitting per bonding environment | **Rejected. Section 4(4), second half.** In-range and out-of-range molecules are indistinguishable, and the worst two in a ten-molecule suite are an sp-nitrile and methanol - the molecule the ensemble was designed around. |
 | Grid inflation will be 2-3x, i.e. 4-9x on the `n_P^2` parts | **Roughly right after all.** The 1.2-1.7x of section 4 priced only *blocked vs global* - one of the two things a transferable grid gives up. Adding the ghost gap gives **1.6-2.7x, i.e. 2.6-7.3x**, improving with system size. Do not quote the 1.2-1.7x figure as the cost of the scheme; it is the cost of half of it. |
@@ -475,20 +485,36 @@ cc-pVDZ; the ridge window in particular is read off a single system.
   The quantity that matters is `dE/dtheta`, it is now computable, and it does not track
   the spread: water's ghost grid has 1.9x the spread of its blocked grid and 30x the net
   torque. Section 4(2)'s deflation of orientation dependence rests on spreads and does
-  not survive being differentiated. What is still open is the part that was always the
-  real question: does the torque converge away with grid size the way the spread does?
-  4(2) took methanol from 175 to 670 points and watched the spread go 218 -> 7.1 -> 0.01
-  uHa; the same ladder in `dE/dtheta` has not been run, and it is the cheapest useful
-  thing left (`gradient.py` already reports it; it needs a loop over thresholds). If the
-  torque converges, lab-fixed attachment is fine and 4(2)'s conclusion survives in the
-  form that matters. If it does not, the frame question is live again and orbit grouping
-  gets the second chance 4(3) denied it.
+  not survive being differentiated. ~~What is still open is the part that was always the
+  real question: does the torque converge away with grid size the way the spread does?~~
+  **Answered - `torque_ladder.py`, FINDINGS section 12, and the answer is no.** The
+  in-molecule `blocked` grid converges cleanly (methanol 459 -> 16 uHa/rad over 235 ->
+  670 points, monotone, 28x); the transferable ghost grid does not (4410 -> 2937 over
+  223 -> 702, ending above its own middle rung, on both molecules). It is not ridge
+  noise - three separate processes agree to five figures - and it is not structural,
+  since the unpruned atomic grid sits at ~1 uHa/rad. **So the frame question is live
+  again.** Orbit grouping is the second chance 4(3) denied it, but read 4(2) before
+  taking it: orbit grouping buys exact *octahedral* invariance, and a lab-fixed grid
+  needs invariance under general rotations, which 4(2) measured it as not supplying.
+  Section 12's own suggestion - make `dE/dtheta` an objective of the offline fit - is the
+  cheaper thing to try first.
 * What is the torque's effect over an actual trajectory? 5592 uHa/rad net on water's
   208-point transferable grid is 13% of the nuclear gradient norm, which is not obviously
   negligible, but a torque is not an error bar - its consequence is secular drift in
   angular momentum, and nothing here integrates it. AIMD is the application the whole
   smooth-PES argument is for, so this is the measurement that decides whether the
-  programme's main use case is actually served.
+  programme's main use case is actually served. **Section 12 raises the stakes on this
+  rather than settling it**: the torque is now known not to shrink with grid size on the
+  transferable grid, so it cannot be outrun and a trajectory is the only thing that says
+  whether the magnitude matters. This is now the most informative single run left.
+* **Does any point-count ratio in 4(3) and 4(4) survive at a gradient-legal ridge?**
+  Section 12 says probably not as quoted. Those sections evaluated `w = 1` grids at
+  `RIDGE = 1e-8`; 4(5) forbids that for a gradient, and at `lambda = 1e-4` the same
+  methanol grids come in at 1153-3119 uHa rather than 4-6 uHa. The matched-accuracy
+  interpolation `analyse.py` performs is what produced "1.49x at 10 uHa", and 10 uHa is
+  not reachable in the gradient's ridge window by any grid measured so far. Re-running
+  the 4(4) suite at `lambda = 1e-4` would say what the scheme actually costs for the use
+  case it is for. Nothing has been re-run.
 * Is there a cheap way to reduce the torque without paying 4(2)'s orbit-grouping tax? The
   torque is `sum_P s_P x (dE/dr_P)`, computable with no SCF beyond the reference, so it
   could be used as an *objective* in the offline fit rather than only as a diagnostic -
