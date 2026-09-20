@@ -1298,8 +1298,7 @@ what any of these torques do over time.
 
 ## Verdict
 
-**Every objection that could have killed this has now been measured, and none of them
-did.** The proposed object exists: §8 builds genuine offline per-element point sets, fits
+The proposed object exists: §8 builds genuine offline per-element point sets, fits
 them against nothing but ghosts, translates them rigidly into methanol and ethanol, and
 they land 1.1-1.8x off the in-molecule `blocked` grids at matched accuracy. Compounded
 with §1, a frozen per-element grid costs **1.6-2.7x** the points of a single global
@@ -1383,6 +1382,12 @@ What remains to be measured, in order:
    in the PES, exactly at the eigenvalue crossings; ridge at `lambda = 1e-8` removes them
    for 0.1-2.2 uHa. Ridge has a floor of its own, and smoothness finds it before accuracy
    does.
+6. **Does the torque §12 is left holding converge away with grid size?** §12 continued
+   the torque to small `lambda` on one grid per mode and found most of §11's number was
+   the regulariser; it did not vary the grid size, so §7's convergence claim is still
+   untested in `dE/dtheta`. `torque_ladder.py` runs that ladder and must be run under the
+   damped filter - a ladder taken at `lambda = 1e-4` measures the ridge, not the grid.
+
 
 ## Caveats
 

@@ -169,7 +169,7 @@ def element_grid(symbol):
 
 
 def fit_element(element, threshold, screening=1e-8, max_points=None, free=False,
-                normalise=True, **env_kwargs):
+                normalise=True, with_weights=False, **env_kwargs):
     """
     Select one element's transferable point set, offline.
 
@@ -181,7 +181,16 @@ def fit_element(element, threshold, screening=1e-8, max_points=None, free=False,
 
     :param free: Fit the isolated atom only, ignoring the ghost environments. This is
         the control, not a configuration worth using.
-    :return: ``(indices, n_parent, n_env)`` - indices into :func:`element_grid`.
+    :param with_weights: Return the surviving NNLS weights alongside the indices. Section
+        3 discarded them because a positive diagonal rescaling of ``X`` is absorbed
+        exactly by the ``Z`` fit - but that argument is about the *pseudoinverse*, which
+        is scale-equivariant, and section 4(5) forces a ridge instead. A ridge is not
+        scale-equivariant, so inside the gradient's ridge window the weights are doing
+        conditioning work again and the offline object may need to carry them. They cost
+        one float per point to store and nothing at all to differentiate: frozen weights
+        have ``dw/dR = 0`` exactly as frozen points do.
+    :return: ``(indices, n_parent, n_env)``, indices into :func:`element_grid` - or
+        ``((indices, weights), n_parent, n_env)`` when ``with_weights``.
     """
     envs = ghost_environments(element, **env_kwargs)
     if free:
@@ -216,7 +225,9 @@ def fit_element(element, threshold, screening=1e-8, max_points=None, free=False,
     w = lawson_hanson(StackedOperator(blocks, scales), b,
                       weight_threshold=threshold, max_passive=max_points)
 
-    return np.flatnonzero(w), len(parent), len(envs)
+    idx = np.flatnonzero(w)
+
+    return ((idx, w[idx]) if with_weights else idx), len(parent), len(envs)
 
 
 def element_supports(elements, threshold, free=False, quiet=False, **kwargs):
@@ -224,14 +235,17 @@ def element_supports(elements, threshold, free=False, quiet=False, **kwargs):
 
     :param quiet: Suppress the per-element line. For callers that fit many ensembles in
         a loop and print their own table.
+    :param kwargs: Passed to :func:`fit_element`; ``with_weights=True`` makes each value
+        an ``(indices, weights)`` pair rather than a bare index array.
     """
     supports = {}
     for symbol in elements:
         t0 = time.time()
-        idx, n_parent, n_env = fit_element(symbol, threshold, free=free, **kwargs)
-        supports[symbol] = idx
+        support, n_parent, n_env = fit_element(symbol, threshold, free=free, **kwargs)
+        supports[symbol] = support
+        n_kept = len(support[0] if kwargs.get("with_weights") else support)
         if not quiet:
-            print(f"    {symbol}: {len(idx):4d} of {n_parent} points from {n_env} "
+            print(f"    {symbol}: {n_kept:4d} of {n_parent} points from {n_env} "
                   f"environment{'s' if n_env != 1 else ''}  ({time.time() - t0:.1f}s)",
                   flush=True)
     return supports

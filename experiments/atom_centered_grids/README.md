@@ -38,6 +38,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `transfer.py` | whether one element's frozen point set serves bonding it was never fitted in - sp2/sp carbon, sp2 oxygen, nitrogen, and bonds shorter than any ghost |
 | `gradient.py` | whether the analytic nuclear gradient agrees with the curve, where the ridge floor is for a derivative, and how much torque a frozen point set exerts |
 | `window.py` | what sets that floor, whether a different filter moves it, and what the torque is once the regulariser is taken out of it |
+| `torque_ladder.py` | whether the torque `window.py` is left holding converges away with grid size, the way the energy spread did |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -63,6 +64,10 @@ uv run python gradient.py water --mode ghost --threshold 3e-4
 uv run python window.py methanol --mode ghost --threshold 3e-4   # the lambda window
 uv run python window.py --report data/window_*.json              # the trade, per grid
 uv run python scan.py methanol 1e-3 --damped-lambdas 1e-8,1e-10  # still smooth?
+uv run python torque_ladder.py methanol --scheme damped --ridges 1e-8,1e-10 --draws 4 \
+    --out torque_ladder_methanol_damped.json                     # the torque, vs grid size
+uv run python torque_ladder.py water --scheme damped --parent    # with the complete-grid floor
+uv run python torque_ladder.py --report data/torque_ladder_*.json
 ```
 
 ## Results
@@ -138,5 +143,4 @@ See [`FINDINGS.md`](FINDINGS.md). Eleven headlines:
   ghost grid has 1.9x the energy spread of its blocked grid but **30x** the net torque
   (5592 against 188 uHa/rad). §7's deflation of orientation dependence rests on spreads
   and does not survive being differentiated.
-
 Raw sweep output is under [`data/`](data).
