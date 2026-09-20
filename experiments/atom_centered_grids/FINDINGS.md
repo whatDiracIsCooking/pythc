@@ -881,6 +881,224 @@ ensemble (plus its N-partner variant). Transferability across *basis sets* is un
 the offline object is a list of indices into an element's level-0 atomic grid, and nothing
 here asks what happens to it in cc-pVTZ.
 
+## 11. The gradient exists - and the ridge that the energy is happy at is far too small for it
+
+`gradient.py`, with the machinery in `pythc.grad`. Section 6 replaced the metric
+truncation with a ridge because the truncation was the last discrete step in the
+pipeline, and argued from the resulting *energy* curve that the potential energy surface
+was now smooth. Nothing checked that a derivative could actually be computed, or that it
+was the derivative of that curve. This does both, and the answer to the first question is
+yes while the answer to the second comes with a much tighter constraint on `lambda` than
+section 6 imposed.
+
+### What was implemented
+
+A hand-written reverse-mode pass over the whole `ov`-mode pipeline, in `pythc/grad/`:
+`laplace_mp2.py` differentiates the `-2J + K` Laplace expression with respect to `X`, `Z`
+and the orbital energies; `linalg.py` supplies the adjoints of `ridge_inv`,
+`ridge_inv_sqrt`, `pinv` and `pseudo_inv_sqrt`; `factorisation.py` carries `dE/dZ` back
+through `Z = D^T D`, `D = J^(-1/2) W S^-1` and the metric to the collocation matrix;
+`geometry.py` turns that into nuclear derivatives. `FrozenGrid` carries the one piece of
+bookkeeping a frozen grid needs and a re-selected one cannot supply: **which atom each
+point rides with**.
+
+The collocation derivative is the whole proposal in one line,
+
+    dX_ao[P,mu] / dR_A = w_P^(1/4) grad phi_mu(r_P) * ( [P rides with A] - [mu sits on A] )
+
+- an AO derivative that any basis-set method has, and a rigid translation that exists
+only because the grid is frozen. There is no third term. A grid re-selected per geometry
+would need one, and it would not be a derivative.
+
+What this computes is the derivative of the **correlation energy at a fixed SCF
+reference**. That is the THC-specific content of the gradient; the orbital-response term
+is structurally identical to DF-MP2's and is not implemented here. Keeping the split
+explicit is what makes the check below exact on both sides.
+
+### It is right
+
+Water, 156-point blocked grid at `1e-3`, cc-pVDZ, orbitals held fixed on both sides:
+
+| ridge | \|grad\| | max\|ana-fd\| h=1e-3 | h=1e-4 | E_corr |
+| --- | --- | --- | --- | --- |
+| 1e-2 | 4.9226e-02 | 1.88e-07 | **1.87e-09** | -0.196916566 |
+| 1e-3 | 4.7635e-02 | 2.81e-07 | **2.92e-09** | -0.203668808 |
+| 1e-4 | 4.5660e-02 | 6.00e-07 | **8.08e-09** | -0.204574645 |
+| 1e-5 | 4.4539e-02 | 1.08e-06 | 7.30e-08 | -0.204716618 |
+| 1e-6 | 4.3909e-02 | 1.16e-05 | 1.16e-05 | -0.204737174 |
+| 1e-7 | 4.3688e-02 | 8.35e-04 | 8.35e-04 | -0.204739888 |
+| 1e-8 | 1.6808e-01 | 1.07e-01 | 1.07e-01 | -0.204740292 |
+| pinv | 4.3537e-02 | 1.68e-07 | 1.95e-06 | -0.204740339 |
+
+The first three rows fall by exactly 100x when the step falls by 10x, which is what a
+correct gradient does and what a gradient missing a term does not. Independently, and
+with no finite difference anywhere, the forces sum to zero to **2.4e-15** of the gradient
+norm - the sharpest available test of the collocation term, since under a uniform shift
+its translation and AO halves are equal and opposite across the molecule and an error in
+either cannot cancel. The energy itself reproduces `LS_RI_Becke` + `LaplaceRMP2` to 1.2e-11.
+
+### The main result: the gradient's ridge floor is three decades above the energy's
+
+Section 6 recommended `lambda = 1e-8` and warned that smoothness finds ridge's floor
+before accuracy does. Put to a gradient, the same question has a much less comfortable
+answer. Reading down the table: the finite difference stops converging at `1e-5`, is
+losing digits by `1e-6`, is wrong in the third digit at `1e-7`, and at **`1e-8` - the
+recommended value - the analytic and numerical gradients disagree by a factor of two**,
+while the energies in the same rows agree to 3 nHa.
+
+Running the *identical* calculation in three separate processes makes the point without
+any finite difference at all. Same SCF to 1e-13, same 156 points:
+
+| ridge | E_corr across runs | \|grad\| across runs | rms torque across runs |
+| --- | --- | --- | --- |
+| 1e-4 | agrees to 3e-13 | 4.5660213e-2, 4.5660215e-2, 4.5660210e-2 | agrees to 5 digits |
+| 1e-6 | agrees to 3e-11 | 4.3921e-2, 4.3910e-2, 4.3918e-2 | 9.5e-6, 1.24e-5, 1.09e-5 |
+| 1e-7 | agrees to 3e-10 | 4.368e-2, 4.466e-2, 4.421e-2 | 5.7e-4, 5.8e-4, 4.9e-4 |
+| 1e-8 | agrees to 2e-9 | **1.34e-1, 2.10e-1, 1.02e-1** | **9.8e-2, 7.3e-2, 5.6e-2** |
+
+At `lambda = 1e-8` the energy is reproducible to 0.002 uHa and the gradient varies by a
+**factor of two** between runs of the same calculation. Nothing in the inputs changed;
+what varies is the order floating-point reductions happen in, amplified by inverting 61
+of water's 156 metric directions - the ones below 1e-14 of the largest eigenvalue - at
+`1/lambda`.
+
+So section 6's `lambda = 1e-8` is a recommendation for energies and must not be carried
+over to gradient work. **The usable window here is `1e-2` to `1e-5`**, and it is bounded
+on both sides: below it the null space is inverted into noise, above it the ridge costs
+real accuracy (`1e-2` is 7.8 mHa from the converged energy, `1e-4` is 165 uHa, `1e-5` is
+23 uHa). That is an uncomfortable place to have to sit, and it is the sharpest thing this
+section has to say. Section 6 said "do not pick `lambda` from an accuracy table alone";
+the correction is that its own smoothness table is not enough either, because a second
+difference at 0.002 A steps over roughness that a derivative sees directly.
+
+The `pinv` row is the control and behaves as section 6 predicts: water's blocked metric
+has no eigenvalue near the cutoff at this geometry, so no crossing occurs, the
+fixed-subspace derivative is the right object, and it agrees to 1.7e-7. That is not a
+reprieve for the truncation - it is what "smooth between crossings" looks like when a
+scan happens not to sit on one.
+
+### Where the gradient comes from, and how little of it the freeze owns
+
+At `lambda = 1e-4`, by norm:
+
+| term | Ha/bohr | share |
+| --- | --- | --- |
+| rigid point translation | 6.54e-04 | 0.014x |
+| AO derivative | 4.35e-03 | 0.095x |
+| *(collocation total)* | 4.62e-03 | 0.10x |
+| 3-centre integrals | 9.78e-02 | 2.14x |
+| 2-centre integrals | 5.68e-02 | 1.24x |
+| **total** | **4.57e-02** | 1.00x |
+
+The gradient is dominated by the derivative integrals, which largely cancel against each
+other as they do in any DF gradient. The grid contributes **10%**, and the rigid
+translation - the term that exists *only* because the point set is frozen and attached -
+is **1.4%** of the total. This is reassuring rather than disappointing: the LS-THC fit is
+chosen to reproduce the DF ERIs, and the DF energy does not depend on the grid at all, so
+the grid's contribution to the gradient is the fit residual's contribution. A frozen grid
+is not injecting large spurious forces.
+
+### The torque, which section 7 could not measure
+
+Section 7 reported orientation dependence as an energy *spread* over random draws and
+concluded it converges away with grid size. A spread is not a derivative. Rotating an
+atom's point set about its own nucleus leaves the molecule, the AOs and the SCF untouched,
+so `dE/dtheta` is exactly computable with no response term, and
+
+    tau_A = sum_{P on A} s_P x (dE/dr_P)
+
+is that derivative. Analytic against finite difference, water at `lambda = 1e-4`, each
+atom rotated about its own torque axis:
+
+| atom | analytic \|tau\| | fd d=1e-4 | fd d=1e-3 | fd d=1e-2 |
+| --- | --- | --- | --- | --- |
+| H0 | 1.53921135e-04 | 1.53921239e-04 | 1.53923600e-04 | 1.54407574e-04 |
+| O1 | 3.91754368e-05 | 3.91763520e-05 | 3.91751850e-05 | 3.91678537e-05 |
+| H2 | 1.80388533e-05 | 1.80373928e-05 | 1.80376728e-05 | 1.80113289e-05 |
+
+Six significant figures. The quantity with physical consequences is the **net** torque:
+rotating the molecule while the point sets keep their lab orientation is the same as
+rotating everything - which the energy is invariant under - and then counter-rotating each
+grid about its nucleus, so `sum_A tau_A` *is* the energy's response to a rigid rotation
+under lab-fixed attachment, and therefore the rate at which angular momentum leaks.
+
+    rms per-atom torque        92.3 uHa/rad
+    net torque |sum_A tau_A|  187.8 uHa/rad
+    nuclear gradient norm    45660  uHa/bohr
+    ratio                     4.1e-3 bohr/rad
+    energy spread, 6 draws    238   uHa peak-to-peak   (the section 7 statistic)
+
+Section 7 posed the choice - lab frame gives spurious torques, a molecular frame is
+itself geometry-dependent and can switch discontinuously - and could only argue about it.
+The number is now 188 uHa/rad of net torque on water's blocked grid, 0.4% of the nuclear
+gradient scale.
+
+### The spread does not track the torque, and the transferable grid is where it shows
+
+Running the same script on the actual proposed object - a ghost-fitted per-element
+support, transferred onto water's nuclei, 208 points at threshold `3e-4` - reproduces
+every verification result (quadratic convergence, 6.9e-8 -> 7.1e-10; forces summing to
+zero at 4.8e-15; torque against finite difference to six figures), and then says
+something the energy measurements did not:
+
+| grid | points | energy spread, 6 draws | net torque | torque / \|grad\| |
+| --- | --- | --- | --- | --- |
+| blocked, 1e-3 | 156 | 238 uHa | 188 uHa/rad | 4.1e-03 bohr/rad |
+| **ghost, 3e-4** | **208** | **452 uHa** | **5592 uHa/rad** | **1.35e-01 bohr/rad** |
+
+The transferable grid has 33% more points and **1.9x** the energy spread - and **30x**
+the net torque. Section 7 measured ghost grids at "2-5x more orientation-dependent than
+`blocked` at matched point count, and identical at matched accuracy" and concluded that
+orientation dependence is a symptom of rank limitation rather than a defect of the ghost
+fit. Read through a spread that is defensible. Read through a derivative it is not: the
+two grids differ by a factor of thirty in the quantity a dynamics run would actually
+feel, and the spread gives no warning of it.
+
+This is the concrete form of the general point. A spread is a peak-to-peak over draws of
+a function of orientation; a torque is that function's slope at one orientation. A
+small-amplitude, rapidly varying function has a small spread and a large slope, and a
+ghost-fitted support - trained against twelve chosen directions and then attached at an
+arbitrary orientation - is exactly the kind of thing that would be rougher in orientation
+without being larger in amplitude. **Support-overlap and `rmsd_S` were already ruled out
+as quality metrics (sections 5, 8, 10); the rotation spread now joins them for gradient
+purposes.** Orientation quality has to be measured with `dE/dtheta`.
+
+Whether 1.35e-1 bohr/rad is tolerable is a question about trajectory length rather than
+about this table. But it is the first number attached to section 7's dichotomy, and it
+points the other way from section 7's conclusion.
+
+The collocation term also carries far more of the gradient on the transferable grid than
+on the blocked one - rigid translation 9% against 1.4%, collocation total 25% against
+10% - which is the same story in a second place: the frozen per-element support is a
+rougher object in the geometric variables than an in-molecule fit, and the energy
+comparisons of sections 8 and 10 do not see it because they are not derivatives.
+
+### What this does not settle
+
+One molecule, one geometry, two grids, cc-pVDZ, `ov` mode, MP2. Water is the molecule
+sections 8 and 10 both decline to quote ratios for, because at 24 AOs everything
+saturates - that does not affect a gradient check, which compares a derivative against
+its own finite difference rather than against another grid, but it does mean the *sizes*
+of the terms above should not be read as typical.
+
+The orbital-response term is not implemented, so `de` is not the total MP2 gradient and
+cannot be compared against `pyscf`'s. The rotational identity
+`sum_A a_A x dE/dR_A + sum_A tau_A = 0` fails for exactly that reason - it assumes the
+orbitals rotate with the molecule - and its residual (4.7e-4 relative) is a measure of
+the omitted term rather than of an error. Wiring in the response would turn that identity
+into a second free test, which is the main reason to do it.
+
+The ridge window is read off one system. Section 6's `shift/maxeig` came out at
+1.7e-10 to 3.3e-10 across three systems at `lambda = 1e-8`, so the window is probably
+not wildly system-dependent, but three systems in one basis was already called a weak
+test there and this is one system.
+
+The blocked/ghost torque comparison is at neither matched point count nor matched
+accuracy - 156 points at -0.204575 against 208 at -0.204006, both at `lambda = 1e-4`. The
+30x ratio is far outside anything that mismatch could produce, and the 1.9x spread ratio
+is measured on the same two grids so the *contrast* between them is internal, but a
+matched-accuracy version of this table is the obvious next run and has not been done.
+
 ## Verdict
 
 **Every objection that could have killed this has now been measured, and none of them

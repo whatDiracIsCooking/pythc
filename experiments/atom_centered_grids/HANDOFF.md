@@ -10,7 +10,10 @@ should not re-derive machinery that turned out to be unnecessary.
 **In one sentence:** run NNLS per atom (with ghost atoms to keep bonding-region points
 alive) to select a point set per element, **discard the fitted weights and keep only the
 points**, build a molecule's grid as the union of its atoms' point sets, and - given
-section 4(1), now done - get analytic nuclear gradients and a smooth PES for free.
+sections 4(1) and 4(5), both now done - get analytic nuclear gradients and a smooth PES
+for free. The gradient is no longer a promise: it is implemented in `pythc.grad` and
+agrees with a finite difference to machine precision, subject to a ridge window three
+decades tighter than the one 4(1) recommends for energies.
 
 Fit a THC grid once per element, offline, and translate it rigidly into any molecule - the
 acCD move (atomic Cholesky decomposition: do the pivoted selection once per element
@@ -38,7 +41,7 @@ in-range against 1.50x out-of-range. The transferable grid transfers.**
 
 ## 2. What was attempted
 
-Nine experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke
+Ten experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke
 parent grid, `ov` mode, 10 Laplace points, against DF-MP2. Geometries from RDKit ETKDG +
 MMFF.
 
@@ -54,6 +57,7 @@ MMFF.
 | `ghosts.py` | what does an offline, ghost-fitted per-element grid cost? | **1.1-1.8x over `blocked`**, shrinking with size; free-atom fits fail structurally |
 | `ensemble.py` | does the *choice* of ghost ensemble change that? | **1.35x on methanol, 1.05x on ethanol** - it amortises; but each ensemble has a hard **rank ceiling** |
 | `transfer.py` | does one element's grid serve bonding it was never fitted in? | **yes.** 1.49x in-range vs **1.50x** out-of-range; an unseen partner element costs nothing, and adding one makes things worse |
+| `gradient.py` | can the gradient be computed, and does it match the curve? | **yes, to machine precision** - but only for `lambda` in `1e-2..1e-5`; at 4(1)'s `1e-8` it varies 2x between runs. Net torque 188 uHa/rad blocked, **5592 ghost** |
 
 The key methodological move: `NNLSGrid(blocked=True)` already fits each atomic sub-grid
 independently, so the penalty for giving up molecular pruning is measurable today. Because
@@ -69,7 +73,7 @@ conclusions are listed here with their current status, so they are not re-derive
 
 | claim from the design discussion | status |
 | --- | --- |
-| Freeze the discrete point selection, differentiate the smooth remainder (AO derivative + rigid point translation) | **Stands.** This is what Song & Martínez actually do. |
+| Freeze the discrete point selection, differentiate the smooth remainder (AO derivative + rigid point translation) | **Stands, and is now implemented** - `pythc.grad`, section 4(5). Those are exactly the two terms and there is no third; the gradient verifies to machine precision. The one correction is that the smooth remainder is only *numerically* smooth above `lambda ~ 1e-5`, well short of 4(1)'s `1e-8`. |
 | LS-THC needs no Becke partition function, since `Z` is fitted rather than quadratured | **Confirmed, and then some** - see the weights result below. |
 | NNLS weights need active-set freezing, QP sensitivity theory, strict complementarity | **Superseded.** The weights barely affect the energy at all; there is nothing to freeze. They were doing *conditioning* work, though, so `w = 1` must be paired with ridge - see section 4(1). |
 | Reparametrise `w = theta^2` to remove the inequality constraint | **Moot**, and it was the wrong power: this codebase builds `X = w^(1/4) phi`, so `theta^2` still leaves `X = |theta|^(1/2) phi`, singular at 0. If a weight fit is ever kept, parametrise the *collocation amplitude* `X = t phi` with `w = t^4`; the whole pipeline is then polynomial in `t`. |
@@ -112,8 +116,17 @@ per bonding environment, "which environment is this atom in" is a discrete funct
 geometry, putting a discrete step back at runtime and undoing (1) and the whole smooth-PES
 argument. It does not. See section 4(4) and FINDINGS section 10.
 
-**Nothing is left that can kill the idea, and nothing is left to measure. (5) a gradient
-is the only remaining work, and it is ordinary development.**
+**(5) is now done as well, and it was not quite the ordinary development this file
+expected.** The gradient itself went in cleanly and verifies to machine precision, but it
+brought back two results that no energy measurement could have produced: the ridge
+strength 4(1) recommends is three decades too small for a gradient to mean anything, and
+the orientation dependence 4(2) deflated has a torque attached to it that is now measured
+rather than argued about. See 4(5) and FINDINGS section 11.
+
+**Nothing is left that can kill the idea.** What remains is the orbital-response layer -
+standard DF-MP2 machinery, and the only thing between this and a total gradient - plus
+the open questions in section 5, of which the selector question is now the one with the
+most leverage.
 
 The target pipeline, for orientation:
 
@@ -330,20 +343,67 @@ times, which makes its point count a first-crossing estimate. And transferabilit
 *basis sets* is untouched: the offline object is a list of indices into an element's
 level-0 atomic grid, and nothing asks what becomes of it in cc-pVTZ.
 
-**(5) Actually compute a gradient. THE ONLY REMAINING WORK.** Still nothing here computes
-one, and with (4) closed it is no longer half of what is left - it is all of it.
-`scan.py` measures the *curve* rather than arguing about it structurally, so the
-smoothness claim is no longer purely theoretical - but a
-finite-difference-vs-analytic check would test the implementation, which the scan cannot.
-`scan.py` is the natural harness: it already walks a frozen grid along a bond at fixed
-ridge, which is the reference curve such a check needs. What (3) adds is that the grids to
-run it on now exist: `ghosts.py`'s per-element supports are the first point sets in this
-directory that are genuinely frozen with respect to geometry, so a gradient computed on
-one has no re-selection term to omit and no excuse for disagreeing with the curve. What
-(4) adds is that those supports do not have to be chosen per environment either: section
-4(4) measured a single frozen support across sp3, sp2 and sp bonding and found no penalty,
-so there is no lurking "refit when the bonding changes" step that a gradient would have to
-differentiate through or silently omit.
+**(5) Actually compute a gradient. DONE** - `pythc.grad`, driven by `gradient.py`, written
+up in FINDINGS section 11. The gradient exists, it agrees with a finite difference to
+machine precision, and it brought back two things nobody had asked it for.
+
+What was built: a hand-written reverse-mode pass over the whole `ov` pipeline
+(`laplace_mp2.py` -> `linalg.py` -> `factorisation.py` -> `geometry.py`), plus
+`FrozenGrid`, which carries the one piece of bookkeeping a frozen grid has and a
+re-selected one cannot - which atom each point rides with. The collocation derivative is
+the target pipeline's second row in one line: an AO derivative, a rigid translation, and
+**no third term**.
+
+What it settled, and what it did not:
+
+* **It is correct.** Quadratic convergence in the finite-difference step (1.88e-7 ->
+  1.87e-9 as `h` goes 1e-3 -> 1e-4), and the forces sum to zero to 2.4e-15 of the
+  gradient norm with no finite difference involved - which is the sharp test of the
+  collocation term, since under a uniform shift its two halves are equal and opposite and
+  an error in either cannot cancel. The energy reproduces `LS_RI_Becke` + `LaplaceRMP2`
+  to 1.2e-11.
+* **Section 4(1)'s `lambda = 1e-8` is far too small for a gradient, and this is the
+  result to carry forward.** At that value the energy is reproducible to 0.002 uHa and
+  the gradient varies by a **factor of two** between runs of the identical calculation,
+  because 61 of water's 156 metric directions sit below 1e-14 of the top eigenvalue and
+  ridge inverts them at `1/lambda`. The usable window is **`1e-2` to `1e-5`**, bounded
+  below by that noise and above by real accuracy loss (23 uHa at `1e-5`, 165 uHa at
+  `1e-4`). 4(1) said not to pick `lambda` from an accuracy table alone; the correction is
+  that its own smoothness table is not enough either - a second difference at 0.002 A
+  steps over roughness a derivative sees directly.
+* **The frozen grid owns very little of the gradient.** At `lambda = 1e-4` the collocation
+  term is 10% of the total and the rigid translation - the part that exists *only* because
+  the grid is frozen - is 1.4%. The rest is derivative integrals. That is the reassuring
+  direction: a frozen grid is not injecting large spurious forces, which is what you would
+  expect given that `Z` is fitted to reproduce DF ERIs that do not depend on the grid at all.
+* **The torque is now a number, and it does not say what the spread said.** Section 4(2)
+  measured orientation dependence as an energy spread and could only argue about the
+  lab-frame-versus-molecular-frame choice. `dE/dtheta` is exactly computable - rotating a
+  point set about its own nucleus leaves the molecule, the AOs and the SCF untouched, so
+  no response term enters - and agrees with a finite difference to six significant
+  figures. The net torque `sum_A tau_A` is the one that matters: it is exactly the
+  energy's response to rigidly rotating the molecule under lab-fixed attachment, i.e. the
+  rate angular momentum leaks. On water: blocked (156 points) **188 uHa/rad**, ghost-fitted
+  per-element (208 points) **5592 uHa/rad**. The transferable grid has 1.9x the energy
+  spread of the blocked one and **30x** the torque.
+* **So the rotation spread joins `rmsd_S` and support overlap on the list of metrics that
+  do not measure what they are used for.** 4(2) deflated orientation dependence on the
+  strength of spreads converging away with grid size. Spreads are peak-to-peak over draws;
+  torques are slopes at one orientation, and a rough-but-small-amplitude function has a
+  tiny spread and a large slope. Do not assess a frozen grid's orientation quality with a
+  spread. The collocation term tells the same story twice over: on the ghost grid the
+  rigid translation is 9% of the gradient against blocked's 1.4%.
+* **What it is not.** This is the derivative of the correlation energy at a *fixed SCF
+  reference*. That is the THC-specific content - everything the frozen grid, collocation,
+  metric and ridge touch - and it is deliberately separated so both sides of the
+  finite-difference check are exact. The orbital-response term is standard DF-MP2
+  machinery and is not implemented; `C_bar` and `eps_bar` are returned ready for it. Until
+  it is, `de` is not the total MP2 gradient and cannot be compared against `pyscf`'s.
+
+Left undone: the orbital response, which would also turn the rotational identity
+`sum_A a_A x dE/dR_A + sum_A tau_A = 0` into a second free test (it currently fails by
+4.7e-4 relative, which *is* the omitted term). Everything above is water, one geometry,
+cc-pVDZ; the ridge window in particular is read off a single system.
 
 ## 5. Open questions
 
@@ -394,17 +454,45 @@ differentiate through or silently omit.
   metric in the set. `ridge.py` sets `mf.conv_tol = 1e-12`; `sweep.py` and `ghosts.py` do
   not. Noticed, not diagnosed - and it is exactly the kind of thing that matters more for
   a gradient (5) than for an energy.
+* **What is the right `lambda` for gradient work, and is `1e-5` really the best available?**
+  Section 4(5) brackets it at `1e-2..1e-5` on water: below that the null space is inverted
+  into noise and the gradient moves by a factor of two between runs; above it the ridge
+  costs 23 uHa at `1e-5` and 165 uHa at `1e-4`. So a gradient currently has to be bought
+  with a hundred-fold worse energy than an energy calculation would accept, which is not a
+  comfortable place to sit and may not be necessary. The obvious escapes were not tried:
+  project the numerically null directions out of the metric before inverting rather than
+  damping them; solve the `Z` fit as a least-squares problem directly instead of forming
+  `S^-1` twice in the adjoint; or use a better-conditioned target than the overlap metric
+  (which connects to the selector question above). One of these probably widens the window.
 * Should `metric_ridge` become the default rather than an opt-in? It costs a few uHa and
   removes a discontinuity, which is the right trade for gradient work and the wrong one
-  for reproducing published single-point energies. (The argument that 4(2)'s larger, more
+  for reproducing published single-point energies. Section 4(5) adds that if the answer is
+  yes for gradient work, the default value cannot be 4(1)'s `1e-8`. (The argument that 4(2)'s larger, more
   redundant grids would make the near-null crowd worse no longer applies, since those
   grids are not the recommended path - but the orbit-grouped grids do exist and were not
   run through `rank.py`, so what they do to the metric is unmeasured.)
-* How small does the rotation spread have to be? Section 4(2) reports it falling to 0.01
-  uHa on methanol's 670-point grid, which looks like enough - but nothing here converts a
-  spread into a torque, and a spurious torque that is negligible for a single point energy
-  may still spoil angular-momentum conservation over an AIMD trajectory. The quantity that
-  matters is `dE/dtheta` at the attachment orientation, not the peak-to-peak over draws.
+* ~~How small does the rotation spread have to be?~~ **Wrong question - section 4(5).**
+  The quantity that matters is `dE/dtheta`, it is now computable, and it does not track
+  the spread: water's ghost grid has 1.9x the spread of its blocked grid and 30x the net
+  torque. Section 4(2)'s deflation of orientation dependence rests on spreads and does
+  not survive being differentiated. What is still open is the part that was always the
+  real question: does the torque converge away with grid size the way the spread does?
+  4(2) took methanol from 175 to 670 points and watched the spread go 218 -> 7.1 -> 0.01
+  uHa; the same ladder in `dE/dtheta` has not been run, and it is the cheapest useful
+  thing left (`gradient.py` already reports it; it needs a loop over thresholds). If the
+  torque converges, lab-fixed attachment is fine and 4(2)'s conclusion survives in the
+  form that matters. If it does not, the frame question is live again and orbit grouping
+  gets the second chance 4(3) denied it.
+* What is the torque's effect over an actual trajectory? 5592 uHa/rad net on water's
+  208-point transferable grid is 13% of the nuclear gradient norm, which is not obviously
+  negligible, but a torque is not an error bar - its consequence is secular drift in
+  angular momentum, and nothing here integrates it. AIMD is the application the whole
+  smooth-PES argument is for, so this is the measurement that decides whether the
+  programme's main use case is actually served.
+* Is there a cheap way to reduce the torque without paying 4(2)'s orbit-grouping tax? The
+  torque is `sum_P s_P x (dE/dr_P)`, computable with no SCF beyond the reference, so it
+  could be used as an *objective* in the offline fit rather than only as a diagnostic -
+  select a support that is stationary in orientation. Nothing here tries that.
 * The orbit-grouped fit's octahedral invariance is exact in the algebra but lands at
   0.00-0.01 uHa in practice, and ridge does *not* remove it (methanol's 732-point grid:
   -0.0071 uHa truncated, -0.0170 uHa at `metric_ridge = 1e-8`). That is round-off
@@ -482,6 +570,10 @@ uv run python experiments/atom_centered_grids/transfer.py --molecules acetonitri
     --thresholds 1e-3,3e-4,2e-4,1e-4,6e-5,3e-5,2e-5,1e-5 \
     --blocked-thresholds 3e-2,1e-2,3e-3,1e-3,1e-4 --out transfer_acn.json
 uv run python experiments/atom_centered_grids/transfer.py --report transfer*.json
+uv run python experiments/atom_centered_grids/gradient.py water --out gradient_water.json
+uv run python experiments/atom_centered_grids/gradient.py water --mode ghost \
+    --threshold 3e-4 --out gradient_water_ghost.json
+uv run pytest tests/test_thc_gradient.py
 ```
 
 Runtimes on 4 cores: water seconds, methanol ~3 min, ethanol ~10 min, alanine ~40 min
@@ -519,6 +611,19 @@ from its floor, which makes every matched-accuracy cell degenerate - widen to `3
 and molecules below ~40 AOs saturate, so their rows are unreadable however the ladder is
 set. The report marks degenerate cells `*` and leaves them out of the statistics; if a
 molecule is all `*`, widen the blocked ladder rather than believing the ratio.
+
+`gradient.py` costs one analytic gradient plus `2 * 3 * natm` frozen-orbital energies per
+ridge per step size, so it is quadratic in nothing and just slow in proportion to the
+ridge ladder: water's default ladder is a few minutes, and `--atom N` restricts the finite
+difference to one atom when only the verification is wanted. The analytic gradient alone
+is one forward pass and one reverse pass - comparable to a single THC-MP2 energy, plus an
+`(n_ao, n_ao, n_aux)` integral array and an `(n_P, n_P, n_occ)` intermediate held in core,
+which is what keeps `pythc.grad` a reference implementation rather than a production one
+and caps it near alanine. Two traps, both hit while writing it: a finite-difference step
+that moves the metric's null directions by more than the ridge shift measures
+nonlinearity rather than a derivative, so `--steps` and `--ridges` are not independent
+knobs; and the torque must be finite-differenced about each atom's *own* torque axis,
+since a fixed lab axis nearly orthogonal to it returns noise.
 
 `ghosts.py` fits each element in seconds - the offline stage is genuinely cheap, and
 independent of the molecule - so its cost is all in the single points: 16 of them on the

@@ -1,0 +1,38 @@
+== water  ghost grid, thr=3e-04, 208 points, 24 AOs, 3 atoms
+
+-- 1/2. analytic vs finite difference, and the ridge floor -------------------
+
+     ridge       |grad|    max|d| h=1e-03    max|d| h=1e-04          E_corr
+     1e-02   2.3249e-02         6.946e-08         7.145e-10    -0.185622622
+     1e-03   3.4970e-02         1.118e-07         1.394e-09    -0.201020629
+     1e-04   4.1541e-02         4.400e-07         5.494e-09    -0.204006440
+     1e-05   4.4619e-02         3.212e-07         7.422e-08    -0.204547677
+     1e-06   4.3942e-02         3.468e-06         3.482e-06    -0.204692308
+     1e-08   5.2052e-02         1.862e-02         1.863e-02    -0.204739424
+      pinv   4.3537e-02         2.256e-07         1.808e-06    -0.204740339
+
+-- 3. where the gradient comes from (ridge 1e-04) --------------------
+
+  term                          norm / Ha bohr^-1   share of total
+  rigid point translation            3.680931e-03            0.09x
+  AO derivative                      9.575112e-03            0.23x
+    (collocation total)              1.018460e-02            0.25x
+  3-centre integrals                 1.042452e-01            2.51x
+  2-centre integrals                 5.666085e-02            1.36x
+  TOTAL                              4.154097e-02            1.00x
+
+-- exact invariance checks (no finite difference) --------------------
+  translational  |sum_A dE/dR_A| = 1.987e-16   (relative to |grad| 4.154e-02: 4.78e-15)
+
+-- 4. torque on the frozen point sets (ridge 1e-04) -----------------
+
+    atom   analytic |tau|       fd d=1e-04       fd d=1e-03       fd d=1e-02
+      H0   6.13246549e-05   6.13253419e-05   6.13225358e-05   6.11314839e-05
+      O1   3.04115704e-04   3.04114272e-04   3.04116166e-04   3.04149656e-04
+      H2   5.40084233e-03   5.40082279e-03   5.39893856e-03   5.21647608e-03
+
+  rms per-atom torque                 3123.318 uHa/rad
+  net torque |sum_A tau_A|            5592.399 uHa/rad   <- angular momentum leak
+  nuclear gradient norm              41540.972 uHa/bohr
+  net torque / gradient norm         1.346e-01 bohr/rad
+  energy spread over  6 draws          452.179 uHa peak-to-peak   (what section 4(2) reported)

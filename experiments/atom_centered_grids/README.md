@@ -36,6 +36,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `ghosts.py` | what an offline, per-element grid fitted against ghost neighbours costs against `blocked` |
 | `ensemble.py` | whether the *choice* of ghost ensemble changes that cost, and the accuracy ceiling each ensemble imposes |
 | `transfer.py` | whether one element's frozen point set serves bonding it was never fitted in - sp2/sp carbon, sp2 oxygen, nitrogen, and bonds shorter than any ghost |
+| `gradient.py` | whether the analytic nuclear gradient agrees with the curve, where the ridge floor is for a derivative, and how much torque a frozen point set exerts |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -56,11 +57,13 @@ uv run python ensemble.py methanol --out ensemble_methanol.json
 uv run python transfer.py --residual                # ghost shells + no-SCF screen
 uv run python transfer.py --out transfer.json       # the ten-molecule suite
 uv run python transfer.py --report transfer*.json
+uv run python gradient.py water                     # analytic vs FD, ridge floor, torque
+uv run python gradient.py water --mode ghost --threshold 3e-4
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Seven headlines:
+See [`FINDINGS.md`](FINDINGS.md). Eight headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -100,7 +103,17 @@ See [`FINDINGS.md`](FINDINGS.md). Seven headlines:
   reported from methanol and ethanol. A partner element the fit never saw (N) costs
   nothing, and *adding* it to the ghost partner list makes every properly resolved
   molecule worse - environment count supplies rank, but variety at fixed environment
-  count only dilutes. With this the programme has no unmeasured objection left; the
-  gradient is the only remaining work.
+  count only dilutes. With this the programme has no unmeasured objection left.
+* **The gradient exists and verifies to machine precision** (`pythc.grad`, driven by
+  `gradient.py`): quadratic convergence against a finite difference, and forces that sum
+  to zero to 2.4e-15 with no finite difference involved. Two things came back with it
+  that no energy measurement could have produced. First, **§6's `lambda = 1e-8` is three
+  decades too small for a gradient** - at that value the energy is reproducible to
+  0.002 uHa while the gradient varies by a *factor of two* between runs of the identical
+  calculation; the usable window is `1e-2` to `1e-5`. Second, **the rotation spread does
+  not track the torque**: `dE/dtheta` is now exactly computable, and water's transferable
+  ghost grid has 1.9x the energy spread of its blocked grid but **30x** the net torque
+  (5592 against 188 uHa/rad). §7's deflation of orientation dependence rests on spreads
+  and does not survive being differentiated.
 
 Raw sweep output is under [`data/`](data).
