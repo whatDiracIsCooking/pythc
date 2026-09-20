@@ -95,7 +95,8 @@ def thc_mp2_gradient(mol: gto.Mole,
                      aux_ridge: Optional[float] = None,
                      ridge_scale: str = "trace",
                      mo_coeff: Optional[np.ndarray] = None,
-                     mo_energy: Optional[np.ndarray] = None) -> ThcGradientResult:
+                     mo_energy: Optional[np.ndarray] = None,
+                     metric_scheme: str = "ridge") -> ThcGradientResult:
     """
     Fixed-orbital analytic nuclear gradient of the frozen-grid LS-THC MP2 energy.
 
@@ -113,6 +114,10 @@ def thc_mp2_gradient(mol: gto.Mole,
     :param mo_coeff: Override for ``mf.mo_coeff``. The finite-difference check uses this
         to hold the orbitals at their reference-geometry values while the nuclei move.
     :param mo_energy: Override for ``mf.mo_energy``.
+    :param metric_scheme: Which regularised inverse to use where a ridge is requested:
+        ``"ridge"`` for ``(S + lambda I)^-1``, ``"damped"`` for the Tikhonov-filtered
+        ``S (S^2 + mu^2 I)^-1``, which sends the numerically null directions to zero
+        instead of to the largest gain in the operator. See :func:`pythc.lib.damped_inv`.
     """
     C, eps = _resolve_reference(mf, mo_coeff, mo_energy)
     n_occ = mol.nelectron // 2
@@ -122,7 +127,8 @@ def thc_mp2_gradient(mol: gto.Mole,
 
     fac = ThcFactorisation(mol, coords, weights, C, n_occ, auxbasis,
                            metric_ridge=metric_ridge, aux_ridge=aux_ridge,
-                           ridge_scale=ridge_scale).build()
+                           ridge_scale=ridge_scale,
+                           metric_scheme=metric_scheme).build()
 
     t, tau_o, tau_v = laplace_factors(eps, n_occ, n_laplace)
     e, X_o_bar, X_v_bar, Z_bar, eps_o_bar, eps_v_bar = energy_and_adjoints(
@@ -163,7 +169,8 @@ def orientation_gradient(mol: gto.Mole,
                          aux_ridge: Optional[float] = None,
                          ridge_scale: str = "trace",
                          mo_coeff: Optional[np.ndarray] = None,
-                         mo_energy: Optional[np.ndarray] = None) -> np.ndarray:
+                         mo_energy: Optional[np.ndarray] = None,
+                         metric_scheme: str = "ridge") -> np.ndarray:
     """
     The torque on each atom's frozen point set, ``(n_atm, 3)`` in Hartree per radian.
 
@@ -172,4 +179,5 @@ def orientation_gradient(mol: gto.Mole,
     for why this rather than a rotation spread is the quantity that matters.
     """
     return thc_mp2_gradient(mol, mf, grid, auxbasis, n_laplace, metric_ridge,
-                            aux_ridge, ridge_scale, mo_coeff, mo_energy).torque
+                            aux_ridge, ridge_scale, mo_coeff, mo_energy,
+                            metric_scheme).torque

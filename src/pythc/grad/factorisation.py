@@ -85,13 +85,17 @@ class ThcFactorisation:
         pseudoinverse. Matches ``LS_RI_THC``'s argument of the same name.
     :param aux_ridge: The same for the auxiliary Coulomb metric.
     :param ridge_scale: How the strengths become absolute shifts.
+    :param metric_scheme: ``"ridge"`` for ``(S + lambda I)^-1``, ``"damped"`` for the
+        Tikhonov-filtered ``S (S^2 + mu^2 I)^-1``. Ignored when the ridge is ``None``.
+        See :func:`pythc.lib.damped_inv`.
     """
 
     def __init__(self, mol: gto.Mole, coords: np.ndarray, weights: np.ndarray,
                  mo_coeff: np.ndarray, n_occ: int, auxbasis: str,
                  metric_ridge: Optional[float] = None,
                  aux_ridge: Optional[float] = None,
-                 ridge_scale: str = "trace"):
+                 ridge_scale: str = "trace",
+                 metric_scheme: str = "ridge"):
         self.mol = mol
         self.coords = np.asarray(coords, dtype=float)
         self.weights = np.asarray(weights, dtype=float)
@@ -101,6 +105,7 @@ class ThcFactorisation:
         self.metric_ridge = metric_ridge
         self.aux_ridge = aux_ridge
         self.ridge_scale = ridge_scale
+        self.metric_scheme = metric_scheme
 
         self.auxmol = build_auxmol(mol, auxbasis)
         self.n_ao = int(mol.nao_nr())
@@ -126,10 +131,12 @@ class ThcFactorisation:
         self.G_o = self.X_o @ self.X_o.T
         self.G_v = self.X_v @ self.X_v.T
         self.S = build_S("ov", self.X, self.n_occ)
-        self.S_inv = invert_metric(self.S.copy(), self.metric_ridge, self.ridge_scale)
+        self.S_inv = invert_metric(self.S.copy(), self.metric_ridge, self.ridge_scale,
+                                   self.metric_scheme)
 
         self.j2c = self.auxmol.intor("int2c2e", aosym="s1")
-        self.Jm = build_aux_coulomb_inv(self.auxmol, self.aux_ridge, self.ridge_scale)
+        self.Jm = build_aux_coulomb_inv(self.auxmol, self.aux_ridge, self.ridge_scale,
+                                        self.metric_scheme)
 
         self.P_occ = C_occ @ C_occ.T
         self.P_vir = C_vir @ C_vir.T
@@ -176,13 +183,14 @@ class ThcFactorisation:
         S_inv_bar = self.Y.T @ D_bar
 
         S_bar = invert_metric_adjoint(self.S, self.S_inv, S_inv_bar,
-                                      self.metric_ridge, self.ridge_scale)
+                                      self.metric_ridge, self.ridge_scale,
+                                      self.metric_scheme)
 
         # Y = Jm W
         W_bar = self.Jm @ Y_bar               # Jm symmetric
         Jm_bar = Y_bar @ self.W.T
         j2c_bar = aux_coulomb_inv_adjoint(self.j2c, Jm_bar, self.aux_ridge,
-                                          self.ridge_scale)
+                                          self.ridge_scale, self.metric_scheme)
 
         # S = (X_o X_o^T) o (X_v X_v^T)
         S_bar = 0.5 * (S_bar + S_bar.T)

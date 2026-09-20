@@ -125,7 +125,8 @@ def contract_codensity_full_eri(self, X, mo_coeff):
 
 
 def invert_metric(S: np.ndarray, ridge: Optional[float] = None,
-                  ridge_scale: str = "trace") -> np.ndarray:
+                  ridge_scale: str = "trace",
+                  scheme: str = "ridge") -> np.ndarray:
     """
     Invert the LS-THC metric ``S_PQ = (X X^T) o (X X^T)``.
 
@@ -164,11 +165,17 @@ def invert_metric(S: np.ndarray, ridge: Optional[float] = None,
     if ridge is None:
         return lib.pinv(S)
 
+    if scheme == "damped":
+        return lib.damped_inv(S, ridge, scale=ridge_scale)
+    if scheme != "ridge":
+        raise ValueError(f"unknown metric scheme {scheme!r}, expected 'ridge' or 'damped'")
+
     return lib.ridge_inv(S, ridge, scale=ridge_scale)
 
 
 def build_aux_coulomb_inv(auxmol, ridge: Optional[float] = None,
-                          ridge_scale: str = "trace"):
+                          ridge_scale: str = "trace",
+                          scheme: str = "ridge"):
     """
     The auxiliary Coulomb metric ``J^{-1/2}``.
 
@@ -182,6 +189,8 @@ def build_aux_coulomb_inv(auxmol, ridge: Optional[float] = None,
     j2c = auxmol.intor('int2c2e', aosym='s1')
     if ridge is None:
         j2c_cholesky = lib.pseudo_inv_sqrt(j2c)
+    elif scheme == "damped":
+        j2c_cholesky = lib.damped_inv_sqrt(j2c, ridge, scale=ridge_scale)
     else:
         j2c_cholesky = lib.ridge_inv_sqrt(j2c, ridge, scale=ridge_scale)
 

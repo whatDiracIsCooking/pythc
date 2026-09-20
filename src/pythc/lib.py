@@ -175,6 +175,81 @@ def ridge_inv_sqrt(M: np.ndarray, lam: float = 1e-8, scale: str = "trace") -> np
     return (eig_vecs * inv_sqrt_vals) @ eig_vecs.T
 
 
+def damped_inv(M: np.ndarray, lam: float = 1e-4, scale: str = "trace") -> np.ndarray:
+    """
+    Damped (Tikhonov-filtered) pseudoinverse ``M (M^2 + mu^2 I)^-1`` of a Hermitian
+    positive semi-definite matrix, with ``mu = ridge_shift(M, lam, scale)``.
+
+    This is the third option beside :func:`pinv` and :func:`ridge_inv`, and it exists
+    because those two each get one half of what the LS-THC metric inversion needs.
+    Writing the gain applied to an eigenvalue ``sigma``:
+
+    =========================  ====================  =================  ==============
+    scheme                     gain                  ``sigma >> mu``    ``sigma -> 0``
+    =========================  ====================  =================  ==============
+    :func:`pinv`               ``1/sigma`` or ``0``  ``1/sigma``        ``0``
+    :func:`ridge_inv`          ``1/(sigma + mu)``    ``1/sigma``        ``1/mu``
+    :func:`damped_inv`         ``sigma/(sigma^2 + mu^2)``  ``1/sigma``  ``sigma/mu^2``
+    =========================  ====================  =================  ==============
+
+    The truncation suppresses the numerically null directions but does so with a step,
+    so the retained count is an integer function of the geometry and the energy jumps
+    when one crosses. The ridge is analytic in ``M`` - no eigenvalue is ever dropped -
+    but it hands the null directions the *largest* gain in the whole operator, ``1/mu``,
+    which is the opposite of suppression. On a grid assembled as a union of per-atom
+    point sets that crowd is large (a third of the metric's directions can sit below
+    1e-14 of the top eigenvalue), and since ``Z = D^T D`` with ``D`` carrying ``S^-1``,
+    their rounding noise returns amplified by ``1/mu^2``.
+
+    The damped inverse is analytic in ``M`` like the ridge - it is a rational matrix
+    function, with no cutoff for an eigenvalue to cross - while sending the null
+    directions to zero like the truncation. Its peak gain, ``1/(2 mu)`` at
+    ``sigma = mu``, is the same as the ridge's there, so ``lam`` means the same thing on
+    both and the two are directly comparable.
+
+    :param M: Hermitian, positive semi-definite matrix. Not modified.
+    :param lam: Dimensionless regularisation strength; see :func:`ridge_shift`.
+    :param scale: How ``lam`` becomes the absolute damping ``mu``; see
+        :func:`ridge_shift`.
+    :return: The damped inverse.
+    """
+    M = 0.5 * (M + M.T)
+    mu = ridge_shift(M, lam, scale)
+
+    logger.info("damped inverting matrix of shape %s with mu=%.3e (lam=%.1e, scale=%s)",
+                M.shape, mu, lam, scale)
+
+    eig_vals, eig_vecs = np.linalg.eigh(M)
+    filt = eig_vals / (eig_vals ** 2 + mu ** 2)
+
+    return (eig_vecs * filt) @ eig_vecs.T
+
+
+def damped_inv_sqrt(M: np.ndarray, lam: float = 1e-4, scale: str = "trace") -> np.ndarray:
+    """
+    The damped counterpart of :func:`ridge_inv_sqrt`, applying
+    ``sqrt(sigma / (sigma^2 + mu^2))`` to the spectrum.
+
+    It is the square root of :func:`damped_inv` in the same sense that
+    :func:`ridge_inv_sqrt` is the square root of :func:`ridge_inv`, and it is provided so
+    the auxiliary Coulomb metric can be treated by the same scheme as the THC metric when
+    that comparison is wanted. The auxiliary metric is far better conditioned, so this is
+    rarely the binding choice.
+
+    :param M: Hermitian, positive semi-definite matrix. Not modified.
+    :param lam: Dimensionless regularisation strength; see :func:`ridge_shift`.
+    :param scale: How ``lam`` becomes the absolute damping ``mu``.
+    :return: The damped inverse square root.
+    """
+    M = 0.5 * (M + M.T)
+    mu = ridge_shift(M, lam, scale)
+
+    eig_vals, eig_vecs = np.linalg.eigh(M)
+    filt = np.sqrt(np.maximum(eig_vals, 0.0) / (eig_vals ** 2 + mu ** 2))
+
+    return (eig_vecs * filt) @ eig_vecs.T
+
+
 def pseudo_inv_sqrt(M: np.ndarray, epsilon: float = 1e-10) -> np.ndarray:
     """
     Builds the M^(-1/2)

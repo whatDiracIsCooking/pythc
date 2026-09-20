@@ -196,9 +196,126 @@ def pseudo_inv_sqrt_adjoint(M: np.ndarray, pinv_sqrt_bar: np.ndarray,
     return spectral_adjoint(eigvals, eigvecs, f_vals, f_prime, pinv_sqrt_bar)
 
 
+def _mu_adjoint(M: np.ndarray, coeff: float, lam: float, scale: str,
+                eigvals=None, eigvecs=None) -> np.ndarray:
+    """
+    Carry ``dE/dmu`` back onto ``M``, where ``mu = lam * reference(M)``.
+
+    The damped inverse depends on ``mu`` through its filter rather than through an added
+    shift, so it cannot reuse :func:`_shift_adjoint`: there the whole dependence is
+    ``A = M + shift I`` and the chain rule runs through ``tr(A_bar)``, here it runs
+    through a separately computed ``dE/dmu``. What the two share is the last step, and
+    the same reason for preferring ``"trace"``: ``tr(M)/n`` is linear in ``M``, so
+    ``dmu/dM`` is a clean multiple of the identity and analytic in the nuclear
+    coordinates.
+
+    :param coeff: ``dE/dmu``, already contracted.
+    """
+    n = M.shape[0]
+
+    if scale == "trace":
+        return (lam * coeff / n) * np.eye(n)
+
+    if scale == "max_eig":
+        if eigvals is None:
+            eigvals, eigvecs = np.linalg.eigh(0.5 * (M + M.T))
+        if len(eigvals) > 1 and abs(eigvals[-1] - eigvals[-2]) <= 1e-10 * max(abs(eigvals[-1]), 1.0):
+            logger.warning("ridge_scale='max_eig' differentiated at a degenerate top "
+                           "eigenvalue; the damping is not differentiable here")
+        u = eigvecs[:, -1]
+        return (lam * coeff) * np.outer(u, u)
+
+    if scale == "absolute":
+        return np.zeros((n, n))
+
+    raise ValueError(f"unknown ridge scale {scale!r}")
+
+
+def damped_inv_adjoint(M: np.ndarray, inv_bar: np.ndarray, lam: float,
+                       scale: str = "trace") -> np.ndarray:
+    """
+    Adjoint of :func:`pythc.lib.damped_inv`, i.e. of ``M (M^2 + mu^2 I)^-1``.
+
+    The forward map is a spectral function ``f(sigma) = sigma / (sigma^2 + mu^2)`` whose
+    parameter ``mu`` is itself a function of ``M``, so the adjoint is in two pieces:
+    :func:`spectral_adjoint` at fixed ``mu``, plus the explicit ``mu`` dependence
+
+        df/dmu = -2 sigma mu / (sigma^2 + mu^2)^2
+
+    contracted against the adjoint on the diagonal of the eigenbasis and pushed back
+    through ``dmu/dM`` by :func:`_mu_adjoint`. Dropping the second piece would leave a
+    gradient that is wrong by a term proportional to ``lam`` - small, but not zero, and
+    exactly the kind of omission a finite difference converges to a constant on rather
+    than quadratically.
+
+    :param M: The matrix that was inverted.
+    :param inv_bar: Adjoint of the forward result.
+    :param lam: The dimensionless strength used in the forward call.
+    :param scale: The scaling used in the forward call.
+    """
+    from pythc.lib import ridge_shift
+
+    M = 0.5 * (M + M.T)
+    mu = ridge_shift(M, lam, scale)
+
+    eigvals, eigvecs = np.linalg.eigh(M)
+    denom = eigvals ** 2 + mu ** 2
+
+    f_vals = eigvals / denom
+    f_prime = (mu ** 2 - eigvals ** 2) / denom ** 2
+
+    M_bar = spectral_adjoint(eigvals, eigvecs, f_vals, f_prime, inv_bar)
+
+    # The explicit mu dependence. inv_bar is symmetrised inside spectral_adjoint; do the
+    # same here so the two pieces see the same adjoint.
+    sym_bar = 0.5 * (inv_bar + inv_bar.T)
+    df_dmu = -2.0 * eigvals * mu / denom ** 2
+    coeff = float(np.sum(df_dmu * np.einsum("ki,kl,li->i", eigvecs, sym_bar, eigvecs)))
+
+    return M_bar + _mu_adjoint(M, coeff, lam, scale, eigvals, eigvecs)
+
+
+def damped_inv_sqrt_adjoint(M: np.ndarray, inv_sqrt_bar: np.ndarray, lam: float,
+                            scale: str = "trace") -> np.ndarray:
+    """
+    Adjoint of :func:`pythc.lib.damped_inv_sqrt`, i.e. of the spectral function
+    ``sqrt(sigma / (sigma^2 + mu^2))``.
+
+    Same two pieces as :func:`damped_inv_adjoint`. The clamp at ``sigma = 0`` in the
+    forward call makes the map non-differentiable for a matrix with a negative
+    eigenvalue, which a Coulomb metric does not have; ``f'`` is set to zero there rather
+    than returning a NaN.
+    """
+    from pythc.lib import ridge_shift
+
+    M = 0.5 * (M + M.T)
+    mu = ridge_shift(M, lam, scale)
+
+    eigvals, eigvecs = np.linalg.eigh(M)
+    denom = eigvals ** 2 + mu ** 2
+    pos = eigvals > 0.0
+
+    g = np.where(pos, eigvals, 0.0) / denom
+    f_vals = np.sqrt(g)
+
+    safe = np.where(f_vals > 0.0, f_vals, 1.0)
+    g_prime = np.where(pos, (mu ** 2 - eigvals ** 2) / denom ** 2, 0.0)
+    f_prime = np.where(f_vals > 0.0, 0.5 * g_prime / safe, 0.0)
+
+    M_bar = spectral_adjoint(eigvals, eigvecs, f_vals, f_prime, inv_sqrt_bar)
+
+    sym_bar = 0.5 * (inv_sqrt_bar + inv_sqrt_bar.T)
+    dg_dmu = np.where(pos, -2.0 * eigvals * mu / denom ** 2, 0.0)
+    df_dmu = np.where(f_vals > 0.0, 0.5 * dg_dmu / safe, 0.0)
+    coeff = float(np.sum(df_dmu * np.einsum("ki,kl,li->i", eigvecs, sym_bar, eigvecs)))
+
+    return M_bar + _mu_adjoint(M, coeff, lam, scale, eigvals, eigvecs)
+
+
 def invert_metric_adjoint(S: np.ndarray, S_inv: np.ndarray, S_inv_bar: np.ndarray,
                           ridge: Optional[float] = None,
-                          ridge_scale: str = "trace") -> np.ndarray:
+                          ridge_scale: str = "trace",
+                          scheme: str = "ridge") -> np.ndarray:
     """
     Adjoint of :func:`pythc.thc.ls_thc_funcs.invert_metric`, dispatching on ``ridge``
     exactly as the forward call does.
@@ -206,16 +323,23 @@ def invert_metric_adjoint(S: np.ndarray, S_inv: np.ndarray, S_inv_bar: np.ndarra
     if ridge is None:
         return pinv_adjoint(S, S_inv_bar)
 
+    if scheme == "damped":
+        return damped_inv_adjoint(S, S_inv_bar, ridge, ridge_scale)
+
     return ridge_inv_adjoint(S, S_inv, S_inv_bar, ridge, ridge_scale)
 
 
 def aux_coulomb_inv_adjoint(j2c: np.ndarray, j2c_inv_bar: np.ndarray,
                             ridge: Optional[float] = None,
-                            ridge_scale: str = "trace") -> np.ndarray:
+                            ridge_scale: str = "trace",
+                            scheme: str = "ridge") -> np.ndarray:
     """
     Adjoint of :func:`pythc.thc.ls_thc_funcs.build_aux_coulomb_inv`.
     """
     if ridge is None:
         return pseudo_inv_sqrt_adjoint(j2c, j2c_inv_bar)
+
+    if scheme == "damped":
+        return damped_inv_sqrt_adjoint(j2c, j2c_inv_bar, ridge, ridge_scale)
 
     return ridge_inv_sqrt_adjoint(j2c, j2c_inv_bar, ridge, ridge_scale)

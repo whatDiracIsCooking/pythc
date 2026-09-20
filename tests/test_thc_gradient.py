@@ -191,6 +191,88 @@ def test_pseudo_inv_sqrt_adjoint(spd):
     assert abs(ana - num) < 1e-5 * abs(num)
 
 
+@pytest.mark.parametrize("scale", ["trace", "absolute", "max_eig"])
+def test_damped_inv_adjoint(spd, scale):
+    M, _ = spd
+    rng = np.random.default_rng(8)
+    out_bar = rng.standard_normal(M.shape); out_bar = 0.5 * (out_bar + out_bar.T)
+    d = rng.standard_normal(M.shape); d = 0.5 * (d + d.T)
+    lam = 1e-3 if scale != "absolute" else 1e-4
+
+    ana = float(np.sum(glin.damped_inv_adjoint(M.copy(), out_bar, lam, scale) * d))
+    num = _directional(lambda m: np.sum(lib.damped_inv(m, lam, scale) * out_bar),
+                       M, d, 1e-9)
+
+    assert abs(ana - num) < 1e-5 * abs(num)
+
+
+def test_damped_inv_sqrt_adjoint(spd):
+    M, _ = spd
+    rng = np.random.default_rng(9)
+    out_bar = rng.standard_normal(M.shape); out_bar = 0.5 * (out_bar + out_bar.T)
+    d = rng.standard_normal(M.shape); d = 0.5 * (d + d.T)
+
+    ana = float(np.sum(glin.damped_inv_sqrt_adjoint(M.copy(), out_bar, 1e-3) * d))
+    num = _directional(lambda m: np.sum(lib.damped_inv_sqrt(m, 1e-3) * out_bar),
+                       M, d, 1e-9)
+
+    assert abs(ana - num) < 1e-5 * abs(num)
+
+
+def test_damped_inv_mu_term_is_not_optional():
+    """
+    The damping ``mu`` depends on ``M``, so it contributes a term of its own.
+
+    Dropping it leaves an adjoint that is wrong by a term proportional to ``lam`` - the
+    kind of omission a finite difference converges to a constant on rather than
+    quadratically. This pins the term directly by varying ``mu`` alone, which
+    ``scale="absolute"`` makes an independent knob.
+    """
+    rng = np.random.default_rng(10)
+    n, n_null = 18, 6
+    Q = np.linalg.qr(rng.standard_normal((n, n)))[0]
+    sigma = np.concatenate([np.logspace(0, -5, n - n_null), np.zeros(n_null)])
+    M = 0.5 * (((Q * sigma) @ Q.T) + ((Q * sigma) @ Q.T).T)
+    out_bar = rng.standard_normal((n, n)); sym = 0.5 * (out_bar + out_bar.T)
+
+    for mu in (1e-2, 1e-3):
+        eigvals, eigvecs = np.linalg.eigh(M)
+        denom = eigvals ** 2 + mu ** 2
+        df_dmu = -2.0 * eigvals * mu / denom ** 2
+        ana = float(np.sum(df_dmu * np.einsum("ki,kl,li->i", eigvecs, sym, eigvecs)))
+
+        h = mu * 1e-5
+        num = float(np.sum(out_bar * (lib.damped_inv(M, mu + h, "absolute")
+                                      - lib.damped_inv(M, mu - h, "absolute")))) / (2 * h)
+
+        assert abs(ana - num) < 1e-6 * abs(num)
+
+
+def test_damped_inv_suppresses_the_null_space_the_ridge_amplifies():
+    """
+    The whole point of the damped inverse, as a property rather than a derivative.
+
+    Both schemes share a peak gain of ``1/(2 mu)``, so ``lam`` means the same thing on
+    each. They differ entirely on the numerically null directions, which the ridge hands
+    the *largest* gain in the operator and the damped inverse sends to zero.
+    """
+    rng = np.random.default_rng(12)
+    n, n_null = 40, 15
+    Q = np.linalg.qr(rng.standard_normal((n, n)))[0]
+    sigma = np.concatenate([np.logspace(0, -6, n - n_null), np.zeros(n_null)])
+    M = 0.5 * (((Q * sigma) @ Q.T) + ((Q * sigma) @ Q.T).T)
+
+    lam = 1e-4
+    mu = lib.ridge_shift(M, lam)
+    ridged, damped = lib.ridge_inv(M.copy(), lam), lib.damped_inv(M.copy(), lam)
+
+    null = Q[:, -1]
+    assert float(null @ ridged @ null) == pytest.approx(1.0 / mu, rel=1e-6)
+    assert abs(float(null @ damped @ null)) < 1e-8 / mu
+
+    assert np.linalg.norm(damped, 2) == pytest.approx(1.0 / (2.0 * mu), rel=1e-3)
+
+
 def test_pinv_adjoint_at_fixed_rank(spd):
     """
     Between crossings the truncated pseudoinverse is an ordinary spectral function.
