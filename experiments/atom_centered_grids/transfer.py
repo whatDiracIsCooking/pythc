@@ -111,7 +111,18 @@ SUITE = [
     ('formaldehyde', 'O sp2, C=O 1.22',   False),
     ('methylamine',  'N sp3, C-N unseen', False),
     ('hcn',          'C sp + N, C#N 1.16', False),
+    # Added after the first pass. The molecules that probe unseen bonding hardest are
+    # inherently small - acetylene, formaldehyde and hcn are 33-38 AOs - and small
+    # molecules rank-saturate, which confounds "the bonding is unseen" with "the
+    # molecule is too small to tell". These two ask the same questions where that
+    # confound is absent, and are not in the default --molecules list because they cost
+    # about as much again as the eight above.
+    ('propene',      'C sp2+sp3, C=C 1.34', False),
+    ('acetonitrile', 'C sp + N, C#N 1.16', False),
 ]
+
+# The suite `--molecules` runs by default: the eight that fit in one sitting.
+DEFAULT_MOLECULES = [n for n, _, _ in SUITE[:8]]
 
 
 def fingerprint(idx):
@@ -341,8 +352,21 @@ def saturated_at(pts, floor, target):
     return bool(ys) and ys[0][1] <= target
 
 
+def ensemble_key(meta):
+    """What ensemble a result file was produced with.
+
+    Files sharing this key are measuring the same frozen object and their molecules can
+    be pooled; files that differ in it cannot, however similar their molecule lists look.
+    """
+    return (tuple(meta.get('partners', PARTNERS)),
+            tuple(meta.get('scales', SCALES)),
+            meta.get('directions', 'icosahedron'),
+            bool(meta.get('full_cross', False)))
+
+
 def report(paths):
     """The ghost gap per molecule, and its spread - which is the actual answer."""
+    pooled = {}
     for path in paths:
         d = json.load(open(path))
         meta, rows = d['meta'], d['rows']
@@ -408,6 +432,20 @@ def report(paths):
             print(f"    {t:5.0f} uHa: {lo:.2f}-{hi:.2f}x over {len(g)} molecules"
                   f"  (worst: {max(g, key=g.get)}){extra}")
 
+        bucket = pooled.setdefault(ensemble_key(meta), {})
+        here = {}
+        for t in TARGETS:
+            for n, g in gaps[t].items():
+                here.setdefault(n, {})[t] = g
+        for n, g in here.items():
+            # Same molecule, same ensemble, two files: keep whichever run resolved more
+            # targets rather than whichever was listed last. A molecule rerun with wider
+            # ladders exists precisely because the first attempt resolved nothing, and a
+            # glob hands the files over in alphabetical order, not in that one.
+            prev = bucket.get(n)
+            if prev is None or len(g) > len(prev[2]):
+                bucket[n] = (meta['molecules'][n]['nao'], probes.get(n, {}), g)
+
         # The residual screen, grouped by element so that the cross-environment
         # comparison the docstring describes can actually be read off.
         print(f"\n  frozen-support residual on the real in-molecule block "
@@ -421,6 +459,29 @@ def report(paths):
                               for n, r in by_el[el])
             print(f"    {el}: {parts}")
 
+    # Pooled across every file sharing an ensemble. This is what the headline numbers in
+    # FINDINGS section 10 are: the suite is spread over several result files (the larger
+    # molecules were run separately, and acetonitrile was rerun with widened ladders),
+    # and a per-file summary cannot see it whole. Where two files hold the same molecule
+    # under the same ensemble the later one wins, which is what makes the acetonitrile
+    # rerun supersede rather than double-count.
+    for key, mols in pooled.items():
+        if len(paths) < 2 or len(mols) < 3:
+            continue
+        print(f"\n=== pooled over {len(mols)} molecules, ensemble partners "
+              f"{','.join(key[0])} scales {','.join(str(x) for x in key[1])}")
+        for t in TARGETS:
+            inr = [g[t] for _nao, p, g in mols.values()
+                   if g.get(t) and p.get('in_ghost_range')]
+            out = [g[t] for _nao, p, g in mols.values()
+                   if g.get(t) and not p.get('in_ghost_range')]
+            if not inr or not out:
+                continue
+            allv = inr + out
+            print(f"  {t:5.0f} uHa: in-range {np.mean(inr):.2f}x (n={len(inr)})  "
+                  f"out-of-range {np.mean(out):.2f}x (n={len(out)})  "
+                  f"overall {min(allv):.2f}-{max(allv):.2f}x")
+
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__.splitlines()[1])
@@ -429,7 +490,7 @@ if __name__ == '__main__':
     p.add_argument('--residual', action='store_true',
                    help='no-SCF screen only: frozen supports and their residual on '
                         'each molecule\'s real per-atom blocks')
-    p.add_argument('--molecules', default=','.join(n for n, _, _ in SUITE))
+    p.add_argument('--molecules', default=','.join(DEFAULT_MOLECULES))
     p.add_argument('--thresholds', default='1e-3,3e-4,1e-4,3e-5,1e-5,1e-6')
     p.add_argument('--blocked-thresholds', default='1e-3,1e-4,1e-5')
     p.add_argument('--partners', default=','.join(PARTNERS))
