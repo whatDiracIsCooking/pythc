@@ -98,8 +98,9 @@ but as a *point selector*, not a weight fitter.
 
 ## 4. Next directions, in order
 
-**(1), (2), (3) and (4) are all done.** (1) was a real prerequisite: the metric truncation was
-the last remaining source of PES non-smoothness, and it is now measured and fixed. (2) was
+**(1), (2), (3) and (4) are all done.** (1) was a real prerequisite: the metric
+truncation was the last remaining source of PES non-smoothness, and it is now measured
+and fixed. (2) was
 believed to be a prerequisite too - the thing that makes "attach the atomic grid rigidly"
 well-defined - and it is not; orientation dependence is a grid-size problem, not a
 structural one. (3) was the one that could still have killed the idea, and it did not:
@@ -236,13 +237,21 @@ What it settled, and what it did not:
   nodes. Do not use support overlap as a quality metric; only point count at matched
   energy means anything.
 
-Left undone here, and **since done in 4(4)**: the ghost ensemble was chosen once and
-never varied. `--full-cross` and `--directions octahedron` have now been run
-(`ensemble.py`), and the choice is worth 1.35x on methanol and 1.05x on ethanol - so the
-methanol ratios below are upper bounds, and the ethanol ones stand. N was never fitted; the grids cover H/C/O. Water was run
-and is not quoted, because at 24 AOs every grid in the comparison is rank-saturated and
-all three modes reach the floor. And no molecule outside the fitting set was tried, which
-is the whole of what (4) means.
+Left undone here, and **all of it since done in 4(4)**:
+
+* the ghost ensemble was chosen once and never varied. `--full-cross` and `--directions
+  octahedron` have now been run (`ensemble.py`), and the choice is worth 1.35x on
+  methanol and 1.05x on ethanol - so the methanol ratios below are upper bounds, and the
+  ethanol ones stand;
+* N was never fitted, so the grids covered H/C/O only. `transfer.py` fits it, and it
+  behaves exactly like C and O (44 to 159 points across the same ladder);
+* no molecule outside the fitting set was tried, which was the whole of what (4) meant.
+  Ten of them have now been, and the ratio does not move - see 4(4).
+
+The one item that stands: water was run and is not quoted, because at 24 AOs every grid
+in the comparison is rank-saturated and all three modes reach the floor. 4(4) reproduces
+that and generalises it - anything below about 40 AOs saturates, which is why its
+`transfer.py` report marks such cells rather than ratioing them.
 
 **(4) Transferability. DONE, both halves.** Two halves. The first - does the *ensemble*
 matter? - is answered in `ensemble.py` and FINDINGS section 9, and the answer is "less
@@ -322,8 +331,9 @@ times, which makes its point count a first-crossing estimate. And transferabilit
 level-0 atomic grid, and nothing asks what becomes of it in cc-pVTZ.
 
 **(5) Actually compute a gradient. THE ONLY REMAINING WORK.** Still nothing here computes
-one, and with (4) closed it is no longer half of what is left - it is all of it. `scan.py` measures the *curve* rather than arguing about
-it structurally, so the smoothness claim is no longer purely theoretical - but a
+one, and with (4) closed it is no longer half of what is left - it is all of it.
+`scan.py` measures the *curve* rather than arguing about it structurally, so the
+smoothness claim is no longer purely theoretical - but a
 finite-difference-vs-analytic check would test the implementation, which the scan cannot.
 `scan.py` is the natural harness: it already walks a frozen grid along a bond at fixed
 ridge, which is the reference curve such a check needs. What (3) adds is that the grids to
