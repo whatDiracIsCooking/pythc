@@ -21,6 +21,7 @@ kill the idea cheaply, but it cannot confirm it.
 | `analyse.py` | interpolates point count at matched MP2 accuracy; prints the ratio |
 | `rank.py` | co-density rank and LS-THC metric conditioning per grid |
 | `rotate.py` | energy shift when each atom's point set is spun about its own nucleus |
+| `weights.py` | whether the fitted weights matter, or only the points they select |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -30,10 +31,18 @@ uv run python sweep.py ethanol --out ethanol.json
 uv run python analyse.py ethanol.json
 uv run python rank.py ethanol 1e-3,1e-4,1e-5
 uv run python rotate.py ethanol 1e-3
+uv run python weights.py ethanol 1e-4
 ```
 
 ## Results
 
-See [`RESULTS.md`](RESULTS.md). Headline: the per-atom penalty is **1.2-1.7x** on point
-count, shrinking with system size - well inside the range where the scheme is worth
-building. Raw sweep output is under [`data/`](data).
+See [`FINDINGS.md`](FINDINGS.md). Two headlines:
+
+* The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
+  inside the range where the scheme is worth building.
+* The fitted weights turn out to be **almost irrelevant** to LS-THC accuracy; the NNLS
+  fit's real product is its support. Where the metric is full-rank, all-ones weights give
+  bit-identical energies. That removes most of the gradient difficulty from the proposal,
+  since `X = phi(r_P)` has no weight to differentiate.
+
+Raw sweep output is under [`data/`](data).
