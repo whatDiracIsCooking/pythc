@@ -276,6 +276,13 @@ def lawson_hanson(op: NNLSOperator | np.ndarray,
 
             # Redundant with the columns already chosen, so it can never enter the
             # passive set: drop it for good instead of picking it again.
+            #
+            # In exact arithmetic this is unreachable. The least-squares solve leaves
+            # the residual orthogonal to every passive column, so anything in their
+            # span has gradient exactly zero and is never the argmax. It is a guard
+            # against near-dependence at finite precision, where the gradient can sit
+            # just above the threshold while the column is numerically dependent - and
+            # without it the solver would pick the same point forever.
             excluded[j] = True
             grad[j] = -np.inf
 
