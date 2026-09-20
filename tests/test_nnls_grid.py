@@ -24,7 +24,8 @@ from pyscf.mp.dfmp2 import DFMP2
 from scipy.optimize import nnls
 from scipy.spatial.transform import Rotation
 
-from pythc.decomp.nnls import GroupOperator, OverlapFitOperator, _IncrementalQR, lawson_hanson
+from pythc.decomp.nnls import (GroupOperator, OverlapFitOperator, StackedOperator,
+                               _IncrementalQR, lawson_hanson, stack_targets)
 from pythc.grid import (BeckeGrid, GridProvider, NNLSGrid, _eval_basefuncs, _rmsd_overlap,
                         octahedral_orbits)
 from pythc.methods.mp2 import LaplaceRMP2
@@ -407,6 +408,78 @@ def test_group_operator_expands_to_constant_weights_per_group():
 def test_group_operator_rejects_a_mismatched_label_count():
     with pytest.raises(ValueError):
         GroupOperator(np.zeros((4, 5)), np.zeros(4, dtype=int))
+
+
+# --------------------------------------------------------------------------------------
+# Stacking: one support fitted against several environments at once.
+# --------------------------------------------------------------------------------------
+
+
+def test_stacked_operator_is_the_row_stacked_problem():
+    """
+    Stacking blocks is the least-squares problem of the vertically concatenated matrix,
+    so a solve over the stack has to agree with a solve over that matrix. The blocks
+    carry different row counts here because the environments an element is fitted
+    against screen their own AO sets and so genuinely differ in size.
+    """
+    rng = np.random.default_rng(0)
+    blocks = [rng.normal(size=(m, 9)) for m in (12, 5, 20)]
+    A = np.vstack(blocks)
+
+    op = StackedOperator(blocks)
+    r = rng.normal(size=A.shape[0])
+
+    assert op.shape == A.shape
+    np.testing.assert_allclose(np.stack([op.column(j) for j in range(9)], axis=1), A,
+                               atol=1e-13)
+    np.testing.assert_allclose(op.gradient(r), A.T @ r, atol=1e-12)
+
+    b = np.abs(rng.normal(size=A.shape[0]))
+    w_ref, _ = nnls(A, b)
+    np.testing.assert_allclose(lawson_hanson(op, b, weight_threshold=1e-12), w_ref,
+                               atol=1e-9)
+
+
+def test_stacked_scales_apply_to_both_sides():
+    """
+    A per-block scale reweights a block in the objective without changing what it is
+    fitting, so a solution that satisfies every block exactly must survive any scaling.
+    Here the second block is a thousand times larger than the first, which is roughly
+    what a heavy ghost partner does to an overlap target next to a hydrogen one.
+    """
+    rng = np.random.default_rng(1)
+    A1, A2 = rng.random((12, 9)), 1000.0 * rng.random((7, 9))
+    w_true = np.zeros(9)
+    w_true[[1, 4, 7]] = [0.5, 1.2, 0.3]
+
+    b, scales = stack_targets([A1 @ w_true, A2 @ w_true], normalise=True)
+
+    # Each block normalised to unit target norm, then the stack to a unit vector.
+    np.testing.assert_allclose(np.linalg.norm(b), 1.0, atol=1e-12)
+
+    op = StackedOperator([A1, A2], scales)
+    np.testing.assert_allclose(lawson_hanson(op, b, weight_threshold=1e-14), w_true,
+                               atol=1e-9)
+
+
+def test_unnormalised_stacking_leaves_the_blocks_alone():
+    targets = [np.array([3.0, 4.0]), np.array([1.0])]
+    b, scales = stack_targets(targets, normalise=False)
+
+    np.testing.assert_allclose(scales, [1.0, 1.0])
+    np.testing.assert_allclose(b, [3.0, 4.0, 1.0])
+
+
+def test_stacked_operator_rejects_blocks_that_disagree_on_variables():
+    """The blocks share their variables - that is the whole point of stacking them."""
+    with pytest.raises(ValueError):
+        StackedOperator([np.zeros((4, 5)), np.zeros((4, 6))])
+
+    with pytest.raises(ValueError):
+        StackedOperator([np.zeros((4, 5))], scales=np.ones(2))
+
+    with pytest.raises(ValueError):
+        StackedOperator([])
 
 
 def test_orbits_of_an_atomic_grid_have_octahedral_sizes(mol):

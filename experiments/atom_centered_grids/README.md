@@ -17,6 +17,10 @@ point-wise (no isotropy constraint), its inflation over the global fit is a **st
 bound** on what any frozen, transferable atom-centred scheme would pay. It can therefore
 kill the idea cheaply, but it cannot confirm it.
 
+`ghosts.py` supplies the confirmation: it builds the transferable object itself - one
+point set per element, fitted offline against ghost neighbours, translated rigidly into a
+molecule and never re-selected - and prices it against that lower bound.
+
 ## Scripts
 
 | script | what it measures |
@@ -29,6 +33,7 @@ kill the idea cheaply, but it cannot confirm it.
 | `weights.py` | whether the fitted weights matter, or only the points they select |
 | `ridge.py` | what ridge regularisation of the metric costs in accuracy, against truncation |
 | `scan.py` | whether the metric truncation puts steps in the PES, and whether ridge removes them |
+| `ghosts.py` | what an offline, per-element grid fitted against ghost neighbours costs against `blocked` |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -42,11 +47,13 @@ uv run python orbits.py methanol --out orbits_methanol.json
 uv run python weights.py ethanol 1e-4
 uv run python ridge.py methanol 1e-3 --blocked
 uv run python scan.py methanol 1e-3
+uv run python ghosts.py --calibrate H,C,O          # threshold ladder, no SCF, seconds
+uv run python ghosts.py methanol --out ghosts_methanol.json
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Four headlines:
+See [`FINDINGS.md`](FINDINGS.md). Five headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -64,5 +71,11 @@ See [`FINDINGS.md`](FINDINGS.md). Four headlines:
   point count a point-wise grid is better on both accuracy and spread. The anisotropy of
   §4 converges away with grid size in either mode, so it is a symptom of a rank-limited
   grid rather than a defect needing a structural fix.
+* **Ghost-fitted per-element grids work.** Fitted offline against ghost neighbours and
+  then only translated, they cost **1.1-1.8x** the points of the in-molecule `blocked`
+  fit at matched accuracy, shrinking with system size - so **1.6-2.7x** against a single
+  global molecular fit. Fitting the *free* atom instead does not work and cannot be made
+  to: an isolated atom's overlap matrix supplies only `n_AO (n_AO + 1) / 2` equations, so
+  NNLS can never retain more than 15 points per hydrogen in cc-pVDZ, at any threshold.
 
 Raw sweep output is under [`data/`](data).
