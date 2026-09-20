@@ -21,6 +21,10 @@ Two details drive the implementation:
 2. The least-squares problem on the passive set is maintained as an incremental QR
    factorization with Givens downdating, rather than being re-solved from scratch in
    every iteration.
+
+:class:`GroupOperator` additionally ties the weights of a group of points together, so
+that the same solver selects whole symmetry orbits of the grid instead of individual
+points. See :func:`~pythc.grid.octahedral_orbits` for what the groups are and why.
 """
 
 import logging
@@ -127,6 +131,77 @@ class OverlapFitOperator(NNLSOperator):
         # n_pair dimension never appears.
         U = self.unpack(r)
         return np.einsum('pm,pm->p', self.R @ U, self.R, optimize=True)
+
+
+class GroupOperator(NNLSOperator):
+    """
+    Ties the variables of an NNLS problem into groups that enter and leave the fit
+    together, by presenting the group sums of the underlying columns as the variables.
+
+    Given a partition of the columns of A into groups G, this operator is the matrix
+    whose columns are ``A_G = sum_{j in G} A[:, j]``. Solving the NNLS problem in the
+    group variables is exactly the original problem restricted to weight vectors that
+    are constant within a group,
+
+        w_j = v_{G(j)},   v >= 0
+
+    so the solution is automatically **group sparse**: every member of a group is either
+    retained with a common weight or dropped, and no group is ever split.
+
+    That is a stronger statement than group sparsity alone, and deliberately so. In the
+    grid application the groups are octahedral orbits of a Lebedev shell (see
+    :func:`~pythc.grid.octahedral_orbits`), whose points are symmetry-equivalent: a
+    common weight is the only assignment that leaves the retained quadrature invariant
+    under the point group, which is the property the grouping exists to buy. Allowing
+    the weights to vary within an orbit would restore the anisotropy that selecting
+    whole orbits was meant to remove.
+
+    The reduction is exact rather than heuristic - the tied problem is itself an NNLS
+    problem - so :func:`lawson_hanson` solves it unmodified, with the KKT threshold now
+    applied to the group gradient. It also shrinks the problem: a level-0 Becke oxygen
+    sub-grid has 858 points but only 58 orbits.
+    """
+
+    def __init__(self, base: NNLSOperator | np.ndarray, labels: np.ndarray):
+        """
+        :param base: Operator (or dense matrix) whose columns are to be grouped.
+        :param labels: Group label per column of ``base``. Any labels ``np.unique``
+            accepts will do; they are renumbered to ``0 .. n_groups - 1`` in sorted
+            order of the label, which is the indexing of the solution vector.
+        """
+        self.base = DenseOperator(base) if isinstance(base, np.ndarray) else base
+
+        labels = np.asarray(labels)
+        if labels.shape != (self.base.shape[1],):
+            raise ValueError(f"expected one label per column, got {labels.shape} labels "
+                             f"for {self.base.shape[1]} columns")
+
+        _, self.labels = np.unique(labels, return_inverse=True)
+        self.labels = self.labels.astype(np.intp).ravel()
+        self.n_groups = int(self.labels.max()) + 1 if self.labels.size else 0
+        # Members of each group, in column order.
+        order = np.argsort(self.labels, kind='stable')
+        bounds = np.searchsorted(self.labels[order], np.arange(self.n_groups + 1))
+        self.members = [order[bounds[g]:bounds[g + 1]] for g in range(self.n_groups)]
+
+    @property
+    def shape(self):
+        return self.base.shape[0], self.n_groups
+
+    def column(self, g):
+        members = self.members[g]
+        a = self.base.column(members[0]).astype(np.float64, copy=True)
+        for j in members[1:]:
+            a += self.base.column(j)
+        return a
+
+    def gradient(self, r):
+        return np.bincount(self.labels, weights=self.base.gradient(r),
+                           minlength=self.n_groups)
+
+    def expand(self, v: np.ndarray) -> np.ndarray:
+        """Spread a group solution back over the underlying columns."""
+        return np.asarray(v)[self.labels]
 
 
 class _IncrementalQR:

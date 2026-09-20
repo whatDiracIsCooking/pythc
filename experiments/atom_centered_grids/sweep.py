@@ -66,7 +66,19 @@ def mp2_on_grid(mol, mf, grid_builder):
     return len(coords), rmsd, float(e_corr)
 
 
-def run(name, thresholds_global, thresholds_blocked, out_path):
+# Fitting mode -> the NNLSGrid keywords that select it. The orbit-grouped rows keep
+# whole octahedral orbits instead of individual points (see orbits.py); their weight
+# threshold is applied to a gradient summed over the orbit, so it is a far tighter knob
+# at the same numeric value and the ladders are only comparable at matched accuracy.
+MODES = {
+    'global':         dict(blocked=False, group_orbits=False),
+    'blocked':        dict(blocked=True,  group_orbits=False),
+    'global_orbits':  dict(blocked=False, group_orbits=True),
+    'blocked_orbits': dict(blocked=True,  group_orbits=True),
+}
+
+
+def run(name, thresholds, out_path):
     mol = gto.M(atom=MOLECULES[name](), basis=BASIS, verbose=0)
     mf = scf.RHF(mol).density_fit(auxbasis=AUXBASIS)
     mf.verbose = 0
@@ -87,22 +99,22 @@ def run(name, thresholds_global, thresholds_blocked, out_path):
     print(f"  becke      n={n:6d}  rmsd={rmsd:.3e}  err={rows[-1]['err_uha']:+10.2f} uHa",
           flush=True)
 
-    for mode, thresholds in (('global', thresholds_global), ('blocked', thresholds_blocked)):
-        for thr in thresholds:
+    for mode, thrs in thresholds.items():
+        for thr in thrs:
             t0 = time.time()
             try:
                 g = NNLSGrid(mol, parent=BeckeGrid(mol), weight_threshold=thr,
-                             blocked=(mode == 'blocked'))
+                             **MODES[mode])
                 n, rmsd, e = mp2_on_grid(mol, mf, g)
             except Exception as exc:                      # keep the sweep going
-                print(f"  {mode:8s} thr={thr:.0e}  FAILED: {type(exc).__name__}: {exc}",
+                print(f"  {mode:14s} thr={thr:.0e}  FAILED: {type(exc).__name__}: {exc}",
                       flush=True)
                 rows.append(dict(mode=mode, threshold=thr, error=f"{type(exc).__name__}: {exc}"))
                 continue
             dt = time.time() - t0
             rows.append(dict(mode=mode, threshold=thr, n_points=n, rmsd_S=rmsd,
                              e_corr=e, err_uha=(e - mp2_ref) * 1e6, fit_seconds=dt))
-            print(f"  {mode:8s} thr={thr:.0e}  n={n:6d} ({n / mol.natm:6.1f}/atom)  "
+            print(f"  {mode:14s} thr={thr:.0e}  n={n:6d} ({n / mol.natm:6.1f}/atom)  "
                   f"rmsd={rmsd:.3e}  err={rows[-1]['err_uha']:+10.2f} uHa  {dt:7.1f}s",
                   flush=True)
             with open(out_path, 'w') as fh:
@@ -119,8 +131,15 @@ if __name__ == '__main__':
     p.add_argument('--out', required=True)
     p.add_argument('--global-thresholds', default='1e-3,1e-4,1e-5,1e-6')
     p.add_argument('--blocked-thresholds', default='1e-3,1e-4,1e-5,1e-6')
+    p.add_argument('--global-orbit-thresholds', default='',
+                   help='orbit-grouped global fits; off by default')
+    p.add_argument('--blocked-orbit-thresholds', default='',
+                   help='orbit-grouped per-atom fits; off by default. These thresholds '
+                        'are not on the same scale as the point-wise ones - see MODES')
     a = p.parse_args()
     run(a.molecule,
-        [float(x) for x in a.global_thresholds.split(',') if x],
-        [float(x) for x in a.blocked_thresholds.split(',') if x],
+        {'global': [float(x) for x in a.global_thresholds.split(',') if x],
+         'blocked': [float(x) for x in a.blocked_thresholds.split(',') if x],
+         'global_orbits': [float(x) for x in a.global_orbit_thresholds.split(',') if x],
+         'blocked_orbits': [float(x) for x in a.blocked_orbit_thresholds.split(',') if x]},
         a.out)

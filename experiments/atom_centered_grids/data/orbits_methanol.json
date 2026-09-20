@@ -1,0 +1,590 @@
+{
+  "meta": {
+    "molecule": "methanol",
+    "natm": 6,
+    "nao": 48,
+    "basis": "cc-pvdz",
+    "auxbasis": "cc-pvdz-ri",
+    "mp2_ri_reference": -0.34340192709398354,
+    "n_rotations": 6,
+    "seed": 7
+  },
+  "rows": [
+    {
+      "threshold": 0.01,
+      "group_orbits": false,
+      "n_points": 175,
+      "fit_seconds": 0.26404833793640137,
+      "e_fitted": -0.3427741675473236,
+      "err_uha": 627.759546659945,
+      "rmsd_S": 0.01896716655832286,
+      "octahedral_shift_uha": -81.93339603568273,
+      "general_ptp_uha": 218.22468899590496,
+      "general_std_uha": 79.67068630871476,
+      "e_general": [
+        -0.3427769364812988,
+        -0.34266571213417407,
+        -0.34267041089364925,
+        -0.34266312558068734,
+        -0.34288135026968325,
+        -0.34269994856977626
+      ],
+      "orbits_touched": 82,
+      "orbits_whole": 0,
+      "orbits": [
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 20,
+          "orbits_whole": 0,
+          "orbits_partial": 20,
+          "mean_partial_fraction": 0.15416666666666667
+        },
+        {
+          "atom": "O",
+          "n_orbits": 58,
+          "orbits_touched": 22,
+          "orbits_whole": 0,
+          "orbits_partial": 22,
+          "mean_partial_fraction": 0.1818181818181818
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 9,
+          "orbits_whole": 0,
+          "orbits_partial": 9,
+          "mean_partial_fraction": 0.1712962962962963
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 7,
+          "orbits_whole": 0,
+          "orbits_partial": 7,
+          "mean_partial_fraction": 0.17261904761904764
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 13,
+          "orbits_whole": 0,
+          "orbits_partial": 13,
+          "mean_partial_fraction": 0.14423076923076922
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 11,
+          "orbits_whole": 0,
+          "orbits_partial": 11,
+          "mean_partial_fraction": 0.1590909090909091
+        }
+      ]
+    },
+    {
+      "threshold": 0.003,
+      "group_orbits": false,
+      "n_points": 235,
+      "fit_seconds": 0.4143826961517334,
+      "e_fitted": -0.34335894225381547,
+      "err_uha": 42.984840168069915,
+      "rmsd_S": 0.010977518343699757,
+      "octahedral_shift_uha": -3.305903930050924,
+      "general_ptp_uha": 74.59644273855037,
+      "general_std_uha": 26.28037432842339,
+      "e_general": [
+        -0.3433052462063354,
+        -0.3433785784001533,
+        -0.3433385328492151,
+        -0.34330398195741474,
+        -0.34335312955580466,
+        -0.3433273875509991
+      ],
+      "orbits_touched": 99,
+      "orbits_whole": 0,
+      "orbits": [
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 22,
+          "orbits_whole": 0,
+          "orbits_partial": 22,
+          "mean_partial_fraction": 0.18939393939393936
+        },
+        {
+          "atom": "O",
+          "n_orbits": 58,
+          "orbits_touched": 28,
+          "orbits_whole": 0,
+          "orbits_partial": 28,
+          "mean_partial_fraction": 0.1681547619047619
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 11,
+          "orbits_whole": 0,
+          "orbits_partial": 11,
+          "mean_partial_fraction": 0.18939393939393942
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 10,
+          "orbits_whole": 0,
+          "orbits_partial": 10,
+          "mean_partial_fraction": 0.1375
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 14,
+          "orbits_whole": 0,
+          "orbits_partial": 14,
+          "mean_partial_fraction": 0.14880952380952378
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 14,
+          "orbits_whole": 0,
+          "orbits_partial": 14,
+          "mean_partial_fraction": 0.21130952380952378
+        }
+      ]
+    },
+    {
+      "threshold": 0.001,
+      "group_orbits": false,
+      "n_points": 301,
+      "fit_seconds": 0.47824597358703613,
+      "e_fitted": -0.34339663660416103,
+      "err_uha": 5.290489822507016,
+      "rmsd_S": 0.00751901090897271,
+      "octahedral_shift_uha": -1.0790860316967077,
+      "general_ptp_uha": 7.072827918341851,
+      "general_std_uha": 2.5129179595228925,
+      "e_general": [
+        -0.34339403604580276,
+        -0.34339134518324865,
+        -0.34339830577531116,
+        -0.34339658846881915,
+        -0.343398418011167,
+        -0.34339693660917336
+      ],
+      "orbits_touched": 111,
+      "orbits_whole": 0,
+      "orbits": [
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 26,
+          "orbits_whole": 0,
+          "orbits_partial": 26,
+          "mean_partial_fraction": 0.21794871794871792
+        },
+        {
+          "atom": "O",
+          "n_orbits": 58,
+          "orbits_touched": 29,
+          "orbits_whole": 0,
+          "orbits_partial": 29,
+          "mean_partial_fraction": 0.1968390804597701
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 13,
+          "orbits_whole": 0,
+          "orbits_partial": 13,
+          "mean_partial_fraction": 0.21794871794871795
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 14,
+          "orbits_whole": 0,
+          "orbits_partial": 14,
+          "mean_partial_fraction": 0.19345238095238096
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 12,
+          "orbits_whole": 0,
+          "orbits_partial": 12,
+          "mean_partial_fraction": 0.22569444444444445
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 17,
+          "orbits_whole": 0,
+          "orbits_partial": 17,
+          "mean_partial_fraction": 0.21568627450980393
+        }
+      ]
+    },
+    {
+      "threshold": 0.0003,
+      "group_orbits": false,
+      "n_points": 410,
+      "fit_seconds": 0.7883813381195068,
+      "e_fitted": -0.3433991472565068,
+      "err_uha": 2.779837476762914,
+      "rmsd_S": 0.0037587848958071223,
+      "octahedral_shift_uha": 1.3472520614121741,
+      "general_ptp_uha": 0.9794098406179508,
+      "general_std_uha": 0.3292094057637577,
+      "e_general": [
+        -0.34339909084549175,
+        -0.343399189789122,
+        -0.34339826762629455,
+        -0.34339884222217115,
+        -0.34339924703613517,
+        -0.3433988180321642
+      ],
+      "orbits_touched": 124,
+      "orbits_whole": 0,
+      "orbits": [
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 30,
+          "orbits_whole": 0,
+          "orbits_partial": 30,
+          "mean_partial_fraction": 0.24583333333333332
+        },
+        {
+          "atom": "O",
+          "n_orbits": 58,
+          "orbits_touched": 32,
+          "orbits_whole": 0,
+          "orbits_partial": 32,
+          "mean_partial_fraction": 0.2109375
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 17,
+          "orbits_whole": 0,
+          "orbits_partial": 17,
+          "mean_partial_fraction": 0.24509803921568624
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 14,
+          "orbits_whole": 0,
+          "orbits_partial": 14,
+          "mean_partial_fraction": 0.25892857142857145
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 15,
+          "orbits_whole": 0,
+          "orbits_partial": 15,
+          "mean_partial_fraction": 0.28611111111111115
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 16,
+          "orbits_whole": 0,
+          "orbits_partial": 16,
+          "mean_partial_fraction": 0.265625
+        }
+      ]
+    },
+    {
+      "threshold": 3.0,
+      "group_orbits": true,
+      "n_points": 304,
+      "fit_seconds": 0.1414494514465332,
+      "e_fitted": -0.34139431579120355,
+      "err_uha": 2007.611302779988,
+      "rmsd_S": 0.055154296462424056,
+      "octahedral_shift_uha": -0.0033607722715878197,
+      "general_ptp_uha": 503.7158915521256,
+      "general_std_uha": 186.1168380782669,
+      "e_general": [
+        -0.34149615487553087,
+        -0.34113139364883466,
+        -0.3415236478199635,
+        -0.3410199319284114,
+        -0.3413939628778392,
+        -0.3413864531377566
+      ],
+      "orbits_touched": 14,
+      "orbits_whole": 14,
+      "orbits": [
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 2,
+          "orbits_whole": 2,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "O",
+          "n_orbits": 58,
+          "orbits_touched": 4,
+          "orbits_whole": 4,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 2,
+          "orbits_whole": 2,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 2,
+          "orbits_whole": 2,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 2,
+          "orbits_whole": 2,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 2,
+          "orbits_whole": 2,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        }
+      ]
+    },
+    {
+      "threshold": 1.0,
+      "group_orbits": true,
+      "n_points": 360,
+      "fit_seconds": 0.12944316864013672,
+      "e_fitted": -0.34299999323629804,
+      "err_uha": 401.93385768549916,
+      "rmsd_S": 0.05140004643651563,
+      "octahedral_shift_uha": -0.0023756025480103915,
+      "general_ptp_uha": 371.5384030484881,
+      "general_std_uha": 125.96355588568309,
+      "e_general": [
+        -0.3428513086465902,
+        -0.3427395297305199,
+        -0.3429474704484726,
+        -0.34257593204542414,
+        -0.342911670799774,
+        -0.34273071133790034
+      ],
+      "orbits_touched": 17,
+      "orbits_whole": 17,
+      "orbits": [
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "O",
+          "n_orbits": 58,
+          "orbits_touched": 6,
+          "orbits_whole": 6,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 2,
+          "orbits_whole": 2,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 2,
+          "orbits_whole": 2,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 2,
+          "orbits_whole": 2,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 2,
+          "orbits_whole": 2,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        }
+      ]
+    },
+    {
+      "threshold": 0.3,
+      "group_orbits": true,
+      "n_points": 504,
+      "fit_seconds": 0.14599990844726562,
+      "e_fitted": -0.34339894599628107,
+      "err_uha": 2.9810977024702368,
+      "rmsd_S": 0.04386144375300414,
+      "octahedral_shift_uha": -0.0005100603273078264,
+      "general_ptp_uha": 0.5152523290252731,
+      "general_std_uha": 0.17179091239511243,
+      "e_general": [
+        -0.3433986033993015,
+        -0.3433987694303786,
+        -0.3433987987236541,
+        -0.3433988930367094,
+        -0.34339900135058143,
+        -0.3433984860982524
+      ],
+      "orbits_touched": 23,
+      "orbits_whole": 23,
+      "orbits": [
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 4,
+          "orbits_whole": 4,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "O",
+          "n_orbits": 58,
+          "orbits_touched": 7,
+          "orbits_whole": 7,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        }
+      ]
+    },
+    {
+      "threshold": 0.1,
+      "group_orbits": true,
+      "n_points": 732,
+      "fit_seconds": 0.1744251251220703,
+      "e_fitted": -0.34339910442764027,
+      "err_uha": 2.8226663432717736,
+      "rmsd_S": 0.04146185447961251,
+      "octahedral_shift_uha": 0.01868135318661146,
+      "general_ptp_uha": 0.04779311757463489,
+      "general_std_uha": 0.016014693011307025,
+      "e_general": [
+        -0.3433991514616941,
+        -0.34339916654763636,
+        -0.3433991538887073,
+        -0.3433991469193225,
+        -0.34339915525582787,
+        -0.34339919471244007
+      ],
+      "orbits_touched": 34,
+      "orbits_whole": 34,
+      "orbits": [
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 8,
+          "orbits_whole": 8,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "O",
+          "n_orbits": 58,
+          "orbits_touched": 8,
+          "orbits_whole": 8,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 5,
+          "orbits_whole": 5,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 4,
+          "orbits_whole": 4,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 6,
+          "orbits_whole": 6,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        }
+      ]
+    }
+  ]
+}

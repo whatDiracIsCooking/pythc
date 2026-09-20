@@ -1,4 +1,10 @@
-"""Points needed to reach a given MP2 accuracy, blocked (per-atom) vs global."""
+"""Points needed to reach a given MP2 accuracy, one column per fitting mode.
+
+Ratios are taken against the global point-wise fit, which is the most compact grid any
+of these modes produces and so the natural denominator: `blocked` prices giving up
+molecular pruning, and the `_orbits` modes price giving up point-wise pruning on top of
+it (see orbits.py).
+"""
 import json, glob, sys
 import numpy as np
 
@@ -42,14 +48,24 @@ for path in sys.argv[1:] or sorted(glob.glob('*.json')):
     if becke is None:
         continue
     floor = becke['err_uha']              # converged value on the full parent grid
-    g, b = curve(rows, 'global'), curve(rows, 'blocked')
+    # Whichever modes this file actually holds, in a fixed order.
+    modes = [m for m in ('global', 'blocked', 'global_orbits', 'blocked_orbits')
+             if curve(rows, m)]
+    curves = {m: curve(rows, m) for m in modes}
 
     print(f"\n=== {meta['molecule']}: {meta['natm']} atoms, {meta['nao']} AOs "
           f"(parent grid {becke['n_points']} pts, converged err {floor:+.2f} uHa)")
-    print(f"  {'target':>9s} {'global':>9s} {'blocked':>9s} {'ratio':>7s}")
+    header = f"  {'target':>9s}" + "".join(f" {m:>14s}" for m in modes)
+    print(header)
     for t in TARGETS:
-        ng, nb = points_for(g, floor, t), points_for(b, floor, t)
-        if ng and nb:
-            print(f"  {t:7.0f}uHa {ng:9.0f} {nb:9.0f} {nb / ng:7.2f}x")
-        elif ng:
-            print(f"  {t:7.0f}uHa {ng:9.0f} {'n/a':>9s} {'--':>7s}   (blocked never reached)")
+        need = {m: points_for(curves[m], floor, t) for m in modes}
+        base = need.get('global')
+        cells = []
+        for m in modes:
+            if need[m] is None:
+                cells.append(f" {'n/a':>14s}")
+            elif base and m != 'global':
+                cells.append(f" {need[m]:8.0f} ({need[m] / base:4.2f}x)")
+            else:
+                cells.append(f" {need[m]:14.0f}")
+        print(f"  {t:7.0f}uHa" + "".join(cells))
