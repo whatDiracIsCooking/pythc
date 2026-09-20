@@ -1,0 +1,574 @@
+{
+  "meta": {
+    "experiment": "transfer",
+    "basis": "cc-pvdz",
+    "auxbasis": "cc-pvdz-ri",
+    "ridge": 1e-08,
+    "weights": "ones",
+    "elements": [
+      "C",
+      "H",
+      "N",
+      "O"
+    ],
+    "molecules": {
+      "hcn": {
+        "natm": 3,
+        "nao": 33,
+        "elements": [
+          "C",
+          "H",
+          "N"
+        ],
+        "mp2_ri_reference": -0.2902368754622973,
+        "bonds": [
+          {
+            "pair": "C-N",
+            "r": 1.16
+          },
+          {
+            "pair": "C-H",
+            "r": 1.065
+          }
+        ],
+        "residual": [
+          {
+            "atom": 0,
+            "element": "C",
+            "n_support": 115,
+            "n_parent": 858,
+            "residual": 0.02967958212109661,
+            "residual_parent": 2.1101117043081882e-11
+          },
+          {
+            "atom": 1,
+            "element": "N",
+            "n_support": 124,
+            "n_parent": 858,
+            "residual": 0.01335484335391407,
+            "residual_parent": 1.0623258035063714e-09
+          },
+          {
+            "atom": 2,
+            "element": "H",
+            "n_support": 125,
+            "n_parent": 392,
+            "residual": 0.002683960393897489,
+            "residual_parent": 7.787346541972906e-12
+          }
+        ]
+      },
+      "methylamine": {
+        "natm": 7,
+        "nao": 53,
+        "elements": [
+          "C",
+          "H",
+          "N"
+        ],
+        "mp2_ri_reference": -0.3305101431272711,
+        "bonds": [
+          {
+            "pair": "C-N",
+            "r": 1.452
+          },
+          {
+            "pair": "C-H",
+            "r": 1.094
+          },
+          {
+            "pair": "C-H",
+            "r": 1.094
+          },
+          {
+            "pair": "C-H",
+            "r": 1.094
+          },
+          {
+            "pair": "N-H",
+            "r": 1.019
+          },
+          {
+            "pair": "N-H",
+            "r": 1.019
+          }
+        ]
+      }
+    },
+    "thresholds": [
+      0.001,
+      0.0003,
+      0.0001,
+      3e-05,
+      1e-05,
+      1e-06
+    ],
+    "blocked_thresholds": [
+      0.001,
+      0.0001,
+      1e-05
+    ],
+    "ghost_shells": {
+      "C-H": [
+        0.9630000000000001,
+        1.1235000000000002,
+        1.5515
+      ],
+      "C-C": [
+        1.368,
+        1.596,
+        2.2039999999999997
+      ],
+      "C-N": [
+        1.323,
+        1.5435,
+        2.1315
+      ],
+      "C-O": [
+        1.278,
+        1.4909999999999999,
+        2.0589999999999997
+      ],
+      "H-H": [
+        0.558,
+        0.651,
+        0.899
+      ],
+      "H-N": [
+        0.918,
+        1.0710000000000002,
+        1.4789999999999999
+      ],
+      "H-O": [
+        0.873,
+        1.0185,
+        1.4064999999999999
+      ],
+      "N-N": [
+        1.278,
+        1.4909999999999999,
+        2.0589999999999997
+      ],
+      "N-O": [
+        1.233,
+        1.4385000000000001,
+        1.9865000000000002
+      ],
+      "O-O": [
+        1.1880000000000002,
+        1.3860000000000001,
+        1.914
+      ]
+    },
+    "fingerprints": {
+      "1e-03": {
+        "C": "e75dc834df61",
+        "H": "ac356e6588ce",
+        "N": "d18b9579dda7",
+        "O": "161a3459d226"
+      },
+      "3e-04": {
+        "C": "a3f483d51022",
+        "H": "dfa85e4dfd71",
+        "N": "3b0b6f80b352",
+        "O": "d6fa6d522e3c"
+      },
+      "1e-04": {
+        "C": "0248429e2dc4",
+        "H": "494f003caade",
+        "N": "596ba1ffc720",
+        "O": "4c24a25f79b3"
+      },
+      "3e-05": {
+        "C": "e0dec347bb53",
+        "H": "9c55a9e14c9a",
+        "N": "6adb0c6f1a1b",
+        "O": "cf26e10364fa"
+      },
+      "1e-05": {
+        "C": "20439f584ae2",
+        "H": "4ef8f92128fe",
+        "N": "20602ffd6eb7",
+        "O": "b7eceac82129"
+      },
+      "1e-06": {
+        "C": "3726fda876b7",
+        "H": "7a93a32f6e79",
+        "N": "c2d77b0a5434",
+        "O": "471e5cc3adc5"
+      }
+    },
+    "suite": [
+      {
+        "molecule": "methanol",
+        "probes": "O sp3 + C sp3",
+        "in_ghost_range": true
+      },
+      {
+        "molecule": "methylamine",
+        "probes": "N sp3, C-N unseen",
+        "in_ghost_range": false
+      },
+      {
+        "molecule": "hcn",
+        "probes": "C sp + N, C#N 1.16",
+        "in_ghost_range": false
+      }
+    ],
+    "directions": "icosahedron",
+    "partners": [
+      "H",
+      "C",
+      "N",
+      "O"
+    ],
+    "scales": [
+      0.9,
+      1.05,
+      1.45
+    ],
+    "full_cross": false
+  },
+  "rows": [
+    {
+      "molecule": "hcn",
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 2112,
+      "natm": 3,
+      "rmsd_S": 0.00015198104666680544,
+      "e_corr": -0.29025968692619386,
+      "err_uha": -22.81146389654376,
+      "fit_seconds": 0.002844572067260742
+    },
+    {
+      "molecule": "hcn",
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 182,
+      "natm": 3,
+      "rmsd_S": 2.879685528357759,
+      "e_corr": -0.2902423341381738,
+      "err_uha": -5.458675876479635,
+      "fit_seconds": 0.20431876182556152
+    },
+    {
+      "molecule": "hcn",
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 273,
+      "natm": 3,
+      "rmsd_S": 3.2282123370695075,
+      "e_corr": -0.2902571827904378,
+      "err_uha": -20.307328140456438,
+      "fit_seconds": 0.42525243759155273
+    },
+    {
+      "molecule": "hcn",
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 345,
+      "natm": 3,
+      "rmsd_S": 3.4399522487484235,
+      "e_corr": -0.290257782102339,
+      "err_uha": -20.90664004167353,
+      "fit_seconds": 0.7254021167755127
+    },
+    {
+      "molecule": "hcn",
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 122,
+      "natm": 3,
+      "rmsd_S": 2.5215064647092738,
+      "e_corr": -0.2887225994797047,
+      "err_uha": 1514.2759825926278,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 36,
+        "H": 42,
+        "N": 44
+      },
+      "fingerprint": {
+        "C": "e75dc834df61",
+        "H": "ac356e6588ce",
+        "N": "d18b9579dda7"
+      }
+    },
+    {
+      "molecule": "hcn",
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 228,
+      "natm": 3,
+      "rmsd_S": 0.8013554744243611,
+      "e_corr": -0.2902536450450579,
+      "err_uha": -16.769582760589596,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 71,
+        "H": 85,
+        "N": 72
+      },
+      "fingerprint": {
+        "C": "a3f483d51022",
+        "H": "dfa85e4dfd71",
+        "N": "3b0b6f80b352"
+      }
+    },
+    {
+      "molecule": "hcn",
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 302,
+      "natm": 3,
+      "rmsd_S": 1.177633394725128,
+      "e_corr": -0.2902574184504695,
+      "err_uha": -20.542988172167487,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 96,
+        "H": 108,
+        "N": 98
+      },
+      "fingerprint": {
+        "C": "0248429e2dc4",
+        "H": "494f003caade",
+        "N": "596ba1ffc720"
+      }
+    },
+    {
+      "molecule": "hcn",
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 364,
+      "natm": 3,
+      "rmsd_S": 3.431382067060678,
+      "e_corr": -0.29025731172494174,
+      "err_uha": -20.43626264441878,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 115,
+        "H": 125,
+        "N": 124
+      },
+      "fingerprint": {
+        "C": "e0dec347bb53",
+        "H": "9c55a9e14c9a",
+        "N": "6adb0c6f1a1b"
+      }
+    },
+    {
+      "molecule": "hcn",
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 433,
+      "natm": 3,
+      "rmsd_S": 3.279463458016457,
+      "e_corr": -0.2902571922428778,
+      "err_uha": -20.31678058050934,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 142,
+        "H": 137,
+        "N": 154
+      },
+      "fingerprint": {
+        "C": "20439f584ae2",
+        "H": "4ef8f92128fe",
+        "N": "20602ffd6eb7"
+      }
+    },
+    {
+      "molecule": "hcn",
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 506,
+      "natm": 3,
+      "rmsd_S": 3.2970037711775073,
+      "e_corr": -0.2902577594604569,
+      "err_uha": -20.883998159582084,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 173,
+        "H": 146,
+        "N": 187
+      },
+      "fingerprint": {
+        "C": "3726fda876b7",
+        "H": "7a93a32f6e79",
+        "N": "c2d77b0a5434"
+      }
+    },
+    {
+      "molecule": "methylamine",
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 3680,
+      "natm": 7,
+      "rmsd_S": 0.0002470743727463393,
+      "e_corr": -0.33050518369835025,
+      "err_uha": 4.959428920869868,
+      "fit_seconds": 0.0042266845703125
+    },
+    {
+      "molecule": "methylamine",
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 350,
+      "natm": 7,
+      "rmsd_S": 2.355457499480233,
+      "e_corr": -0.3304882588439444,
+      "err_uha": 21.884283326722986,
+      "fit_seconds": 0.4461839199066162
+    },
+    {
+      "molecule": "methylamine",
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 571,
+      "natm": 7,
+      "rmsd_S": 2.978206914414509,
+      "e_corr": -0.33050193288532165,
+      "err_uha": 8.210241949468955,
+      "fit_seconds": 1.0151472091674805
+    },
+    {
+      "molecule": "methylamine",
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 789,
+      "natm": 7,
+      "rmsd_S": 2.364568211161151,
+      "e_corr": -0.3305044195310246,
+      "err_uha": 5.7235962465096435,
+      "fit_seconds": 1.9712309837341309
+    },
+    {
+      "molecule": "methylamine",
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 290,
+      "natm": 7,
+      "rmsd_S": 1.5891887135414142,
+      "e_corr": -0.3303907166203275,
+      "err_uha": 119.42650694363178,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 36,
+        "H": 42,
+        "N": 44
+      },
+      "fingerprint": {
+        "C": "e75dc834df61",
+        "H": "ac356e6588ce",
+        "N": "d18b9579dda7"
+      }
+    },
+    {
+      "molecule": "methylamine",
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 568,
+      "natm": 7,
+      "rmsd_S": 0.5697681226693805,
+      "e_corr": -0.33050039869807235,
+      "err_uha": 9.744429198765836,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 71,
+        "H": 85,
+        "N": 72
+      },
+      "fingerprint": {
+        "C": "a3f483d51022",
+        "H": "dfa85e4dfd71",
+        "N": "3b0b6f80b352"
+      }
+    },
+    {
+      "molecule": "methylamine",
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 734,
+      "natm": 7,
+      "rmsd_S": 0.8266253679967914,
+      "e_corr": -0.3305040993118916,
+      "err_uha": 6.043815379497275,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 96,
+        "H": 108,
+        "N": 98
+      },
+      "fingerprint": {
+        "C": "0248429e2dc4",
+        "H": "494f003caade",
+        "N": "596ba1ffc720"
+      }
+    },
+    {
+      "molecule": "methylamine",
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 864,
+      "natm": 7,
+      "rmsd_S": 2.1915169448677743,
+      "e_corr": -0.3305035609093672,
+      "err_uha": 6.58221790389435,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 115,
+        "H": 125,
+        "N": 124
+      },
+      "fingerprint": {
+        "C": "e0dec347bb53",
+        "H": "9c55a9e14c9a",
+        "N": "6adb0c6f1a1b"
+      }
+    },
+    {
+      "molecule": "methylamine",
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 981,
+      "natm": 7,
+      "rmsd_S": 2.108888789312283,
+      "e_corr": -0.330504113483972,
+      "err_uha": 6.029643299099163,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 142,
+        "H": 137,
+        "N": 154
+      },
+      "fingerprint": {
+        "C": "20439f584ae2",
+        "H": "4ef8f92128fe",
+        "N": "20602ffd6eb7"
+      }
+    },
+    {
+      "molecule": "methylamine",
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 1090,
+      "natm": 7,
+      "rmsd_S": 2.1251040980855147,
+      "e_corr": -0.3305042187234072,
+      "err_uha": 5.924403863932781,
+      "fit_seconds": 0.0,
+      "per_element": {
+        "C": 173,
+        "H": 146,
+        "N": 187
+      },
+      "fingerprint": {
+        "C": "3726fda876b7",
+        "H": "7a93a32f6e79",
+        "N": "c2d77b0a5434"
+      }
+    }
+  ]
+}

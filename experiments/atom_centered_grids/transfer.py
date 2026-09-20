@@ -323,6 +323,24 @@ def run(names, thresholds, blocked_thresholds, out_path, **env_kwargs):
     return rows
 
 
+def saturated_at(pts, floor, target):
+    """
+    Is this curve's loosest grid already inside `target` of the floor?
+
+    If it is, `points_for` returns that first point unchanged and the cell says only
+    "the ladder started past the question" - the molecule needs FEWER points than any
+    grid on the ladder, and how many fewer is not measured. Reading a ratio off two
+    such cells compares two ladder start points, not two grids, which is exactly the
+    artefact HANDOFF.md warns about for water: at 24 AOs every mode reaches the floor,
+    so water's ratio is constant across every target and means nothing.
+
+    Cells where either curve is saturated are marked `*` and kept out of the spread
+    statistics.
+    """
+    ys = sorted((n, abs(e - floor)) for n, e in pts if abs(e - floor) > 1e-9)
+    return bool(ys) and ys[0][1] <= target
+
+
 def report(paths):
     """The ghost gap per molecule, and its spread - which is the actual answer."""
     for path in paths:
@@ -342,8 +360,8 @@ def report(paths):
         names = [r['molecule'] for r in rows]
         names = sorted(set(names), key=names.index)
 
-        print(f"\n  {'molecule':<14s} {'probes':<20s} {'in-range':>8s}" +
-              "".join(f" {f'{t:.0f}uHa':>16s}" for t in TARGETS))
+        print(f"\n  {'molecule':<14s} {'probes':<20s} {'nao':>4s} {'in-rng':>6s}" +
+              "".join(f" {f'{t:.0f}uHa':>17s}" for t in TARGETS))
         gaps = {t: {} for t in TARGETS}
         for name in names:
             mrows = [r for r in rows if r['molecule'] == name]
@@ -358,16 +376,24 @@ def report(paths):
                 nb = points_for(cur['blocked'], floor, t)
                 ng = points_for(cur['ghost'], floor, t)
                 if nb and ng:
-                    gaps[t][name] = ng / nb
-                    cells.append(f" {nb:6.0f}/{ng:5.0f} {ng / nb:4.2f}x")
+                    deg = (saturated_at(cur['blocked'], floor, t) or
+                           saturated_at(cur['ghost'], floor, t))
+                    if not deg:
+                        gaps[t][name] = ng / nb
+                    cells.append(f" {nb:6.0f}/{ng:5.0f} {ng / nb:4.2f}x"
+                                 f"{'*' if deg else ' '}")
                 else:
-                    cells.append(f" {'n/a':>16s}")
+                    cells.append(f" {'n/a':>17s}")
             p = probes.get(name, {})
             print(f"  {name:<14s} {p.get('probes', ''):<20s} "
-                  f"{str(p.get('in_ghost_range', '')):>8s}" + "".join(cells))
+                  f"{meta['molecules'][name]['nao']:>4d} "
+                  f"{str(p.get('in_ghost_range', '')):>6s}" + "".join(cells))
         print("   (blocked points / frozen points, and their ratio - the ghost gap)")
+        print("   * the ladder's loosest grid is already inside the target, so the "
+              "cell compares\n     two ladder start points rather than two grids - "
+              "excluded from the spread below")
 
-        print(f"\n  ghost gap spread across the suite:")
+        print(f"\n  ghost gap spread across the suite (unsaturated cells only):")
         for t in TARGETS:
             g = gaps[t]
             if len(g) < 2:

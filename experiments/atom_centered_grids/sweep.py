@@ -60,6 +60,11 @@ MOLECULES = {
     'formaldehyde': lambda: geom_from_smiles('C=O'),
     'methylamine':  lambda: geom_from_smiles('CN'),
     'hcn':          lambda: geom_from_smiles('C#N'),
+    # Larger multiply-bonded systems, to separate "the bonding is unseen" from "the
+    # molecule is too small to tell" - acetylene, formaldehyde and hcn are 33-38 AOs
+    # and partly rank-saturated, where ethane and methanol are 48-58.
+    'propene':      lambda: geom_from_smiles('CC=C'),
+    'acetonitrile': lambda: geom_from_smiles('CC#N'),
 }
 
 
