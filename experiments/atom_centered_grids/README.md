@@ -25,6 +25,7 @@ kill the idea cheaply, but it cannot confirm it.
 | `analyse.py` | interpolates point count at matched MP2 accuracy; prints the ratio |
 | `rank.py` | co-density rank and LS-THC metric conditioning per grid |
 | `rotate.py` | energy shift when each atom's point set is spun about its own nucleus |
+| `orbits.py` | what selecting whole octahedral orbits costs in points and buys in orientation independence |
 | `weights.py` | whether the fitted weights matter, or only the points they select |
 | `ridge.py` | what ridge regularisation of the metric costs in accuracy, against truncation |
 | `scan.py` | whether the metric truncation puts steps in the PES, and whether ridge removes them |
@@ -36,7 +37,8 @@ against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
 uv run python sweep.py ethanol --out ethanol.json
 uv run python analyse.py ethanol.json
 uv run python rank.py ethanol 1e-3,1e-4,1e-5
-uv run python rotate.py ethanol 1e-3
+uv run python rotate.py ethanol 1e-3            # add --orbits for a whole-orbit fit
+uv run python orbits.py methanol --out orbits_methanol.json
 uv run python weights.py ethanol 1e-4
 uv run python ridge.py methanol 1e-3 --blocked
 uv run python scan.py methanol 1e-3
@@ -44,7 +46,7 @@ uv run python scan.py methanol 1e-3
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Three headlines:
+See [`FINDINGS.md`](FINDINGS.md). Four headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -56,5 +58,11 @@ See [`FINDINGS.md`](FINDINGS.md). Three headlines:
   left, and it puts measurable ~0.5 uHa jumps in the energy exactly where an eigenvalue
   crosses the cutoff. Ridge regularisation removes them for 0.1-2.2 uHa, and is now
   available as `metric_ridge` on `LS_RI_THC`.
+* Fitting **whole octahedral orbits** (`NNLSGrid(group_orbits=True)`) makes each atomic
+  grid *exactly* invariant under the 24 rotations of the octahedral group, for 1.2-1.6x
+  the points - but it **never reduces the spread under general rotations**. At matched
+  point count a point-wise grid is better on both accuracy and spread. The anisotropy of
+  §4 converges away with grid size in either mode, so it is a symptom of a rank-limited
+  grid rather than a defect needing a structural fix.
 
 Raw sweep output is under [`data/`](data).

@@ -296,6 +296,101 @@
       ]
     },
     {
+      "threshold": 0.0001,
+      "group_orbits": false,
+      "n_points": 765,
+      "fit_seconds": 2.8482182025909424,
+      "e_fitted": -0.48883456078538556,
+      "err_uha": 6.192506468438719,
+      "rmsd_S": 0.001302928885296578,
+      "octahedral_shift_uha": -0.01995734011384087,
+      "general_ptp_uha": 1.143721155394406,
+      "general_std_uha": 0.3949325086053167,
+      "e_general": [
+        -0.48883549874201343,
+        -0.4888348526640002,
+        -0.48883490128425483,
+        -0.4888352926589666,
+        -0.48883435502085804
+      ],
+      "orbits_touched": 203,
+      "orbits_whole": 0,
+      "orbits": [
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 28,
+          "orbits_whole": 0,
+          "orbits_partial": 28,
+          "mean_partial_fraction": 0.2589285714285714
+        },
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 29,
+          "orbits_whole": 0,
+          "orbits_partial": 29,
+          "mean_partial_fraction": 0.29454022988505746
+        },
+        {
+          "atom": "O",
+          "n_orbits": 58,
+          "orbits_touched": 36,
+          "orbits_whole": 0,
+          "orbits_partial": 36,
+          "mean_partial_fraction": 0.2314814814814815
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 18,
+          "orbits_whole": 0,
+          "orbits_partial": 18,
+          "mean_partial_fraction": 0.3217592592592593
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 19,
+          "orbits_whole": 0,
+          "orbits_partial": 19,
+          "mean_partial_fraction": 0.25219298245614036
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 18,
+          "orbits_whole": 0,
+          "orbits_partial": 18,
+          "mean_partial_fraction": 0.2569444444444444
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 18,
+          "orbits_whole": 0,
+          "orbits_partial": 18,
+          "mean_partial_fraction": 0.3055555555555556
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 18,
+          "orbits_whole": 0,
+          "orbits_partial": 18,
+          "mean_partial_fraction": 0.26157407407407407
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 19,
+          "orbits_whole": 0,
+          "orbits_partial": 19,
+          "mean_partial_fraction": 0.2390350877192982
+        }
+      ]
+    },
+    {
       "threshold": 1.0,
       "group_orbits": true,
       "n_points": 512,
@@ -480,6 +575,196 @@
           "n_orbits": 34,
           "orbits_touched": 4,
           "orbits_whole": 4,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        }
+      ]
+    },
+    {
+      "threshold": 0.2,
+      "group_orbits": true,
+      "n_points": 772,
+      "fit_seconds": 0.20469141006469727,
+      "e_fitted": -0.4888273913130847,
+      "err_uha": 13.36197876927736,
+      "rmsd_S": 0.03688243919676038,
+      "octahedral_shift_uha": -0.0033564084844783793,
+      "general_ptp_uha": 30.92603053039822,
+      "general_std_uha": 10.862655492606367,
+      "e_general": [
+        -0.48881719422411624,
+        -0.4888048148279621,
+        -0.48882059065821404,
+        -0.48878966462768364,
+        -0.4888071898281503
+      ],
+      "orbits_touched": 36,
+      "orbits_whole": 36,
+      "orbits": [
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 4,
+          "orbits_whole": 4,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 5,
+          "orbits_whole": 5,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "O",
+          "n_orbits": 58,
+          "orbits_touched": 7,
+          "orbits_whole": 7,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 5,
+          "orbits_whole": 5,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        }
+      ]
+    },
+    {
+      "threshold": 0.1,
+      "group_orbits": true,
+      "n_points": 970,
+      "fit_seconds": 0.13843059539794922,
+      "e_fitted": -0.48883327844613195,
+      "err_uha": 7.474845718447032,
+      "rmsd_S": 0.03533787140882746,
+      "octahedral_shift_uha": -0.001740602773026012,
+      "general_ptp_uha": 1.1497734412335703,
+      "general_std_uha": 0.4420371733413283,
+      "e_general": [
+        -0.4888330977310714,
+        -0.48883424750451265,
+        -0.4888334639950172,
+        -0.48883404542699177,
+        -0.4888332949999086
+      ],
+      "orbits_touched": 47,
+      "orbits_whole": 47,
+      "orbits": [
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 5,
+          "orbits_whole": 5,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "C",
+          "n_orbits": 58,
+          "orbits_touched": 5,
+          "orbits_whole": 5,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "O",
+          "n_orbits": 58,
+          "orbits_touched": 8,
+          "orbits_whole": 8,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 5,
+          "orbits_whole": 5,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 3,
+          "orbits_whole": 3,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 5,
+          "orbits_whole": 5,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 4,
+          "orbits_whole": 4,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 5,
+          "orbits_whole": 5,
+          "orbits_partial": 0,
+          "mean_partial_fraction": null
+        },
+        {
+          "atom": "H",
+          "n_orbits": 34,
+          "orbits_touched": 7,
+          "orbits_whole": 7,
           "orbits_partial": 0,
           "mean_partial_fraction": null
         }

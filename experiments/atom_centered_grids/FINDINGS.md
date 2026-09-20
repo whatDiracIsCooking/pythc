@@ -144,9 +144,14 @@ The shell structure explains it. Across methanol and ethanol, **not one angular 
 survives intact** - every retained shell keeps only 8-20% of its Lebedev points. NNLS
 shreds the octahedral orbits that make the parent grid effectively isotropic. Since the
 parent grid's `treutler_prune` already reduces Lebedev order per radial region in an
-orbit-preserving way, the fix is to make NNLS prune **(radial shell, angular orbit) blocks**
-rather than individual points - a group-sparsity variant. Its coarser granularity is a
-further point-count tax not included in §1.
+orbit-preserving way, the obvious fix is to make NNLS prune **(radial shell, angular
+orbit) blocks** rather than individual points - a group-sparsity variant, at the cost of
+a coarser granularity and so a further point-count tax not included in §1.
+
+**That fix was built and measured in §7, and it is not the fix.** Both grids tabulated
+here are rank-limited, and the spread falls to 0.01-1.1 uHa in *either* mode once the
+grid is converged. Read this section as a measurement of compact grids, not as a defect
+that survives.
 
 ## 5. The overlap RMSD is close to orthogonal to THC accuracy
 
@@ -264,20 +269,156 @@ in miniature, the thing being removed. `"max_eig"` is available for comparing ag
 
 ---
 
+## 7. Whole orbits buy exact octahedral invariance, and nothing else
+
+`orbits.py`. §4 left the scheme without a well-defined orientation: no angular shell
+survived a per-atom NNLS fit intact, and spinning each atom's point set about its own
+nucleus moved the energy by tens of uHa. The proposed fix was to make the fit select
+**(radial shell, octahedral orbit) blocks** rather than individual points. That is now
+implemented - `grid.octahedral_orbits` labels the blocks, `decomp.nnls.GroupOperator`
+ties their weights together, and `NNLSGrid(group_orbits=True)` uses them - and measured.
+
+It works exactly as designed, and it does not do what it was wanted for.
+
+Per-atom (`blocked`) fits against the DF-MP2 reference. "octa" is the energy shift when
+each atom's grid is spun by a random element of the octahedral group; "ptp" is the
+peak-to-peak spread over random `SO(3)` rotations (6 on methanol, 5 on ethanol).
+Methanol, parent-grid floor `+2.75` uHa:
+
+| mode | points | err/uHa | octa/uHa | ptp/uHa | whole orbits |
+| --- | --- | --- | --- | --- | --- |
+| point-wise | 175 | +627.76 | -81.93 | 218.22 | 0 / 82 |
+| point-wise | 235 | +42.98 | -3.31 | 74.60 | 0 / 99 |
+| point-wise | 271 | +18.56 | -8.93 | 15.49 | 0 / 109 |
+| point-wise | 301 | +5.29 | -1.08 | 7.07 | 0 / 111 |
+| point-wise | 356 | +3.33 | +0.48 | 3.00 | 0 / 118 |
+| point-wise | 410 | +2.78 | +1.35 | 0.98 | 0 / 124 |
+| point-wise | 491 | +2.76 | +0.10 | **0.17** | 0 / 134 |
+| point-wise | 670 | +2.75 | -0.14 | **0.01** | 0 / 144 |
+| orbits | 304 | +2007.61 | **+0.00** | 503.72 | 14 / 14 |
+| orbits | 360 | +401.94 | **-0.01** | 371.53 | 17 / 17 |
+| orbits | 408 | +78.83 | **-0.00** | 87.93 | 19 / 19 |
+| orbits | 504 | +2.98 | **+0.00** | 0.53 | 23 / 23 |
+| orbits | 512 | +2.91 | **-0.00** | 0.63 | 24 / 24 |
+| orbits | 732 | +2.83 | **+0.01** | 0.05 | 34 / 34 |
+
+Ethanol, floor `+5.96` uHa:
+
+| mode | points | err/uHa | octa/uHa | ptp/uHa | whole orbits |
+| --- | --- | --- | --- | --- | --- |
+| point-wise | 375 | +136.95 | -32.59 | 96.46 | 0 / 156 |
+| point-wise | 477 | +38.64 | -33.68 | 25.73 | 0 / 158 |
+| point-wise | 602 | +11.97 | -0.28 | 5.64 | 0 / 172 |
+| point-wise | 765 | +6.19 | -0.02 | **1.14** | 0 / 203 |
+| orbits | 512 | +4942.73 | **-0.00** | 110.58 | 24 / 24 |
+| orbits | 740 | +18.91 | **+0.00** | 40.80 | 34 / 34 |
+| orbits | 772 | +13.36 | **-0.00** | 30.93 | 36 / 36 |
+| orbits | 970 | +7.47 | **-0.00** | 1.15 | 47 / 47 |
+
+### The octahedral invariance is exact
+
+Every orbit-grouped fit is invariant to round-off under the 24 proper rotations of the
+octahedral group, at every threshold on both molecules, while the point-wise fits shift
+by up to 82 uHa under the same operation. That is not a numerical accident: the retained
+set is a union of whole `O_h` orbits carrying one weight each, so a group element merely
+permutes the points among themselves, and the LS-THC fit does not care how its points
+are ordered. The `whole orbits` column reports it directly - **every orbit the grouped
+fit touches, it keeps entire** (23/23, 47/47), against 0 of 82 to 0 of 203 point-wise.
+
+The residual is 0.00-0.01 uHa rather than identically zero. The obvious suspect was §6's
+mechanism in miniature - the permutation reorders the summations, an eigenvalue moves
+across `pinv`'s cutoff - but that is not it: on methanol's 732-point grouped grid the
+shift is `-0.0071` uHa under the truncation and `-0.0170` uHa under `metric_ridge = 1e-8`,
+so regularising does not remove it. What is left is ordinary floating-point
+non-associativity amplified by the metric's conditioning: a relative perturbation of
+1e-16 through a metric whose smallest eigenvalue is ~1e-20 (§2) lands exactly at the
+1e-8 Ha observed. The invariance is exact in the algebra and limited by the conditioning
+in practice, which is a statement about §2, not about §6.
+
+### It never reduces the general-rotation spread
+
+`O_h` is a finite subgroup of `SO(3)`, and closing the discrete symmetry does nothing
+for the continuous one. **At matched point count the point-wise grid is better on both
+axes, everywhere it was measured:**
+
+| points | point-wise err / ptp | orbit-grouped err / ptp |
+| --- | --- | --- |
+| methanol ~300 | +5.29 / 7.07 | +2007.61 / 503.72 |
+| methanol ~500 | +2.76 / **0.17** | +2.98 / 0.53 |
+| methanol ~700 | +2.75 / **0.01** | +2.83 / 0.05 |
+| ethanol ~770 | +6.19 / **1.14** | +13.36 / 30.93 |
+
+And at matched *accuracy* grouping buys nothing either: ethanol reaches a 1.14 uHa
+spread on 765 points point-wise and a 1.15 uHa spread on 970 grouped points - the same
+number for 1.27x the points.
+
+The reason is visible in the point-wise column on its own. Methanol's spread falls
+218 -> 74.6 -> 15.5 -> 7.07 -> 3.00 -> 0.98 -> 0.17 -> 0.01 uHa as the grid grows,
+monotonically, with no structural change whatever. **Orientation dependence is a symptom
+of a rank-limited grid, not an independent defect**: it converges away at the same rate
+the energy error does, and a point-wise fit spends points on it more efficiently than a
+grouped one, because an orbit of 24 or 48 points is a coarse thing to spend.
+
+So §4's framing is the thing these measurements revise. Anisotropy is a real
+rotational-invariance failure, and §4 measured it correctly - but on grids chosen in the
+compact regime, and it is not what stands between the programme and a usable frozen
+grid.
+
+### The threshold is a coarser knob, and not monotone
+
+Because the group gradient sums over up to 48 points, the grouped fit's KKT threshold is
+far tighter at the same numeric value: methanol needs `1e-1` to `3e0` where the
+point-wise fit needs `1e-5` to `1e-2`. The two ladders are comparable at matched
+accuracy or matched size, never at matched threshold.
+
+The grouped ladder is also coarse and not monotone in point count. Methanol goes from
+408 points at +78.83 uHa straight to 504 at +2.98 with nothing in between; `4e-1` and
+`3e-1` give the identical grid, while `2e-1` gives a *larger* one at 512 points. Orbits
+differ in size, so admitting one is not a fixed increment, and the active set can settle
+on a different subset when the threshold moves. There is no smooth size knob here.
+
+### What this means for the programme
+
+**Orbit grouping is not the fix for orientation dependence; converging the grid is.** The
+justification for it - that it is what makes "attach the atomic grid rigidly" a
+well-defined operation - does not survive contact with the numbers, and it should not
+become the default.
+
+What it is still good for is narrow but real. A *molecule-dependent local frame* (aligned
+to bonds, say) can switch orientation discontinuously as the geometry changes; where the
+switch is by an octahedral element, a grouped grid gives the identical energy and a
+point-wise one kinks by up to 82 uHa. If a frame-based attachment scheme is ever built,
+this removes that class of discontinuity for 1.2-1.6x the points. A fixed lab
+orientation, which never switches frames, gets nothing from it.
+
+It should therefore be decided alongside (3), the ghost gap, rather than before it. A
+ghost-augmented per-element fit sees an artificial environment and may be anisotropic in
+ways a real-neighbour `blocked` fit is not; that is the case where exact `O_h` invariance
+could still earn its points, and it is untested.
+
+---
+
 ## Verdict
 
 The kill shot missed. The structural penalty for giving up molecular pruning is 1.2-1.7x,
 not 3x, and it shrinks as molecules grow. More importantly, §3 removes most of the
 difficulty from the gradient side of the proposal: freeze the point set, drop the weights,
-and the nuclear derivative is elementary.
+and the nuclear derivative is elementary. §6 and §7 have since disposed of the two
+remaining structural objections, in opposite ways: the metric truncation's steps were
+real and are now fixable with ridge, while the missing orientation turned out not to
+need a structural fix at all - it converges away with grid size.
 
 What remains to be measured, in order:
 
 1. **The ghost gap.** §1 bounds a scheme that sees real neighbours. Build ghost-augmented
    per-element grids for H/C/N/O and measure how much worse than `blocked` they are. This
    is the only remaining question that can still kill the idea.
-2. **The isotropy tax.** Implement group-NNLS over (radial shell, angular orbit) blocks and
-   re-measure §1 and §4. Expect a larger grid and a smaller rotation spread.
+2. ~~**The isotropy tax.**~~ **Done - see §7, and the answer is no.** Whole-orbit fitting
+   makes each atomic grid exactly invariant under the octahedral group, for 1.2-1.6x the
+   points. It never reduces the spread under *general* rotations: at matched point count
+   a point-wise grid is better on both accuracy and spread. §4's anisotropy converges
+   away with grid size in either mode. Keep it opt-in; revisit only for (1), where a
+   ghost-fitted grid may be anisotropic in a way a real-neighbour fit is not.
 3. ~~**Ridge vs truncation.**~~ **Done - see §6.** The truncation does put ~0.5 uHa steps
    in the PES, exactly at the eigenvalue crossings; ridge at `lambda = 1e-8` removes them
    for 0.1-2.2 uHa. Ridge has a floor of its own, and smoothness finds it before accuracy
@@ -291,6 +432,14 @@ What remains to be measured, in order:
 cc-pVDZ only; four small molecules; MMFF geometries; `ov` mode and MP2 only. The rank and
 weight analyses are on methanol and ethanol. Ghost-augmented per-element grids, the object
 the proposal actually calls for, have not been built.
+
+§7 covers two molecules over eight and four grid sizes, with 6 and 5 random rotations
+each; a peak-to-peak over so few draws is a coarse statistic, and the matched-size rows
+are matched only to within ~3% in point count. The octahedral-invariance result needs
+none of that - it is exact by construction and merely confirmed here. The negative
+result does rest on it, though the margins (3-27x in spread, at matched size, in the
+same direction on both molecules) are wide relative to the noise. Nothing there tests a
+ghost-fitted grid, which is the case where the conclusion might differ.
 
 §6 measures smoothness by finite differences along one bond of one molecule per system;
 no analytic gradient was computed, and nothing here checks that an implemented gradient
