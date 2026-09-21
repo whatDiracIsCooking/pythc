@@ -369,7 +369,13 @@ def report(paths, ridge):
     """
     for path in paths:
         d = json.load(open(path))
-        label = "pinv" if ridge is None else f"{d['rows'][0].get('scheme', 'ridge')} {ridge:.0e}"
+        # From a row at the requested ridge, not from rows[0]: with --pinv the first row
+        # of every ladder is the control, which labelled a damped report "pinv 1e-08".
+        # Section 4(6) is emphatic that a torque means nothing without the filter that
+        # produced it, so the header has to name the right one.
+        at_ridge = [r for r in d["rows"] if r["ridge"] == ridge]
+        label = ("pinv" if ridge is None else
+                 f"{at_ridge[0].get('scheme', 'ridge') if at_ridge else 'ridge'} {ridge:.0e}")
         print(f"\n=== {d['molecule']} ({d['n_ao']} AOs), {label}, "
               f"{d['draws']} draws")
 
@@ -418,7 +424,8 @@ if __name__ == "__main__":
     p.add_argument("--draws", type=int, default=4,
                    help="random per-atom orientations; 0 for the as-fitted row only")
     p.add_argument("--seed", type=int, default=7)
-    p.add_argument("--scheme", default="ridge", choices=["ridge", "damped"],
+    p.add_argument("--scheme", default="ridge",
+                   choices=["ridge", "damped", "ridge_jacobi", "damped_jacobi"],
                    help="metric filter; section 4(6) says a torque must be quoted "
                         "with the regularisation that produced it")
     p.add_argument("--pinv", action="store_true",

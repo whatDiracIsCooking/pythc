@@ -95,11 +95,14 @@ uv run python levers.py methanol --variants ghost,parent1,cage,tetra \
 uv run python levers.py methanol --basis cc-pvtz --variants ghost,cage \
     --out data/levers_methanol_tz.json               # the basis lever, with its own floor
 uv run python levers.py --report data/levers_*.json
+uv run python torque_ladder.py methanol --modes blocked,blocked1,ghost --ridges 1e-8 \
+    --pinv --draws 4 --scheme damped_jacobi   # the preconditioner, in dE/dtheta
+uv run python trajectory.py methanol --modes ghost --scheme damped_jacobi   # unrun
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Twenty-one headlines:
+See [`FINDINGS.md`](FINDINGS.md). Twenty-two headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -259,6 +262,26 @@ See [`FINDINGS.md`](FINDINGS.md). Twenty-one headlines:
   premise HANDOFF 4(9) is written on - and a tetrahedral direction set is the cheapest
   thing measured at 50 uHa and cannot reach 10 uHa at any threshold, which is §9's rank
   ceiling on a new axis. **No torque has been measured for any of them.**
+* **The weight footing cancels out of a preconditioned metric - exactly - and with it
+  the last structural objection to a transferable support.** §17's runtime scaling
+  `E = diag(1/sqrt(diag S))` recovers in the energy what discarding the NNLS weights
+  costs, and had no adjoint, so it could not be asked what it does to a gradient. It has
+  one now, verified against a finite difference, against the identity that an exact
+  inverse cannot see a similarity transform, and end to end on an assembled gradient and
+  torque. On methanol at matched supports and matched draws, `ghost` - the transferable
+  object, at `w = 1` - goes **15.15 -> 0.21 uHa/rad** at 702 points and **21.37 -> 0.09**
+  at 627, below the 0.24 the complete 3284-point parent grid sits at, while its energy
+  lands on the same +2.75 uHa floor the in-molecule fit reaches. The reason is algebra
+  rather than luck: `diag(S(w))_PP = w_P diag(S(1))_PP`, so `E(w) S(w) E(w) = E(1) S(1)
+  E(1)` for any positive weights, and `blocked` and `blocked1` - one support at two
+  footings - agree to **ten digits** under it. §13 put the whole remaining transferable
+  gap on the weight footing and §16 showed it could not be repaired by transplanting a
+  weight set; both are about a quantity the preconditioner removes. §14's ERI-fitted
+  weights - the only transferable set that ever helped - collapse onto their own
+  unweighted row under it too, and are beaten at matched support (565 points: 0.35
+  uHa/rad weighted, **0.06** preconditioned and unweighted), so that section splits: its
+  support survives, its weights are redundant. One molecule, one basis, one seed, and no
+  trajectory has been run on it.
 * **The gradient exists and verifies to machine precision** (`pythc.grad`, driven by
   `gradient.py`): quadratic convergence against a finite difference, and forces that sum
   to zero to 2.4e-15 with no finite difference involved. Two things came back with it

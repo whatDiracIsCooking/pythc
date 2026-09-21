@@ -51,8 +51,14 @@ class LS_RI_THC(THC):
         :param metric_scheme: Which regularised inverse the two strengths above select:
             ``"ridge"`` for ``(S + lambda I)^-1``, ``"damped"`` for the Tikhonov-filtered
             ``S (S^2 + mu^2 I)^-1``, which suppresses the numerically null directions
-            instead of handing them the largest gain in the operator. See
-            :func:`pythc.lib.damped_inv`.
+            instead of handing them the largest gain in the operator. Either name takes a
+            ``"_jacobi"`` suffix, which preconditions the metric symmetrically by
+            ``E = diag(1 / sqrt(diag S))`` around the filter. Since the collocation
+            weights enter the metric only as ``S(w) = D S(1) D``, that scaling absorbs
+            them exactly - the preconditioned inverse is invariant to the weights - and
+            it is what makes a ridge or damped filter behave like the pseudoinverse in
+            that respect.
+            See :func:`pythc.lib.damped_inv` and :func:`pythc.lib.jacobi_scaling`.
         """
         self.N = mol.nao_nr()
         self.mol = mol

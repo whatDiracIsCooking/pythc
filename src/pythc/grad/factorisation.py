@@ -86,8 +86,10 @@ class ThcFactorisation:
     :param aux_ridge: The same for the auxiliary Coulomb metric.
     :param ridge_scale: How the strengths become absolute shifts.
     :param metric_scheme: ``"ridge"`` for ``(S + lambda I)^-1``, ``"damped"`` for the
-        Tikhonov-filtered ``S (S^2 + mu^2 I)^-1``. Ignored when the ridge is ``None``.
-        See :func:`pythc.lib.damped_inv`.
+        Tikhonov-filtered ``S (S^2 + mu^2 I)^-1``, either with a ``"_jacobi"`` suffix to
+        precondition the metric by ``E = diag(1 / sqrt(diag S))`` around the filter.
+        Ignored when the ridge is ``None``. See :func:`pythc.lib.damped_inv` and
+        :func:`pythc.lib.jacobi_scaling`.
     """
 
     def __init__(self, mol: gto.Mole, coords: np.ndarray, weights: np.ndarray,

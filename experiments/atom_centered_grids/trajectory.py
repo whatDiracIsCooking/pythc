@@ -572,7 +572,8 @@ if __name__ == "__main__":
     p.add_argument("--propagate", default="hf", choices=["hf", "full"],
                    help="which surface drives the motion; see the module docstring")
     p.add_argument("--ridge", type=float, default=1e-8)
-    p.add_argument("--scheme", default="damped", choices=["ridge", "damped"])
+    p.add_argument("--scheme", default="damped",
+                   choices=["ridge", "damped", "ridge_jacobi", "damped_jacobi"])
     p.add_argument("--reference", default="rhf", choices=["rhf", "rks"],
                    help="rhf is grid-free and conserves L to the integrator floor; rks "
                         "puts an ordinary lab-fixed Becke grid back in, which is the "

@@ -202,6 +202,49 @@ def ridge_inv_eigh(M: np.ndarray, lam: float = 1e-8, scale: str = "trace") -> np
     return (eig_vecs / (eig_vals + shift)) @ eig_vecs.T
 
 
+JACOBI_SUFFIX = "_jacobi"
+
+
+def strip_jacobi(scheme: str) -> str:
+    """
+    The filter a metric scheme names, with any Jacobi preconditioning taken off.
+
+    The preconditioner wraps a filter rather than replacing one, so every consumer of a
+    scheme string needs the same two answers - is it preconditioned, and what filter is
+    underneath - and they must not disagree. They did: the forward inversion grew a
+    ``"_jacobi"`` branch that the adjoint and the auxiliary Coulomb metric did not know
+    about, and both silently applied a ridge instead.
+    """
+    return scheme[: -len(JACOBI_SUFFIX)] if scheme.endswith(JACOBI_SUFFIX) else scheme
+
+
+def jacobi_scaling(M: np.ndarray) -> np.ndarray:
+    """
+    The symmetric Jacobi preconditioner of a Hermitian matrix, as a vector.
+
+    ``e_P = 1 / sqrt(M_PP)`` turns ``M`` into ``E M E`` with unit diagonal, which is the
+    scaling the LS-THC metric itself suggests: the collocation weights enter it only as
+    ``S(w) = D S(1) D`` with ``D = diag(sqrt(w))``, so a weighting and a diagonal
+    preconditioner are the same kind of object. The pseudoinverse absorbs either exactly;
+    a ridge or damped filter, whose shift is absolute, absorbs neither - which is why
+    applying this one at runtime can stand in for weights the offline object cannot carry.
+
+    ``M_PP`` is exactly zero for a grid point carrying no amplitude, which a weight fit
+    produces whenever it drops a point. Those rows are left unscaled rather than divided
+    by zero; the filter sends them to zero anyway.
+
+    Both the forward inversion and its adjoint go through this function, so the scaling
+    they differentiate is the scaling that was applied.
+
+    :param M: Hermitian matrix with a non-negative diagonal.
+    :return: The scaling vector ``e``, one entry per row, strictly positive.
+    """
+    diag = np.diag(M)
+    positive = diag > 0.0
+
+    return np.where(positive, 1.0 / np.sqrt(np.where(positive, diag, 1.0)), 1.0)
+
+
 def damped_inv(M: np.ndarray, lam: float = 1e-4, scale: str = "trace") -> np.ndarray:
     """
     Damped (Tikhonov-filtered) pseudoinverse ``M (M^2 + mu^2 I)^-1`` of a Hermitian

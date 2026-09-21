@@ -297,6 +297,160 @@ def test_pinv_adjoint_at_fixed_rank(spd):
     assert abs(ana - num) < 1e-5 * abs(num)
 
 
+@pytest.fixture(scope="module")
+def spd_scaled():
+    """
+    An SPD matrix whose *diagonal* spans four decades, so the Jacobi scaling is real.
+
+    The ``spd`` fixture above is built from a random orthogonal basis, which leaves its
+    diagonal nearly flat and ``E`` nearly a multiple of the identity - under which a
+    preconditioned adjoint would agree with an unpreconditioned one for the wrong reason.
+    The row scaling here is exactly the object the LS-THC metric carries: collocation
+    weights enter it only as ``S(w) = D S(1) D``.
+    """
+    rng = np.random.default_rng(3)
+    n = 24
+    Q = np.linalg.qr(rng.standard_normal((n, n)))[0]
+    M = 0.5 * (((Q * np.logspace(0, -5, n)) @ Q.T) + ((Q * np.logspace(0, -5, n)) @ Q.T).T)
+    s = np.logspace(-1.0, 1.0, n)
+    M = s[:, None] * M * s[None, :]
+
+    return 0.5 * (M + M.T)
+
+
+@pytest.mark.parametrize("scheme", ["ridge_jacobi", "ridge_eigh_jacobi", "damped_jacobi"])
+@pytest.mark.parametrize("scale", ["trace", "absolute", "max_eig"])
+def test_jacobi_adjoint(spd_scaled, scheme, scale):
+    """
+    Adjoint of the Jacobi-preconditioned inversion, against a central difference.
+
+    ``E = diag(1 / sqrt(diag M))`` is a function of ``M``, so this differentiates three
+    paths at once - the inner filter, and ``E`` in each of the two places it appears.
+    """
+    M = spd_scaled
+    rng = np.random.default_rng(11)
+    out_bar = rng.standard_normal(M.shape); out_bar = 0.5 * (out_bar + out_bar.T)
+    d = rng.standard_normal(M.shape); d = 0.5 * (d + d.T)
+    lam = 1e-3 if scale != "absolute" else 1e-4
+
+    inv = invert_metric(M.copy(), lam, scale, scheme)
+    ana = float(np.sum(glin.invert_metric_adjoint(M.copy(), inv, out_bar, lam, scale,
+                                                  scheme) * d))
+    num = _directional(lambda m: np.sum(invert_metric(m.copy(), lam, scale, scheme)
+                                        * out_bar), M, d, 1e-10)
+
+    assert abs(ana - num) < 1e-5 * abs(num)
+
+
+@pytest.mark.parametrize("scheme", ["ridge_jacobi", "damped_jacobi"])
+def test_jacobi_scaling_terms_are_not_optional(spd_scaled, scheme):
+    """
+    Neither of the two ways of not differentiating ``E`` gives the right answer.
+
+    The forward pass shipped without an adjoint and the dispatch fell through to the
+    ridge's, which differentiates ``filter(S)`` where the forward applied
+    ``E filter(E S E) E``. Energies were right and gradients silently wrong - net torques
+    of ~4e5 uHa/rad against ~1e-1 for the same grids under ``"damped"``. Two candidates
+    are checked here against the same finite difference: that historic fall-through, and
+    the near miss of taking the inner filter's term at ``Mj`` but holding ``E`` fixed.
+    Both are wrong by decades more than the full adjoint's own error, and the
+    ``"damped"`` fall-through is wrong by 100%.
+    """
+    M = spd_scaled
+    rng = np.random.default_rng(12)
+    out_bar = rng.standard_normal(M.shape); out_bar = 0.5 * (out_bar + out_bar.T)
+    d = rng.standard_normal(M.shape); d = 0.5 * (d + d.T)
+    lam, inner = 1e-3, lib.strip_jacobi(scheme)
+
+    inv = invert_metric(M.copy(), lam, "trace", scheme)
+    full = float(np.sum(glin.invert_metric_adjoint(M.copy(), inv, out_bar, lam, "trace",
+                                                   scheme) * d))
+
+    # The inner filter's term alone, i.e. E held fixed - everything jacobi_inv_adjoint
+    # adds on top of that is what this test is about.
+    e = lib.jacobi_scaling(M)
+    Mj_bar = glin.invert_metric_adjoint(e[:, None] * M * e[None, :],
+                                        inv / np.outer(e, e),
+                                        e[:, None] * out_bar * e[None, :],
+                                        lam, "trace", inner)
+    held = float(np.sum((e[:, None] * Mj_bar * e[None, :]) * d))
+
+    # And the fall-through itself: the unpreconditioned filter, differentiated at M.
+    fell_through = float(np.sum(glin.invert_metric_adjoint(M.copy(), inv, out_bar, lam,
+                                                           "trace", inner) * d))
+
+    num = _directional(lambda m: np.sum(invert_metric(m.copy(), lam, "trace", scheme)
+                                        * out_bar), M, d, 1e-10)
+
+    assert abs(full - num) < 1e-6 * abs(num)
+    assert abs(held - num) > 1e-4 * abs(num)
+    assert abs(fell_through - num) > 1e-4 * abs(num)
+
+
+def test_jacobi_cancels_where_the_filter_is_an_exact_inverse(spd_scaled):
+    """
+    The preconditioner is a similarity transform, so an exact inverse cannot see it.
+
+    ``E (E M E)^-1 E = M^-1`` for any invertible diagonal ``E``, which makes the whole
+    construction a no-op at ``lambda = 0`` - and its derivative the plain
+    ``-M^-1 B_bar M^-1``. That is an identity rather than a finite difference, so it
+    checks the three paths against each other to machine precision: an error in the
+    inner term, in either ``E`` term, or in a sign, breaks the cancellation.
+    """
+    M = spd_scaled
+    rng = np.random.default_rng(13)
+    out_bar = rng.standard_normal(M.shape); out_bar = 0.5 * (out_bar + out_bar.T)
+
+    inv = invert_metric(M.copy(), 0.0, "absolute", "ridge_jacobi")
+    exact_inv = np.linalg.inv(M)
+    assert np.max(np.abs(inv - exact_inv)) < 1e-8 * np.max(np.abs(exact_inv))
+
+    ana = glin.invert_metric_adjoint(M.copy(), inv, out_bar, 0.0, "absolute",
+                                     "ridge_jacobi")
+    exact = -exact_inv @ out_bar @ exact_inv
+
+    assert np.max(np.abs(ana - exact)) < 1e-8 * np.max(np.abs(exact))
+
+
+def test_jacobi_leaves_a_point_with_no_amplitude_alone():
+    """
+    ``S_PP`` is exactly zero wherever a weight fit dropped a point, and ``1/sqrt(0)``
+    would turn the whole metric - and its adjoint - into NaN.
+
+    Those rows are left unscaled, which also makes ``e_P`` a constant there rather than a
+    function of the diagonal, so they contribute nothing to the diagonal term.
+    """
+    rng = np.random.default_rng(14)
+    n, dead = 12, 3
+    A = rng.standard_normal((n, n))
+    A[-dead:] = 0.0
+    M = A @ A.T
+
+    assert np.allclose(np.diag(M)[-dead:], 0.0)
+
+    out_bar = rng.standard_normal((n, n)); out_bar = 0.5 * (out_bar + out_bar.T)
+    inv = invert_metric(M.copy(), 1e-3, "trace", "damped_jacobi")
+    bar = glin.invert_metric_adjoint(M.copy(), inv, out_bar, 1e-3, "trace",
+                                     "damped_jacobi")
+
+    assert np.all(np.isfinite(inv))
+    assert np.all(np.isfinite(bar))
+
+    # And it is still the derivative. The perturbation leaves the dead rows dead, which
+    # is what a frozen support does - a dropped point stays dropped as the nuclei move -
+    # so the forward map is smooth along it.
+    d = rng.standard_normal((n, n)); d = 0.5 * (d + d.T)
+    d[-dead:, :] = 0.0
+    d[:, -dead:] = 0.0
+
+    ana = float(np.sum(bar * d))
+    num = _directional(lambda m: np.sum(invert_metric(m.copy(), 1e-3, "trace",
+                                                      "damped_jacobi") * out_bar),
+                       M, d, 1e-10)
+
+    assert abs(ana - num) < 1e-5 * abs(num)
+
+
 def test_pinv_has_no_derivative_across_a_crossing(spd):
     """
     The truncation's discontinuity, in miniature.
@@ -478,6 +632,81 @@ def test_nuclear_gradient_against_finite_difference(system):
             dm[ia, k] -= h
             num = (energy_at(dp) - energy_at(dm)) / (2.0 * h)
             assert abs(res.de[ia, k] - num) < 1e-7, f"atom {ia} component {k}"
+
+
+@pytest.mark.parametrize("scheme", ["ridge_jacobi", "damped_jacobi"])
+def test_nuclear_gradient_under_jacobi_preconditioning(system, scheme):
+    """
+    The same check with the metric Jacobi-preconditioned, where the scaling has to move.
+
+    On a random matrix the preconditioner is a fixed diagonal; on a molecule it is not.
+    ``diag(S)_PP = (sum_mu X_muP^2)^2`` is a function of the nuclear coordinates, so a
+    gradient that treats ``E`` as a constant is wrong on the only input that matters -
+    which is exactly how the scheme shipped, and why FINDINGS section 17 has no torque.
+    """
+    mol, mf, per_atom = system
+    kwargs = dict(n_laplace=10, metric_ridge=TEST_RIDGE, aux_ridge=TEST_RIDGE,
+                  metric_scheme=scheme)
+    res = thc_mp2_gradient(mol, mf, FrozenGrid(mol, per_atom), AUXBASIS, **kwargs)
+
+    class Ref:
+        mo_coeff = np.array(mf.mo_coeff)
+        mo_energy = np.array(mf.mo_energy)
+
+    R0 = mol.atom_coords()
+    h = 1e-4
+
+    def energy_at(coords):
+        m = mol.copy(); m.set_geom_(coords, unit="Bohr"); m.build(False, False)
+        return thc_mp2_gradient(m, Ref, FrozenGrid(m, per_atom), AUXBASIS,
+                                mo_coeff=Ref.mo_coeff, mo_energy=Ref.mo_energy,
+                                **kwargs).energy
+
+    for ia in range(mol.natm):
+        for k in range(3):
+            dp, dm = R0.copy(), R0.copy()
+            dp[ia, k] += h
+            dm[ia, k] -= h
+            num = (energy_at(dp) - energy_at(dm)) / (2.0 * h)
+            assert abs(res.de[ia, k] - num) < 1e-7, f"atom {ia} component {k}"
+
+
+def test_jacobi_torque_against_rotating_the_point_set(system):
+    """
+    The measurement section 17 was left unable to make.
+
+    A preconditioned metric is the one thing that can replace the weights a transferable
+    support cannot carry, and orientation is the quantity that decides whether the
+    support is usable - so ``dE/dtheta`` under ``"_jacobi"`` is the number the section
+    needs. It is meaningless unless it is a derivative, which is what this asserts.
+    """
+    from scipy.spatial.transform import Rotation
+
+    mol, mf, per_atom = system
+    kwargs = dict(n_laplace=10, metric_ridge=TEST_RIDGE, aux_ridge=TEST_RIDGE,
+                  metric_scheme="damped_jacobi")
+    res = thc_mp2_gradient(mol, mf, FrozenGrid(mol, per_atom), AUXBASIS, **kwargs)
+
+    class Ref:
+        mo_coeff = np.array(mf.mo_coeff)
+        mo_energy = np.array(mf.mo_energy)
+
+    delta = 1e-4
+    for ia in range(mol.natm):
+        tau = res.torque[ia]
+        norm = float(np.linalg.norm(tau))
+        axis = tau / norm
+
+        vals = []
+        for sign in (+1, -1):
+            rots = [np.eye(3)] * mol.natm
+            rots[ia] = Rotation.from_rotvec(sign * delta * axis).as_matrix()
+            vals.append(thc_mp2_gradient(mol, Ref, FrozenGrid(mol, per_atom, rots),
+                                         AUXBASIS, mo_coeff=Ref.mo_coeff,
+                                         mo_energy=Ref.mo_energy, **kwargs).energy)
+
+        num = (vals[0] - vals[1]) / (2.0 * delta)
+        assert abs(norm - num) < 1e-4 * abs(num), f"atom {ia}"
 
 
 def test_gradient_is_translationally_invariant(system):

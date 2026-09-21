@@ -312,6 +312,64 @@ def damped_inv_sqrt_adjoint(M: np.ndarray, inv_sqrt_bar: np.ndarray, lam: float,
     return M_bar + _mu_adjoint(M, coeff, lam, scale, eigvals, eigvecs)
 
 
+def jacobi_inv_adjoint(M: np.ndarray, inv: np.ndarray, inv_bar: np.ndarray,
+                       lam: float, scale: str, inner_scheme: str) -> np.ndarray:
+    """
+    Adjoint of the Jacobi-preconditioned inversion
+    ``B(M) = E f(E M E) E``, ``E = diag(1 / sqrt(diag M))``.
+
+    The scaling is a function of ``M`` - that is what makes it a preconditioner rather
+    than a weighting chosen offline - so it contributes terms of its own, and they are
+    not small. Falling through to the unpreconditioned adjoint leaves energies right and
+    gradients silently wrong: net torques of ~4e5 uHa/rad against ~1e-1 for the same
+    grids under ``"damped"``, which is what FINDINGS section 17 was left holding.
+
+    Writing ``Mj = E M E``, ``G = f(Mj)`` and ``B = E G E``, three paths carry the
+    adjoint back:
+
+    * through ``G`` at fixed ``E``: ``G_bar = E B_bar E``, handed to the inner filter's
+      own adjoint (which also absorbs the dependence of its shift or damping on ``Mj``),
+      and returned to ``M`` as ``E Mj_bar E``;
+    * through ``E`` where it scales ``M`` into ``Mj``: ``2 (Mj_bar o M) e``;
+    * through ``E`` where it scales ``G`` into ``B``: ``2 (B_bar o G) e``.
+
+    The last step is ``de_P / dM_PP = -e_P^3 / 2``, a diagonal contribution, and it is
+    zero on the rows :func:`pythc.lib.jacobi_scaling` leaves unscaled - there ``e`` is
+    the constant 1 rather than a function of the diagonal.
+
+    A sanity check the tests pin: if ``f`` is the exact inverse, ``B = M^-1`` whatever
+    ``E`` is, and the three paths cancel to the plain ``-M^-1 B_bar M^-1``.
+
+    :param M: The matrix that was inverted.
+    :param inv: The forward result ``B``. The inner filter's output is recovered from it
+        exactly, as ``G = E^-1 B E^-1``, rather than recomputed.
+    :param inv_bar: Adjoint of the forward result.
+    :param lam: The dimensionless strength used in the forward call.
+    :param scale: The scaling used in the forward call.
+    :param inner_scheme: The filter the Jacobi scaling wraps, without the suffix.
+    """
+    from pythc.lib import jacobi_scaling
+
+    M = 0.5 * (M + M.T)
+    inv_bar = 0.5 * (inv_bar + inv_bar.T)
+
+    e = jacobi_scaling(M)
+    Mj = e[:, None] * M * e[None, :]
+    G = inv / np.outer(e, e)
+
+    G_bar = e[:, None] * inv_bar * e[None, :]
+    Mj_bar = invert_metric_adjoint(Mj, G, G_bar, lam, scale, inner_scheme)
+    Mj_bar = 0.5 * (Mj_bar + Mj_bar.T)
+
+    e_bar = 2.0 * ((Mj_bar * M) @ e + (inv_bar * G) @ e)
+
+    M_bar = e[:, None] * Mj_bar * e[None, :]
+    de_dM = np.where(np.diag(M) > 0.0, -0.5 * e ** 3, 0.0)
+    M_bar[np.diag_indices_from(M_bar)] += e_bar * de_dM
+
+    return M_bar
+
+
 def invert_metric_adjoint(S: np.ndarray, S_inv: np.ndarray, S_inv_bar: np.ndarray,
                           ridge: Optional[float] = None,
                           ridge_scale: str = "trace",
@@ -320,20 +378,17 @@ def invert_metric_adjoint(S: np.ndarray, S_inv: np.ndarray, S_inv_bar: np.ndarra
     Adjoint of :func:`pythc.thc.ls_thc_funcs.invert_metric`, dispatching on ``ridge``
     exactly as the forward call does.
     """
+    from pythc import lib
+
     if ridge is None:
         return pinv_adjoint(S, S_inv_bar)
 
-    if scheme.endswith("_jacobi"):
-        # The forward Jacobi scheme scales by E = diag(1/sqrt(diag S)), which is itself a
-        # function of S, so the adjoint carries a term through E that none of the branches
-        # below computes. Falling through to the ridge adjoint gives energies that are
-        # right and gradients that are silently wrong - measured, net torques of ~4e5
-        # uHa/rad against ~1e-1 for the same grids under "damped". Raise until the term
-        # is derived.
-        raise NotImplementedError(
-            f"no adjoint for metric scheme {scheme!r}: the Jacobi scaling depends on "
-            "diag(S), so d(E filter(E S E) E)/dS has a term through E that is not "
-            "implemented. The forward scheme is usable for energies only.")
+    if scheme.endswith(lib.JACOBI_SUFFIX):
+        # The scaling E = diag(1/sqrt(diag S)) is itself a function of S, so the adjoint
+        # carries terms through E on top of the inner filter's; jacobi_inv_adjoint has
+        # them, and the unpreconditioned branches below do not.
+        return jacobi_inv_adjoint(S, S_inv, S_inv_bar, ridge, ridge_scale,
+                                  lib.strip_jacobi(scheme))
 
     if scheme == "damped":
         return damped_inv_adjoint(S, S_inv_bar, ridge, ridge_scale)
@@ -356,6 +411,11 @@ def aux_coulomb_inv_adjoint(j2c: np.ndarray, j2c_inv_bar: np.ndarray,
     if ridge is None:
         return pseudo_inv_sqrt_adjoint(j2c, j2c_inv_bar)
 
+    # As in the forward call: this metric has no Jacobi branch, and an unstripped suffix
+    # would land in the ridge below and differentiate a filter that was not applied.
+    from pythc.lib import strip_jacobi
+
+    scheme = strip_jacobi(scheme)
     if scheme == "damped":
         return damped_inv_sqrt_adjoint(j2c, j2c_inv_bar, ridge, ridge_scale)
 

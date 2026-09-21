@@ -274,3 +274,11 @@ energy — prefer `metric_scheme='damped'`, and see
 [`experiments/atom_centered_grids/FINDINGS.md`](experiments/atom_centered_grids/FINDINGS.md)
 sections 11–12 for why a ridge that the energy is happy at can be three decades too small
 for its derivative.
+
+On a frozen grid, prefer `metric_scheme='damped_jacobi'`. The suffix preconditions the
+metric by `E = diag(1/sqrt(diag S))` around the filter, which costs nothing and is
+differentiated exactly. Because the collocation weights enter the metric only as
+`S(w) = D S(1) D`, that scaling absorbs them: the preconditioned inverse is invariant to
+the weights, so a grid carrying none is not penalised for it. Measured on methanol, it
+drops a transferable support's net torque from 15.2 to 0.2 µHa/rad at 702 points and puts
+its energy on the same floor an in-molecule fit reaches — sections 17–18.
