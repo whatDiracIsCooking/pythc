@@ -315,6 +315,36 @@
       "err_uha": 7.005107061086591,
       "fit_seconds": 10.233896732330322,
       "scheme": "damped_jacobi"
+    },
+    {
+      "mode": "blocked:nnls:damped_jacobi",
+      "threshold": 1e-05,
+      "n_points": 1293,
+      "rmsd_S": 0.0010060928360650294,
+      "e_corr": -0.45766158348824965,
+      "err_uha": 7.1279931586065715,
+      "fit_seconds": 17.601632833480835,
+      "scheme": "damped_jacobi"
+    },
+    {
+      "mode": "blocked:nnls:damped_jacobi",
+      "threshold": 1e-06,
+      "n_points": 1531,
+      "rmsd_S": 0.0009399345053329755,
+      "e_corr": -0.4576615712097854,
+      "err_uha": 7.1402716228519125,
+      "fit_seconds": 26.76127576828003,
+      "scheme": "damped_jacobi"
+    },
+    {
+      "mode": "blocked:nnls:damped_jacobi",
+      "threshold": 1e-07,
+      "n_points": 1746,
+      "rmsd_S": 0.0009387529635394388,
+      "e_corr": -0.45766157128433016,
+      "err_uha": 7.140197078092658,
+      "fit_seconds": 62.54830551147461,
+      "scheme": "damped_jacobi"
     }
   ]
 }
