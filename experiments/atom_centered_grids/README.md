@@ -87,7 +87,7 @@ uv run python torque_ladder.py methanol --modes eri,eriw,ghost --scheme damped \
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Fifteen headlines:
+See [`FINDINGS.md`](FINDINGS.md). Sixteen headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -169,11 +169,17 @@ See [`FINDINGS.md`](FINDINGS.md). Fifteen headlines:
   times better at it than its own parent. A level-3 grid is ~25x better still, on 163x the
   points; the in-molecule `blocked` grid is within **2.3x of level-3 DFT on 224x fewer
   points**, which localises the remaining gap to the weights.
-* **The orbital response is now a prerequisite, not a refinement.** On the fixed-orbital
-  surface the force is not the gradient of the propagated energy, and that alone breaks
-  rotational invariance at **~8300 uHa/rad** - fifty times the transferable grid's own
-  torque, and identical on a grid with five thousand times less. No AIMD runs on the
-  present gradient whatever the grid does.
+* **The orbital response is built, and AIMD runs on the THC surface.** It was the
+  programme's last unbuilt component. The obstacle was not the CPHF solve but the Laplace
+  factors: carrying orbital *energies*, they make the energy non-invariant under a
+  rotation among the occupied orbitals, so the response needs blocks of `U` that no
+  solver returns. Written `Theta_o = w^(1/4) exp(t F_oo)` the energy is the same at the
+  canonical point and manifestly invariant, leaving only the standard occupied-virtual
+  response. Section 11's rotational identity now closes to **6.1e-9** relative where the
+  fixed-orbital force sits at 9.1e-3, and NVE through `pyscf.md` conserves energy to
+  **0.247 uHa/step against 21.68** - the fixed-orbital number being exactly the "tens of
+  microhartree per step" section 13 reported. What is left is making it cost one
+  coupled-perturbed solve rather than `3 N`.
 * **The ghosts turn out not to be necessary: fit the atom's own ERIs instead.** §4(3)
   killed the free-atom fit on an *equation count* - an isolated atom's overlap target
   supplies `n_AO(n_AO+1)/2` equations, 15 for hydrogen in cc-pVDZ, and NNLS can never

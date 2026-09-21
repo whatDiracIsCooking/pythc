@@ -145,14 +145,19 @@ fits are pruned from loses angular momentum *six times faster* than the frozen s
 does. Lab-fixed atom-centred quadrature is not an acTHC defect; it is what the whole
 family does, and the pruned reweighted support is better at it than its own parent.
 
-**What that leaves is one prerequisite and one lever.** The prerequisite is the
-orbital-response layer, and 4(7) promotes it from "standard DF-MP2 machinery, left
-undone" to the thing actually blocking the application: on the fixed-orbital surface the
-force is not the gradient of the propagated energy, and that alone breaks rotational
-invariance at **~8300 uHa/rad**, fifty times the transferable grid's own torque and
-identically so on a grid with five thousand times less. No AIMD runs on the present
-gradient whatever the grid does. The lever was the **weights**, and 4(9) has now pulled
-it: weights fitted against the free atom's own ERIs transfer, converge on the torque
+**The prerequisite 4(7) left is now built, and the application runs.** It was the
+orbital-response layer: on the fixed-orbital surface the force is not the gradient of the
+propagated energy, which alone broke rotational invariance at ~8300 uHa/rad, fifty times
+the transferable grid's own torque and identically so on a grid with five thousand times
+less. What made it more than plumbing was not the CPHF solve but the Laplace factors -
+carrying orbital *energies*, they make the energy non-invariant under occupied-occupied
+rotation, so the response needs blocks of `U` no solver returns. Writing
+`Theta_o = w^(1/4) exp(t F_oo)` instead is the same function at the canonical point,
+manifestly invariant, and leaves only the standard occupied-virtual response. The
+rotational identity now closes to **6.1e-9** relative against 9.1e-3, and NVE on the THC
+surface drifts **0.247 uHa/step against 21.68**. See FINDINGS section 15; what is left
+there is making it cost one coupled-perturbed solve rather than `3 N`. The lever was the
+**weights**, and 4(9) has now pulled it: weights fitted against the free atom's own ERIs transfer, converge on the torque
 ladder like the in-molecule weighted fit, and come with a support that beats the ghost
 one. So what is left is the prerequisite, the finer parent grid of (10), and the open
 questions in section 5 - where the selector question, which 4(9) speaks to directly,
@@ -170,8 +175,10 @@ The target pipeline, for orientation:
 Nothing discrete happens at runtime. That is the whole point, and (1) has now made it true
 of the `Z` fit as well. **`ghosts.py` implements every row of that table** - the offline
 selection, the rigid attachment, `w = 1`, ridge - and measures what the pipeline costs
-end to end. What is missing is no longer a mechanism or a measurement but the nuclear
-derivative itself, which is (5).
+end to end. The nuclear derivative that was missing is (5), and with FINDINGS section 15's
+response layer on top of it the table is now something a trajectory is actually propagated
+on: `pythc.grad.total.ThcMP2Gradients.as_scanner()` hands the whole pipeline to
+`pyscf.md`, with the per-element point sets held fixed for the entire run.
 
 **(1) Ridge instead of truncation. DONE** - `lib.ridge_inv`, `lib.ridge_inv_sqrt`, and
 `metric_ridge` / `aux_ridge` on `LS_RI_THC`, reaching the inversion through
