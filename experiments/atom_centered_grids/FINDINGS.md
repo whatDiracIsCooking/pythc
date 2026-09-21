@@ -2051,7 +2051,386 @@ Against §14 this route is strictly worse and should not be preferred: it needs 
 molecules, it lands at ~3x over `ghostw` where `eriw` lands at 1481x over the ladder, and
 its product is no more transferable. The `molw` control is what earns it a section.
 
+## 17. Four levers on the ghost fit, the weight footing priced, and a preconditioner that replaces the weights in the energy
 
+**Read §14 first, because it moves this section's subject out from under it.** This work
+was done in parallel with §14 and §16 and asks what sets where a *ghost* fit's support
+stops. §14 then showed the free atom's own ERIs lift the equation ceiling that forced
+ghosts in the first place, so the ensemble these levers tune may not be the object worth
+tuning. Three things survive that:
+
+* the levers are properties of **any** NNLS support fit against a stacked target, not of
+  ghosts specifically - the parent-grid and basis rows in particular transfer directly to
+  §14's ERI target, whose ceiling is set the same way;
+* the oracle below is the **ceiling** form of §16's `molw` control, run with more freedom
+  than §16 gives it and agreeing with it;
+* the Jacobi result is about the **metric inversion** and is independent of the target,
+  the support and the weights alike.
+
+Everything in §§8-13 was measured at one point in the space of things that decide where a
+ghost fit's support stops. Four axes were never varied:
+
+* the **AO basis** - cc-pVDZ throughout (`sweep.py:23`), which sets the equation count;
+* the **parent grid** - level 0 throughout (hardcoded in `ghosts.element_grid`), which
+  sets the number of candidate points the solve chooses between;
+* the **direction set** - 12 icosahedral vertices, with 6 octahedral ones tried in §9; a
+  tetrahedron, the smallest non-degenerate set and the one that matches sp3 bonding, had
+  never been tried;
+* **cage or not** - one ghost per environment throughout, on the strength of an argument
+  in `ghost_environments` that a cage would squeeze the central atom's Becke share down
+  to a lobe around the nucleus. An argument, never a measurement.
+
+`levers.py` runs all four in two stages, and they are separate because of the lesson this
+directory keeps re-learning about cheap proxies. Stage A drives the KKT threshold to zero
+and reports where Lawson-Hanson stops - the support **ceiling**, SCF-free, seconds per
+cell. Stage B runs accuracy ladders against one SCF, one DF-MP2 reference and one floor.
+
+**A ceiling is a necessary condition, not a quality.** §9 has `octa-cycled` carrying one
+of the lowest ceilings and the *best* methanol accuracy, while failing ethanol precisely
+because its ceiling is too low. Stage A says what a setting *can* reach; only stage B
+says what it costs to get there. Both tables are below and they do not rank the levers
+the same way, which is the point.
+
+### Stage A: where each setting saturates
+
+Threshold `1e-12`, no SCF. `ghost` is the committed configuration of §§8-13.
+
+| element | setting | equations | candidates | ceiling | vs `ghost` | Becke share |
+| --- | --- | --- | --- | --- | --- | --- |
+| H | `free` | 15 | 392 | **15** | 0.11x | 1.000 |
+| H | `ghost` | 1485 | 392 | 132 | - | 0.575 |
+| H | `basis:cc-pVTZ` | 8481 | 392 | **205** | 1.55x | 0.575 |
+| H | `parent1` | 1485 | **2040** | **187** | 1.42x | 0.551 |
+| H | `dir:octahedron` | 750 | 392 | 80 | 0.61x | 0.577 |
+| H | `dir:tetrahedron` | 370 | 392 | 47 | 0.36x | 0.562 |
+| H | `cage:icosahedron` | 96756 | 392 | **172** | 1.30x | **0.003** |
+| C | `free` | 105 | 858 | 92 | 0.59x | 1.000 |
+| C | `ghost` | 3681 | 858 | 155 | - | 0.572 |
+| C | `basis:cc-pVTZ` | 17385 | 858 | **362** | 2.34x | 0.572 |
+| C | `parent1` | 3681 | **4412** | **216** | 1.39x | 0.554 |
+| C | `dir:tetrahedron` | 1081 | 858 | 99 | 0.64x | 0.563 |
+| C | `cage:icosahedron` | 108348 | 858 | **336** | 2.17x | **0.002** |
+| O | `ghost` | 3681 | 858 | 199 | - | 0.581 |
+| O | `basis:cc-pVTZ` | 17385 | 858 | **390** | 1.96x | 0.581 |
+| O | `parent1` | 3681 | **4412** | **251** | 1.26x | 0.560 |
+| O | `dir:tetrahedron` | 1081 | 858 | 103 | 0.52x | 0.570 |
+| O | `cage:icosahedron` | 108348 | 858 | **314** | 1.58x | **0.003** |
+
+Three things are already visible.
+
+**The ceiling is not the nominal equation count, and the gap is large.** `cage:icosahedron`
+supplies 108348 equations to `ghost`'s 3681 - a factor of 29 - and lifts the ceiling by
+2.2x. Nominal equations are not what binds a stacked ghost fit; *independent* ones are,
+exactly as `ensemble.saturate` says. Only the free-atom cap of §8 is exact, because one
+environment's equations are all independent of each other.
+
+**At level 0 in cc-pVDZ both constraints are active.** `parent1` moves the ceiling by
+1.26-1.42x at **unchanged** equation count - it only adds candidate columns. **This
+contradicts the premise HANDOFF section 4(9) is written on**, which reasons that since
+NNLS cannot retain more points than the target supplies equations, a finer parent offers
+"the same support size, chosen better". The support size is not the same; it moves. The
+level-0 parent has been co-limiting all along, and 4(9) should be re-written before it is
+run rather than after.
+
+**The cage's partition really does collapse, and it does not matter.** The central atom
+keeps 0.2-0.3% of its free-atom Becke weight under an icosahedral cage against 57% with
+one neighbour, so `ghost_environments` called the mechanism correctly. What does not
+follow is the conclusion: the ceiling goes **up**. `stack_targets` normalises each
+environment's target to unit norm, which is what rescues a nearly-vanished fragment, and
+what is left is a target that sees every direction at once.
+
+### Stage B: what the levers cost per microhartree
+
+Methanol, 48 AOs, floor `+2.69` uHa on the 3288-point parent grid, `w = 1`,
+`metric_ridge = 1e-8` - the footing of §§8-10, so these rows are readable against those
+tables. The `becke`, `blocked` and `ghost` rows reproduce §8 exactly, point for point and
+microhartree for microhartree, which is what makes the new columns comparable.
+
+| points / err (uHa) | curve |
+| --- | --- |
+| `blocked` | 301/+16.41, 491/+5.29, 670/+4.15 |
+| `ghost` | 223/+277.87, 414/+19.78, 512/+30.26, 627/+8.85, 702/+5.85, 816/+5.67 |
+| `parent1` | 245/+93.48, 455/+15.34, 593/+7.12, 745/+4.38, 912/+3.91, 1111/+3.44 |
+| `cage` | 314/+44.34, 529/**+4.84**, 795/+3.33, 923/+3.07, 1053/+2.96, 1112/+2.96 |
+| `tetra` | 191/+407.07, 210/+441.29, 278/+30.36, 316/+20.81, 363/+13.79, 375/+15.32 |
+
+Interpolated to matched accuracy, against the in-molecule `blocked` lower bound:
+
+| target | `blocked` | `ghost` | `parent1` | `cage` | `tetra` |
+| --- | --- | --- | --- | --- | --- |
+| 50 uHa | 301 | 326 (1.08x) | 295 (0.98x) | 314 (1.04x) | **262 (0.87x)** |
+| 20 uHa | 301 | 400 (1.33x) | 394 (1.31x) | 357 (1.19x) | 307 (1.02x) |
+| 10 uHa | 330 | 587 (1.78x) | 483 (1.46x) | **404 (1.22x)** | n/a |
+| 5 uHa | 405 | 650 (1.60x) | 575 (1.42x) | **456 (1.13x)** | n/a |
+| 2 uHa | 565 | n/a | 716 (1.27x) | **542 (0.96x)** | n/a |
+
+**The cage is the best lever measured in this basis, and it nearly closes the ghost
+gap.** 1.78x becomes **1.22x** at 10 uHa and 1.60x becomes **1.13x** at 5 uHa. (In
+cc-pVTZ it does the opposite - see the basis lever below, which is why "in this basis"
+is not a hedge.) At 2 uHa the transferable grid
+is *smaller* than the in-molecule fit it is supposed to be paying a penalty against, and
+`ghost` cannot reach that target at all while `cage` reaches the parent-grid floor
+(+2.96 uHa against +2.69) and stops improving because there is nothing left to improve.
+
+Compounding with §1's `blocked`/`global` ratios on the same molecule, a frozen
+per-element grid against a single global molecular fit costs
+
+| target | with `ghost` (§8) | with `cage` |
+| --- | --- | --- |
+| 10 uHa | 1.51 x 1.78 = **2.7x** | 1.51 x 1.22 = **1.85x** |
+| 5 uHa | 1.47 x 1.60 = **2.4x** | 1.47 x 1.13 = **1.65x** |
+| 2 uHa | n/a | 1.45 x 0.96 = **1.39x** |
+
+i.e. **1.9-3.4x on the `n_P^2` parts where §8 reported 5.8-7.3x**, on the one molecule
+measured. The headline tax of this programme is roughly halved by an option that was
+turned off on the strength of a docstring.
+
+**The tetrahedron reproduces §9's rank ceiling on a new axis.** It is the *cheapest*
+setting at loose accuracy - 262 points at 50 uHa, better than `blocked` itself - and it
+cannot reach 10 uHa at any threshold, flattening at +13.79 uHa and then getting worse. Its
+ceilings (47/99/103 for H/C/O) cap methanol at 390 points, and the curve stops at 375. So
+a small direction set is not a bad ensemble; it is a *short* one, and §9's advice - sum
+the per-element saturation sizes before spending single points - is what catches it. Its
+non-monotone start (191/+407 then 210/+441) is the coarse-ladder behaviour §9 documents.
+
+**The parent-grid lever helps, and is not the lever.** 1.78x to 1.46x at 10 uHa on 5.1x
+the candidate points. Worth having, much cheaper to obtain than the cage's equations, and
+nowhere near the cage. Its real interest is elsewhere: §13 shows the level-0 parent is a
+poor grid to be rotationally invariant on, and nothing here measures a torque.
+
+### The basis lever, and the cage does not survive it
+
+The basis gets its own file and its own floor, because the parent grid is a different
+object in a different basis: the same 3288-point level-0 Becke grid is **+7.32 uHa** in
+cc-pVTZ against +2.69 in cc-pVDZ. Nothing here ratios across the two.
+
+Methanol, 116 AOs, cc-pVTZ / cc-pVTZ-RI, error **above that floor**:
+
+| | curve |
+| --- | --- |
+| `blocked` | 767/+105.6, 1053/+32.0, 1293/+19.3 |
+| `ghost` | 523/+594.4, 778/+74.8, 1063/+8.4, 1202/**+3.9**, 1351/+4.4 |
+| `cage` | 699/+513.1, 918/+66.0, 1150/+27.9, 1366/+17.4, 1504/**+6.0** |
+
+| target | `blocked` | `ghost` | `cage` |
+| --- | --- | --- | --- |
+| 50 uHa | 935 | 824 | 987 (**1.20x** `ghost`) |
+| 20 uHa | 1274 | 940 | 1298 (**1.38x**) |
+| 10 uHa | n/a | 1038 | 1436 (**1.38x**) |
+
+**In cc-pVTZ the cage is 1.2-1.4x worse than the single-ghost ensemble it beats by
+1.5x in cc-pVDZ.** That is the reversal, and it is the reason the stage-B headline above
+must be read as a statement about one molecule in one basis rather than about caging.
+
+Two things stop this being a clean refutation, and both point the same way - the ladders
+are off-scale in this basis, as §10 warns they go:
+
+* **`cage`'s curve is still falling steeply at its tightest rung** (27.9 -> 17.4 -> 6.0)
+  while `ghost`'s has flattened and gone non-monotone (8.4 -> 3.9 -> 4.4). A curve that
+  is still descending has not reached the point count its ratio is being read at.
+* **[CORRECTED by the extended ladder - see below.** This read "`blocked`'s ladder never
+  converges at all. Its tightest rung is 19.3 uHa above the floor and still falling,
+  which makes the apparent result that `ghost` *beats* the in-molecule fit here an
+  artefact of an unconverged denominator and not a measurement." Extended two decades it
+  does not fall. It plateaus.**]**
+
+### The `blocked` plateau was the weights, and the lower bound holds after all
+
+`levers.py --blocked-diagnostic`. The extended ladder above grows `blocked`'s support
+1293 -> 1746 points for no accuracy at all, ~19 uHa above the parent-grid floor
+throughout, while `ghost` passes it and reaches 2.5. Read at face value that breaks the
+premise §1 and §8 rest on - that the in-molecule fit is a *strict lower bound* on any
+frozen atom-centred scheme. **It does not survive the diagnostic, and what it was is the
+weights.**
+
+One set of `blocked` supports, fitted once and re-weighted, evaluated four ways at the
+same `lambda = 1e-8` on both filters, so that everything that moves between arms is the
+footing rather than the grid. Methanol, cc-pVTZ, uHa **above the +7.18 floor**:
+
+| arm | 1053 pts | 1293 | 1531 | 1746 |
+| --- | --- | --- | --- | --- |
+| `w = 1`, ridge | +32.15 | +19.43 | +18.68 | +19.06 |
+| `w = 1`, damped | +8.60 | +5.65 | +6.72 | +5.99 |
+| NNLS weights, ridge | +0.36 | -0.08 | -0.04 | **+0.00** |
+| NNLS weights, damped | +0.29 | -0.16 | -0.07 | **-0.07** |
+
+**With its own weights the in-molecule fit sits on the parent-grid floor from 1053 points
+upward.** Not near it - on it, to within 0.4 uHa at the loosest rung and 0.1 at the rest.
+The plateau is gone, and so is everything that was read off it:
+
+* **RETRACTED: "in cc-pVTZ the transferable grid beats the in-molecule fit."** It does
+  not. `blocked` is at the floor at 1053 points; `ghost` needs 1485 to reach 2.5 uHa
+  above it and never reaches it on the ladder run. §1 and §8's lower-bound premise holds
+  in cc-pVTZ, and holds *harder* than in cc-pVDZ.
+* **The filter is worth a factor of three and the weights are worth everything.** Ridge
+  to damped takes the `w = 1` plateau from 19 to 6 uHa - §12's result reproducing in a
+  second basis, on a grid five times larger than anything it was measured on. Restoring
+  the weights takes it from 19 to zero. Both matter; they are not the same size.
+
+**And that is the result, because a transferable support cannot carry those weights.**
+§13 localised the orientation gap to exactly this - `ghost` converges like `blocked1`
+(`w = 1`) and not like weighted `blocked`, 35.6x against 17667x - and this prices the
+same footing in *energy*, in a basis where it is no longer a rounding error:
+
+| | cost of discarding the weights, in-molecule support |
+| --- | --- |
+| cc-pVDZ, 670 pts | ~1.5 uHa |
+| cc-pVTZ, 1746 pts | **~19 uHa** |
+
+§3 concluded the weights barely matter, on the strength of bit-identical energies under
+the *pseudoinverse*. §12 walked that back for conditioning. §13 walked it back for
+orientation. This walks it back for the energy, and adds the part that matters for where
+the programme goes: **the penalty grows with basis size.** So the ghost gap is not merely
+unimproved in cc-pVTZ - measured against a `blocked` that is allowed its own weights, it
+is far worse than the 1.1-1.8x §8 reports in cc-pVDZ, and HANDOFF 4(8) - fit per-element
+weights *for* the in-molecule objective - stops being the highest-leverage idea on the
+list and becomes a prerequisite for using this scheme in a production basis.
+
+**One caveat this puts on §8, §10 and this section alike.** Every ghost-gap number in this
+directory is measured against a `blocked` row that is itself at `w = 1`, deliberately, so
+that the only difference between the modes is where the points came from. That is the
+right control for isolating the *selection*, and this diagnostic shows it is a materially
+handicapped baseline - increasingly so with basis size. The published gaps therefore
+flatter the transferable scheme relative to what an in-molecule fit can actually do. They
+are not wrong; they are answering a narrower question than their phrasing suggests.
+
+So cc-pVTZ establishes two things, one narrow and one not. The narrow one: **the cage's
+cc-pVDZ win does not generalise across basis sets as measured**, and that ranking is
+still provisional, because `cage`'s ladder is the one arm never driven to convergence -
+`levers_methanol_tz_wide.json` was killed by the machine on its second cage rung, a
+cc-pVTZ cage environment carrying ~360 AOs across 9 environments being the heaviest solve
+in this directory. The broad one is the weight footing above, which is not about the cage
+at all.
+
+What does carry across is stage A's mechanism. cc-pVTZ raises the per-element ceilings
+1.55-2.34x and the supports are correspondingly larger at every threshold - `ghost` spans
+523-1351 points here against 223-816 on the same molecule in cc-pVDZ. The basis lever
+moves what it was predicted to move. It just does not follow that a lever which buys
+points buys accuracy, which is the same lesson `tetra` teaches from the other end.
+
+### The ceiling on an in-molecule weight fit, and it lands below the floor
+
+`levers.py --oracle`. §16 runs `molw` - a ghost support carrying weights fitted per
+*element* against the in-molecule overlap objective - and finds it never wins. This is
+the same control with the constraint removed: weights fitted **per atom, per molecule**,
+against that atom's own Becke share of the real molecular overlap. That is strictly more
+freedom than HANDOFF 4(8) or §16's `molw` can have, so whatever it reaches is a
+**ceiling** on the whole idea rather than a proposal.
+
+Methanol, cc-pVDZ, `pinv`, 4 random per-atom orientations. The first four rows reproduce
+§13's ladder to the digit - 0.02 / 9.02 / 27.2 / 52.3 uHa/rad - which is what licenses
+reading the fifth:
+
+| footing | support | weights | n | err/uHa | net tau | rms over draws | spread |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `blocked` | in-molecule | in-molecule | 670 | +2.75 | **0.02** | 0.12 | 0.01 |
+| `blocked1` | in-molecule | 1 | 670 | +3.65 | 9.02 | 9.28 | 0.40 |
+| `ghost` | ghost | 1 | 702 | +3.15 | 27.25 | 22.03 | 0.41 |
+| `ghostw` | ghost | ghost | 702 | +2.83 | 52.27 | 9.22 | 0.68 |
+| `ghost_oracle` | ghost | **per-atom in-molecule** | 702 | +5.54 | **155.67** | 87.37 | 16.79 |
+
+**The oracle is the worst of the five on every column**, 5.7x above simply setting
+`w = 1` on the same support. Repeated at `damped 1e-10` it is 6.92 against `ghost`'s 0.30,
+23x, so both filters agree in direction and this is not the regulariser §12 warns about.
+
+So §16's "`molw` never wins" is not an artefact of fitting per element rather than per
+atom, and not an artefact of its training set: **the ceiling is below the floor**. Fitting
+weights against the in-molecule *overlap* objective is worse than not fitting them, with
+any amount of freedom.
+
+The reason is the one this file has now recorded four times. The overlap target carries no
+information about THC accuracy - §5's `rmsd_S`, §8's support agreement, §10's residual,
+which is *anti*-correlated - so an oracle for that objective is an oracle for the wrong
+thing. §14 is the constructive form of the same point: it replaces the target rather than
+optimising against it, and its weights transfer where these do not. **What is refuted is
+4(8) against the overlap objective, which is how both routes to it were built. 4(8)
+against the torque itself (4(11)) or against the LS-THC residual is untouched**, and §14's
+`eriw` is evidence the second of those works.
+
+### The weights are a diagonal preconditioner, and a runtime one replaces them in the energy
+
+`levers.py --blocked-diagnostic`, `metric_scheme="*_jacobi"`. The collocation is
+`X = w^(1/4) R` and the metric is `S_PQ = (X X^T) o (X X^T)`, so
+
+    S(w) = D S(1) D,   D = diag(sqrt(w))
+
+exactly. **The weights' entire effect on the fit is a symmetric diagonal scaling of the
+metric.** That is why §3 found them irrelevant - a positive diagonal rescaling is absorbed
+identically by the *pseudoinverse* - and why they are not: `ridge` and `damped` both apply
+an absolute shift `lambda tr(S)/n`, which is not scale-equivariant.
+
+If a diagonal scaling is all they are, the metric can supply one itself. `E = diag(1 /
+sqrt(diag S))` gives `S^-1 = E (E S E)^-1 E`, `diag(S)_PP = (sum_mu X_muP^2)^2` is smooth
+in the nuclear coordinates, and nothing about it is fitted or transferred. Methanol
+cc-pVTZ, uHa above the +7.18 parent-grid floor, one set of supports throughout:
+
+| arm | 1053 pts | 1293 | 1531 | 1746 |
+| --- | --- | --- | --- | --- |
+| `w = 1`, ridge | +32.15 | +19.43 | +18.68 | +19.06 |
+| `w = 1`, damped | +8.60 | +5.65 | +6.72 | +5.99 |
+| NNLS weights, ridge | +0.36 | -0.08 | -0.04 | +0.00 |
+| **`w = 1`, ridge_jacobi** | **-0.10** | **-0.03** | **-0.05** | **-0.05** |
+| **`w = 1`, damped_jacobi** | **-0.17** | **-0.05** | **-0.04** | **-0.04** |
+| NNLS weights, damped_jacobi | -0.17 | -0.05 | -0.04 | -0.04 |
+
+`w = 1` with a runtime preconditioner sits **on** the floor, indistinguishable from the
+NNLS weights, under both filters, and does not hurt where weights are already present. The
+19 uHa that discarding the weights costs in cc-pVTZ is recovered in full by a scaling read
+off `S` in closed form - no offline object, no training molecules, nothing transferred.
+
+**This is an energy result and nothing more, for a reason that is a defect rather than a
+caveat.** `invert_metric_adjoint` has no `_jacobi` branch. The forward scheme was added
+without one, the dispatch fell through to the *ridge* adjoint, and the reverse pass
+therefore differentiated a different operator than the forward pass applied: `E` depends
+on `S`, so `d(E filter(E S E) E)/dS` carries a term through `E` that nothing computes.
+Energies right, gradients silently wrong - measured, net torques of ~4e5 uHa/rad against
+~1e-1 for the same grids under `damped`. It now raises `NotImplementedError` naming the
+missing term, and an unknown scheme raises rather than falling through. **There is no
+Jacobi torque measurement, and §15 raises the stakes on getting one**: the orbital
+response is built and AIMD now runs on this surface, so a metric scheme whose gradient is
+undefined is a gap in the pipeline rather than a curiosity.
+
+One implementation note that is not cosmetic: `diag(S)_PP` is exactly zero for a point
+carrying no amplitude, which is what a weight fit produces whenever it drops a point - the
+oracle above zeroes 250 of 702. Those rows are left unscaled; `1/sqrt(0)` turns the whole
+metric to NaN.
+
+
+### What this does not settle
+
+**The two stages disagree and stage B is the one that counts.** `basis:cc-pVTZ` has the
+highest ceilings in stage A and `cage` the second highest, but stage A cannot see that
+`tetra`'s low ceiling comes with the best points-per-uHa at 50 uHa. Do not rank levers on
+stage A.
+
+**`cage` and `ghost` are not matched in environment count** - 10 against 13, since a cage
+carries one environment per `(partner, scale)` rather than one per direction. §9 and §10
+both identify environment count as what supplies rank, so part of the cage's win may be
+bookkeeping rather than geometry. A cage ensemble widened to 13 environments, or a
+single-ghost ensemble narrowed to 10, would separate the two. Nothing here does.
+
+**Everything is at `w = 1` and `metric_ridge = 1e-8`,** which §12 disqualifies for a
+gradient. A lever that wins on energy has to be re-read under `--scheme damped` before it
+means anything for the application, and none of these settings has been through
+`window.py`, `torque_ladder.py` or `trajectory.py`. **In particular no torque has been
+measured for the cage**, and §13 puts the whole remaining gap to production DFT on the
+weight footing and orientation rather than on the energy - so the lever that halves the
+point-count tax is not yet known to help, or not to hurt, the quantity that actually
+blocks AIMD.
+
+One molecule, one geometry, one ensemble family **in cc-pVDZ - and the one basis it was
+carried to reverses its ranking**, on ladders that are not converged in either direction.
+Until `levers_methanol_tz_wide.json` lands, the cage is a cc-pVDZ result and the honest
+summary of the programme's point tax is still §8's, with §14's figure as the best case
+rather than the number. The cage was run with the icosahedral,
+octahedral and tetrahedral direction sets in stage A but only the icosahedral one in
+stage B, and `cage:tetrahedron` is the interesting cell there - it reaches `ghost`'s
+ceiling on H exactly (132) and 1.4-1.9x of it on C and O with an order of magnitude
+fewer equations than `cage:icosahedron`, so it may be most of the win for a fraction of
+the fit cost. The cage's fit is also the slowest thing in stage A by a wide margin
+(76-80 s per heavy element at saturation against 1-2 s), which is irrelevant to an
+offline object run once per element but is what makes a stage-A sweep over cages
+expensive.
 
 ## Verdict
 
@@ -2120,9 +2499,9 @@ energy conservation at tens of uHa, the size of the orientational potential itse
 accumulates is **4.5 degrees of rotation-axis tilt**, which is artificial rotational
 diffusion rather than heating. And the control that reframes the whole question:
 **RKS/PBE on the level-0 Becke grid these fits are pruned from loses angular momentum
-twenty times faster and to twice the excursion.** Lab-fixed atom-centred quadrature is not
-an acTHC defect - it is what every atom-centred grid does, and the pruned, reweighted
-support is quieter at it than its own parent. The one thing §13 does make urgent is the
+about eight times faster at a picosecond, and 4.4x faster at 100 fs.** Lab-fixed
+atom-centred quadrature is not an acTHC defect - it is what every atom-centred grid
+does, and the pruned, reweighted support is quieter at it than its own parent. The one thing §13 does make urgent is the
 **orbital response**: on the fixed-orbital surface the force is not the gradient of the
 propagated energy, and that alone breaks rotational invariance at ~8300 uHa/rad, fifty
 times the frozen grid's own torque and identical on a grid with five thousand times less.
@@ -2206,7 +2585,7 @@ What remains to be measured, in order:
    conservation, and what accumulates is 4.5 degrees of rotation-axis tilt. Water, which
    saturates, leaks 0.0027 hbar. And the comparison nobody had made: **plain RKS/PBE on
    the same level-0 Becke grid the THC fits are pruned from loses angular momentum about
-   twenty times faster and to twice the excursion**, so the frozen support is quieter in
+   eight times faster at a picosecond**, so the frozen support is quieter in
    orientation than its own parent quadrature.
 8. ~~**Fit per-element weights against an objective LS-THC cares about.**~~ **Done -
    see §14, and the answer is that it works.** §13 made this the highest-leverage

@@ -42,6 +42,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `trajectory.py` | what that torque does over a trajectory, and whether it is worse than the quadrature the grid is pruned from |
 | `atomic_eri.py` | whether a **richer purely-atomic target** - the free atom's own ERIs rather than its overlap matrix - lifts the equation-count ceiling that forced ghosts, and what the support it selects is worth |
 | `insitu.py` | whether fitting against *real* neighbours beats fitting against ghosts, and - by pairing a support with weights fitted for a different objective - whether a support and its weights can be chosen separately at all |
+| `levers.py` | the four things that set where a ghost fit's support stops - AO basis, parent grid level, ghost direction set, cage or not - as a ceiling (no SCF) and as points per microhartree |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -88,11 +89,17 @@ uv run python insitu.py --calibrate                  # supports + weight sums, n
 uv run python insitu.py --out data/insitu.json       # train/held-out, energy and spread
 uv run python torque_ladder.py formaldehyde --modes ghost,ghostw,molw,molfit,molfit1 \
     --ridges "" --pinv --draws 4                     # the mixed-footing control, as torque
+uv run python levers.py --ceilings H,C,O --out data/levers_ceilings.json  # no SCF
+uv run python levers.py methanol --variants ghost,parent1,cage,tetra \
+    --out data/levers_methanol.json                                  # does a ceiling convert?
+uv run python levers.py methanol --basis cc-pvtz --variants ghost,cage \
+    --out data/levers_methanol_tz.json               # the basis lever, with its own floor
+uv run python levers.py --report data/levers_*.json
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Eighteen headlines:
+See [`FINDINGS.md`](FINDINGS.md). Twenty-one headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -220,6 +227,38 @@ See [`FINDINGS.md`](FINDINGS.md). Eighteen headlines:
   methodology notes come with it - read these at **matched point count**, and take no
   ratio from a torque quoted at one rung, since `ghostw` on formaldehyde runs 163 uHa/rad
   at 344 points, 1.0 at 427 and 3.7 at 486.
+* **The orbital response is now a prerequisite, not a refinement.** On the fixed-orbital
+  surface the force is not the gradient of the propagated energy, and that alone breaks
+  rotational invariance at **~8300 uHa/rad** - fifty times the transferable grid's own
+  torque, and identical on a grid with five thousand times less. No AIMD runs on the
+  present gradient whatever the grid does.
+* **The ghost cage was rejected on an argument, and the argument is wrong - the point
+  tax is roughly halved.** `ghost_environments` declines to put ghosts in every direction
+  at once because that would squeeze the central atom's Becke share to a lobe around the
+  nucleus. It does - the caged atom keeps **0.2-0.3%** of its free-atom weight against
+  57% with one neighbour - and the support ceiling goes **up** anyway, 2.2x on carbon,
+  because `stack_targets` normalises the fragment and what is left sees every direction
+  at once. On methanol the ghost gap goes **1.78x -> 1.22x** at 10 uHa and
+  **1.60x -> 1.13x** at 5 uHa, and at 2 uHa the transferable grid is *smaller* than the
+  in-molecule fit (0.96x) while `ghost` cannot reach that target at all. Compounded
+  against a global molecular fit that is **1.85x rather than 2.7x**, i.e. 3.4x rather
+  than 7.3x on the `n_P^2` parts. **All of that is cc-pVDZ, and cc-pVTZ reverses it** -
+  there the cage is 1.2-1.4x *worse* than the single-ghost ensemble. Treat the halved tax
+  as a best case, not a result.
+* **The bigger cc-pVTZ finding is not about the cage: discarding the NNLS weights costs
+  ~19 uHa there against ~1.5 in cc-pVDZ.** A `blocked` ladder that looked like it had
+  hit an accuracy ceiling at ~19 uHa above the floor - and that `ghost` appeared to beat,
+  which would have broken the strict-lower-bound premise of sections 1 and 8 - turns out
+  to sit exactly **on** the floor once its own weights are restored (+0.36 to +0.00 uHa
+  from 1053 points up). The filter is worth a factor of three, the weights are worth all
+  of it, and a transferable support can carry neither. **The weight penalty grows with
+  basis size**, so the ghost gap is worse in a production basis, not better, and fitting
+  per-element weights for the in-molecule objective is now a prerequisite rather than an
+  improvement. Two more levers behave as §9 predicts: a finer parent
+  grid moves the ceiling 1.26-1.42x *at unchanged equation count* - which contradicts the
+  premise HANDOFF 4(9) is written on - and a tetrahedral direction set is the cheapest
+  thing measured at 50 uHa and cannot reach 10 uHa at any threshold, which is §9's rank
+  ceiling on a new axis. **No torque has been measured for any of them.**
 * **The gradient exists and verifies to machine precision** (`pythc.grad`, driven by
   `gradient.py`): quadratic convergence against a finite difference, and forces that sum
   to zero to 2.4e-15 with no finite difference involved. Two things came back with it

@@ -323,8 +323,23 @@ def invert_metric_adjoint(S: np.ndarray, S_inv: np.ndarray, S_inv_bar: np.ndarra
     if ridge is None:
         return pinv_adjoint(S, S_inv_bar)
 
+    if scheme.endswith("_jacobi"):
+        # The forward Jacobi scheme scales by E = diag(1/sqrt(diag S)), which is itself a
+        # function of S, so the adjoint carries a term through E that none of the branches
+        # below computes. Falling through to the ridge adjoint gives energies that are
+        # right and gradients that are silently wrong - measured, net torques of ~4e5
+        # uHa/rad against ~1e-1 for the same grids under "damped". Raise until the term
+        # is derived.
+        raise NotImplementedError(
+            f"no adjoint for metric scheme {scheme!r}: the Jacobi scaling depends on "
+            "diag(S), so d(E filter(E S E) E)/dS has a term through E that is not "
+            "implemented. The forward scheme is usable for energies only.")
+
     if scheme == "damped":
         return damped_inv_adjoint(S, S_inv_bar, ridge, ridge_scale)
+
+    if scheme not in ("ridge", "ridge_eigh"):
+        raise ValueError(f"unknown metric scheme {scheme!r} in the adjoint")
 
     # "ridge_eigh" is the same map as "ridge", computed differently, so it shares the
     # adjoint: dB = -B dA B holds for the inverse however the inverse was obtained.
