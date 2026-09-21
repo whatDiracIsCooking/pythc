@@ -30,6 +30,12 @@ points. See :func:`~pythc.grid.octahedral_orbits` for what the groups are and wh
 one support has to serve a point set in more than one environment at once. That is what
 an offline, per-element grid needs: the element is fitted against a range of ghost
 neighbours simultaneously rather than in any one of them.
+
+:class:`ERIFitOperator` changes the target rather than the variables: it asks the same
+weights to reproduce the two-electron integrals instead of the overlap matrix. That is
+still linear in w - the ERI is the integral of a co-density against the electrostatic
+potential of another - but it supplies O(n_AO^4) equations where the overlap supplies
+O(n_AO^2), which is what lifts the Lawson-Hanson support ceiling off a free-atom fit.
 """
 
 import logging
@@ -136,6 +142,161 @@ class OverlapFitOperator(NNLSOperator):
         # n_pair dimension never appears.
         U = self.unpack(r)
         return np.einsum('pm,pm->p', self.R @ U, self.R, optimize=True)
+
+
+class ERIFitOperator(NNLSOperator):
+    """
+    Fitting matrix of the **ERI** quadrature problem, built from a collocation matrix
+    and the electrostatic potentials of the AO co-densities on the same points.
+
+    :class:`OverlapFitOperator` asks a weight vector to reproduce the overlap matrix,
+
+        S_{mu nu} = sum_P w_P phi_mu(r_P) phi_nu(r_P),
+
+    which is one equation per unique AO pair - ``n_AO (n_AO + 1) / 2`` of them. Since
+    Lawson-Hanson can never retain more variables than the problem has equations, that
+    count is a hard ceiling on the support an overlap fit can select: 15 points for
+    hydrogen in cc-pVDZ, whatever the threshold. On an isolated atom, where there is no
+    neighbour to add rows, the ceiling binds and the fit fails structurally (see
+    ``experiments/atom_centered_grids/ghosts.py``).
+
+    This operator swaps the target for the two-electron integrals, using the exact
+    identity
+
+        (mu nu | lambda sigma) = integral dr phi_mu(r) phi_nu(r) V_{lambda sigma}(r),
+        V_{lambda sigma}(r) = integral dr' phi_lambda(r') phi_sigma(r') / |r - r'|,
+
+    so that a quadrature rule reproducing every ERI is one satisfying
+
+        (mu nu | lambda sigma) = sum_P w_P phi_mu(r_P) phi_nu(r_P) V_{lambda sigma}(r_P).
+
+    That is still **linear in w**, so the same NNLS solver applies unchanged - but it is
+    ``[n_AO (n_AO + 1) / 2]^2`` equations rather than ``n_AO (n_AO + 1) / 2``, i.e.
+    ``O(n_AO^4)`` against ``O(n_AO^2)``. Hydrogen goes from 15 equations to 225 and
+    carbon from 105 to 11025, which removes the equation-count ceiling outright and
+    lets a *free-atom* fit select a support of useful size.
+
+    The target is also physically closer to what LS-THC needs. The overlap target is a
+    short-ranged, exponentially decaying quantity; ``V_{lambda sigma}`` falls off as
+    ``1/r``, so the ERI target keeps paying attention to the tail region where a bond
+    would be - which is exactly what ghost neighbours were introduced to supply.
+
+    Rows are indexed by pairs of AO pairs, each pair packed as in
+    :class:`OverlapFitOperator` (unique ``mu <= nu``, off-diagonals scaled by
+    ``sqrt(2)``), so the packed 2-norm is the Frobenius norm of the full four-index
+    array. Column P is the outer product of the packed co-density and the packed
+    potential at ``r_P``, and the gradient contracts the residual against both without
+    the pair-pair index ever appearing:
+
+        (A^T r)_P = rho(r_P)^T U(r) v(r_P)
+
+    with ``U(r)`` the residual reshaped to (pair, pair).
+
+    **Rank reduction.** Every column lies in ``range(Rho^T) (x) range(Vp^T)``, so the
+    component of the target outside that subspace is a constant of the fit: no weight
+    vector can touch it. Projecting both indices onto orthonormal bases of those two
+    ranges is therefore an *exact* reduction - the minimiser, the gradient and the
+    active set are unchanged - and it shrinks the row count from ``n_pair^2`` to
+    ``rank(Rho) * rank(Vp)``. That costs two thin SVDs and is what makes the operator
+    usable when a screened environment carries AOs the grid cannot resolve. The part
+    dropped is reported by :meth:`dropped_norm_sq` so that a residual can still be
+    quoted against the full target.
+    """
+
+    def __init__(self, R: np.ndarray, V: np.ndarray, rank_tol: float = 1e-12):
+        """
+        :param R: Collocation matrix ``phi_mu(r_P)``, shape ``(n_grid, n_AO)``.
+        :param V: Co-density potentials ``V_{mu nu}(r_P)``, shape
+            ``(n_grid, n_AO, n_AO)`` - PySCF's ``int1e_grids`` evaluated on the same
+            points, in the same AO ordering as ``R``.
+        :param rank_tol: Relative singular-value cutoff for the exact range projection
+            described above. ``0`` keeps every direction and so does nothing; the
+            default discards only what is numerically zero. Raising it makes the
+            reduction lossy, which is occasionally worth it and never silent - the
+            discarded weight shows up in :meth:`dropped_norm_sq`.
+        """
+        R, V = np.asarray(R), np.asarray(V)
+        if V.shape[0] != R.shape[0] or V.shape[1:] != (R.shape[1], R.shape[1]):
+            raise ValueError(f"collocation matrix of shape {R.shape} does not go with "
+                             f"potentials of shape {V.shape}")
+
+        self.n_grid, self.n_ao = R.shape
+        self.rows, self.cols = np.triu_indices(self.n_ao)
+        self.scale = np.where(self.rows == self.cols, 1.0, np.sqrt(2.0))
+        self.n_pair = self.rows.size
+
+        # Packed co-densities and packed potentials, one row per grid point.
+        self.rho = R[:, self.rows] * R[:, self.cols] * self.scale
+        self.vpot = V[:, self.rows, self.cols] * self.scale
+
+        self.p_left = _range_basis(self.rho, rank_tol)
+        self.p_right = _range_basis(self.vpot, rank_tol)
+        self.rho = self.rho @ self.p_left
+        self.vpot = self.vpot @ self.p_right
+        self.k_left, self.k_right = self.p_left.shape[1], self.p_right.shape[1]
+
+    @property
+    def shape(self):
+        return self.k_left * self.k_right, self.n_grid
+
+    def pack(self, eri: np.ndarray) -> np.ndarray:
+        """
+        Pack a four-index ERI array into the right-hand side of this fit.
+
+        :param eri: ``(mu nu | lambda sigma)`` in chemists' notation, shape
+            ``(n_AO,) * 4``, in the AO ordering of the collocation matrix.
+        """
+        return self._project(self._to_pairs(eri)).ravel()
+
+    def dropped_norm_sq(self, eri: np.ndarray) -> float:
+        """
+        How much of the target the rank reduction put out of reach, as a squared norm.
+
+        ``||b_full||^2 - ||pack(eri)||^2``. At the default ``rank_tol`` this is the
+        component no quadrature on these points could have reproduced anyway, so it
+        belongs in a quoted residual but not in a judgement of the fit.
+        """
+        pairs = self._to_pairs(eri)
+        return float(np.sum(pairs ** 2) - np.sum(self._project(pairs) ** 2))
+
+    def _to_pairs(self, eri: np.ndarray) -> np.ndarray:
+        """Four-index ERI -> the (pair, pair) matrix this fit works in."""
+        eri = np.asarray(eri)
+        if eri.shape != (self.n_ao,) * 4:
+            raise ValueError(f"expected an ERI array of shape {(self.n_ao,) * 4}, "
+                             f"got {eri.shape}")
+        m = eri[self.rows[:, None], self.cols[:, None], self.rows[None, :], self.cols[None, :]]
+        return m * self.scale[:, None] * self.scale[None, :]
+
+    def _project(self, pairs: np.ndarray) -> np.ndarray:
+        return self.p_left.T @ pairs @ self.p_right
+
+    def column(self, j):
+        return np.outer(self.rho[j], self.vpot[j]).ravel()
+
+    def gradient(self, r):
+        # (A^T r)_P = rho_P^T U vpot_P, contracted so that the pair-pair dimension is
+        # never materialised per point.
+        u = r.reshape(self.k_left, self.k_right)
+        return np.einsum('pk,pk->p', self.rho @ u, self.vpot, optimize=True)
+
+
+def _range_basis(m: np.ndarray, rank_tol: float) -> np.ndarray:
+    """
+    Orthonormal basis of the row space of ``m``, as a ``(n_cols, rank)`` matrix.
+
+    Directions whose singular value falls below ``rank_tol`` times the largest are
+    dropped. With ``rank_tol = 0`` nothing is dropped and the result is square and
+    orthogonal, so every operation built on it is an exact change of basis.
+    """
+    if rank_tol <= 0.0:
+        return np.eye(m.shape[1])
+
+    _, s, vt = np.linalg.svd(m, full_matrices=False)
+    keep = s > rank_tol * (s[0] if s.size else 0.0)
+    if not keep.any():                      # an all-zero block; keep one direction
+        keep[0] = True
+    return vt[keep].T
 
 
 class GroupOperator(NNLSOperator):

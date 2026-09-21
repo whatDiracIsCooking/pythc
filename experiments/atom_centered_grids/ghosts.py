@@ -14,7 +14,7 @@ same level-0 atomic grid, and all evaluated with the weights thrown away (`w = 1
 section 3 of HANDOFF.md established costs nothing) and the metric ridge-regularised.
 
 That `w = 1` footing is this script's scope, not a recommendation: section 3's result is
-about the pseudoinverse, and 4(6) and 4(8) both walk it back for the regularised inverse
+about the pseudoinverse, and 4(6), 4(9) and 4(13) all walk it back for the regularised inverse
 the gradient needs. `insitu.py` carries the weighted transferable modes, and its `molfit`
 - support and weights fitted together against real neighbours - beats everything here.
 Keep that in mind before reading a `ghost` row as the ceiling of the scheme.

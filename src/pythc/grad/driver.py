@@ -10,16 +10,19 @@ the rotational derivative, which needs nothing else.
 at a fixed SCF reference: MO coefficients and orbital energies are held at the values
 passed in. That is the THC-specific content of the gradient and the part that had never
 been written down - it contains every term the frozen grid, the collocation, the metric,
-the ridge and the fitted ``Z`` contribute. It is **not** the total MP2 gradient and must
-not be compared against one: the orbital response and the Hartree-Fock gradient are
-separate and standard, and the orbital response is not implemented here. ``C_bar`` and
-``eps_bar`` are returned ready to be contracted with a coupled-perturbed solution
-whenever it is.
+the ridge and the fitted ``Z`` contribute. It is **not** the total MP2 gradient on its
+own: the orbital response and the Hartree-Fock gradient are separate and standard.
+:func:`pythc.grad.total.total_mp2_gradient` assembles all three, and
+:mod:`pythc.grad.response` supplies the response from the ``C_bar``, ``F_oo_bar`` and
+``F_vv_bar`` returned here.
 
 Keeping the split explicit is deliberate rather than a shortcut. The fixed-orbital
 derivative is exactly finite-difference checkable on its own - hold ``C`` and ``e`` fixed
-and move the nuclei - so the novel machinery can be verified to machine precision without
-the response layer's approximations sitting in the way.
+and move the nuclei - so the novel machinery could be verified to machine precision
+without the response layer sitting in the way. It stays available separately because the
+difference between the two is a quantity worth measuring: on water it is 18% of the
+fixed-orbital correlation gradient's norm, and it is the whole of that gradient's
+rotational-invariance error.
 """
 import logging
 from dataclasses import dataclass, field
@@ -70,6 +73,15 @@ class ThcGradientResult:
 
     eps_bar: np.ndarray
     """``dE/de``, ``(n_mo,)``, for the orbital-response layer."""
+
+    F_oo_bar: np.ndarray = None
+    """``dE/dF_oo``, ``(n_occ, n_occ)``. The matrix generalisation of ``eps_bar``'s
+    occupied part, and what :mod:`pythc.grad.response` actually needs: the energy's
+    dependence on ``e_i`` is really a dependence on the occupied Fock block, and off the
+    diagonal the two differ. ``diag(F_oo_bar) == eps_bar[:n_occ]``."""
+
+    F_vv_bar: np.ndarray = None
+    """``dE/dF_vv``, ``(n_vir, n_vir)``. Likewise."""
 
     n_points: int = 0
     translation_only: np.ndarray = field(default=None)
@@ -131,8 +143,10 @@ def thc_mp2_gradient(mol: gto.Mole,
                            metric_scheme=metric_scheme).build()
 
     t, tau_o, tau_v = laplace_factors(eps, n_occ, n_laplace)
-    e, X_o_bar, X_v_bar, Z_bar, eps_o_bar, eps_v_bar = energy_and_adjoints(
-        fac.X_o, fac.X_v, fac.Z, tau_o, tau_v, t)
+    (e, X_o_bar, X_v_bar, Z_bar, eps_o_bar, eps_v_bar,
+     F_oo_bar, F_vv_bar) = energy_and_adjoints(
+        fac.X_o, fac.X_v, fac.Z, tau_o, tau_v, t,
+        want_fock_adjoints=True, eps_o=eps[:n_occ], eps_v=eps[n_occ:])
 
     adj = fac.backward(Z_bar, X_o_bar, X_v_bar)
 
@@ -155,6 +169,8 @@ def thc_mp2_gradient(mol: gto.Mole,
         torque=torque,
         C_bar=adj.C_bar,
         eps_bar=np.concatenate([eps_o_bar, eps_v_bar]),
+        F_oo_bar=F_oo_bar,
+        F_vv_bar=F_vv_bar,
         n_points=len(coords),
         translation_only=translation,
     )

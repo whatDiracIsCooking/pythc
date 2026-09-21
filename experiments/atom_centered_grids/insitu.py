@@ -1,5 +1,5 @@
 """
-Per-element weights fitted against the in-molecule objective - HANDOFF.md step (8).
+Per-element weights fitted against real molecules - the mixed-footing control, 4(13).
 
 Section 4(7) localises the entire orientation gap of the transferable scheme to the
 *weight footing* rather than to the transfer: on methanol at matched support, `w = 1`
@@ -8,8 +8,18 @@ gives 9.02 uHa/rad of net torque and the in-molecule NNLS weights give 0.02, a f
 gives 52.3 and is *worse than discarding them*, which 4(6) reads as those weights
 conditioning the ghost metric rather than the in-molecule one.
 
-That leaves one square of the table empty. Nobody has fitted a per-element weight set
-*for* the objective the runtime actually faces. This script fills it.
+That left step (8) open: fit a per-element weight set *for* the objective the runtime
+actually faces. This script takes the in-molecule route to it. **4(9) got there first and
+better** - the free atom's own ERIs are a rich enough target that no molecule and no ghost
+is needed, and ``atomic_eri.py``'s `eriw` converges 1481x where this route manages ~3x
+over `ghostw`. For a grid, use that.
+
+What keeps this script alive is the one thing 4(9) cannot measure. Every pairing it
+compares is self-consistent - a support and the weights the same fit produced - and it
+warns in passing not to read an `eriw` number against a `w = 1` one. Breaking the pairing
+is natural to build here and nowhere else: `molw` is a weight set fitted for one objective
+and laid onto a support selected for another. It loses to `ghostw` **0 times out of 12**,
+which turns that warning into a much stronger statement. See the mode table below.
 
 The fit
 -------
@@ -51,27 +61,28 @@ Support and weights are separable, and the point of the table is to separate the
     ---------- ----------------------------- -----------------------------
     ghost      ghost fit                     1                 (section 8's proposal)
     ghostw     ghost fit                     ghost fit         (section 4(7))
-    molw       ghost fit                     in-molecule       <- step (8)
-    molfit     in-molecule, per element      in-molecule       (transferable ceiling)
+    molw       ghost fit                     in-molecule       <- the mixed footing
+    molfit     in-molecule, per element      in-molecule       (self-consistent pairing)
     molfit1    in-molecule, per element      1                 (is it support or weight?)
     blocked    in-molecule, per atom         in-molecule       (non-transferable bound)
     blocked1   in-molecule, per atom         1
 
-`molw` against `ghost` and `ghostw` is step (8) proper - identical support, three weight
-footings. `molfit` asks the further question of whether the ghost *support* was ever the
-limiting factor, and `molfit1` splits its answer into the part the support bought and
-the part the weights bought.
+`molw` against `ghost` and `ghostw` is the control - identical support, three weight
+footings, only one of which was fitted with those points. `molfit` asks whether the ghost
+*support* was ever the limiting factor, and `molfit1` splits its answer into the part the
+support bought and the part the weights bought.
 
-**The answer, written up in FINDINGS section 14.** `molw` loses: it beats `ghostw` 0
+**The answer, written up in FINDINGS section 16.** `molw` loses: it beats `ghostw` 0
 times out of 12 on held-out molecules, on energy and on rotation spread alike, despite
 having much the better overlap residual. `molfit` wins, 8/10 on energy at a median of
 ~3x. So support and weights are one object - a weight set is worth nothing on a support
-selected by a different fit - and the weights themselves are worth 2-2.5x at matched
-support rather than the 450x 4(7)'s single-rung torque pair implied.
+selected by a different fit, which is why 4(9)'s 1481x belongs to the ERI *fit* rather
+than to weights that could be transplanted - and the weights themselves are worth 2-2.5x
+at matched support rather than the 450x 4(7)'s single-rung torque pair implied.
 
 Two things to know before re-running it. Every comparison has to be at **matched point
 count**: the modes do not agree on size at a shared threshold, a first draft of section
-14 read `molfit` at 401 points against `ghostw` at 344 and got a 26x that the next rung
+16 read `molfit` at 401 points against `ghostw` at 344 and got a 26x that the next rung
 inverted, and `matched_size_report` exists to stop that. And prefer the energy and spread
 ladders to a torque quoted at one rung - `ghostw` on formaldehyde runs 163 uHa/rad at 344
 points, 1.0 at 427 and 3.7 at 486, so a single-rung torque ratio means very little in

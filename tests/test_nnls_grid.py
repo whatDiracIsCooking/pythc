@@ -24,8 +24,9 @@ from pyscf.mp.dfmp2 import DFMP2
 from scipy.optimize import nnls
 from scipy.spatial.transform import Rotation
 
-from pythc.decomp.nnls import (GroupOperator, OverlapFitOperator, StackedOperator,
-                               _IncrementalQR, lawson_hanson, stack_targets)
+from pythc.decomp.nnls import (ERIFitOperator, GroupOperator, OverlapFitOperator,
+                               StackedOperator, _IncrementalQR, lawson_hanson,
+                               stack_targets)
 from pythc.grid import (BeckeGrid, GridProvider, NNLSGrid, _eval_basefuncs, _rmsd_overlap,
                         octahedral_orbits)
 from pythc.methods.mp2 import LaplaceRMP2
@@ -408,6 +409,214 @@ def test_group_operator_expands_to_constant_weights_per_group():
 def test_group_operator_rejects_a_mismatched_label_count():
     with pytest.raises(ValueError):
         GroupOperator(np.zeros((4, 5)), np.zeros(4, dtype=int))
+
+
+# --------------------------------------------------------------------------------------
+# The ERI target: the same weights, fitted against O(n_AO^4) equations instead of
+# O(n_AO^2). See experiments/atom_centered_grids/atomic_eri.py for what it is for.
+# --------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def eri_operator():
+    """An ERIFitOperator over random collocation and potential matrices, with A built
+    explicitly. The potentials are symmetrised because real co-density potentials are.
+    """
+    rng = np.random.default_rng(3)
+    R = rng.normal(size=(25, 4))
+    V = rng.normal(size=(25, 4, 4))
+    V = 0.5 * (V + V.transpose(0, 2, 1))
+
+    op = ERIFitOperator(R, V, rank_tol=0.0)
+    A = np.stack([op.column(j) for j in range(R.shape[0])], axis=1)
+    return op, R, V, A
+
+
+def test_eri_columns_are_the_codensity_potential_outer_product(eri_operator):
+    """
+    Column P is the packed co-density at r_P against the packed potential at r_P. That
+    outer-product structure is the whole reason the ERI stays linear in the weights, so
+    it is worth pinning against a direct construction rather than against itself.
+    """
+    op, R, V, A = eri_operator
+    for j in (0, 7, 24):
+        rho = np.outer(R[j], R[j])[op.rows, op.cols] * op.scale
+        v = V[j][op.rows, op.cols] * op.scale
+        np.testing.assert_allclose(A[:, j], np.outer(rho, v).ravel(), atol=1e-13)
+
+    assert op.shape == (op.n_pair ** 2, R.shape[0])
+
+
+def test_eri_packing_preserves_the_frobenius_norm(eri_operator):
+    """
+    The sqrt(2) now appears on both pair indices, so a four-index array packs to a
+    vector of the same 2-norm. Get it wrong and the fit weights some integrals twice
+    and others once.
+    """
+    op, _, _, _ = eri_operator
+    rng = np.random.default_rng(4)
+    e = rng.normal(size=(op.n_ao,) * 4)
+    # An ERI array is symmetric in each pair and under exchanging them.
+    e = e + e.transpose(1, 0, 2, 3)
+    e = e + e.transpose(0, 1, 3, 2)
+    e = e + e.transpose(2, 3, 0, 1)
+
+    np.testing.assert_allclose(np.linalg.norm(op.pack(e)), np.linalg.norm(e))
+    assert op.dropped_norm_sq(e) == pytest.approx(0.0, abs=1e-18)
+
+
+def test_eri_gradient_matches_the_explicit_matrix(eri_operator):
+    """A^T r, contracted over the two pair indices rather than through n_pair^2 rows."""
+    op, _, _, A = eri_operator
+    rng = np.random.default_rng(5)
+    r = rng.normal(size=A.shape[0])
+    np.testing.assert_allclose(op.gradient(r), A.T @ r, atol=1e-11)
+
+
+def test_eri_model_is_the_quadrature_it_claims_to_be(eri_operator):
+    """
+    ``A w`` has to be the four-index array a quadrature with those weights produces -
+    that identity is what makes the fit mean anything, and it is the one place a
+    packing or ordering slip would hide.
+    """
+    op, R, V, A = eri_operator
+    rng = np.random.default_rng(6)
+    w = rng.random(R.shape[0])
+
+    quad = np.einsum('p,pm,pn,pls->mnls', w, R, R, V, optimize=True)
+    np.testing.assert_allclose(A @ w, op.pack(quad), atol=1e-11)
+
+
+def test_eri_rank_reduction_leaves_the_problem_unchanged(eri_operator):
+    """
+    Every column lies in ``range(Rho^T) x range(Vp^T)``, so projecting both indices onto
+    those ranges cannot move the minimiser: the part it discards is a constant of the
+    fit. Here the potential side is made deliberately rank-deficient, which is what a
+    screened environment does in practice, and the reduced problem must still return the
+    same weights.
+    """
+    _, R, V, _ = eri_operator
+    # Collapse the potentials onto two independent point profiles: the row space of the
+    # packed potential matrix then has rank 2 rather than n_pair.
+    rng = np.random.default_rng(7)
+    profiles = rng.normal(size=(2, V.shape[1], V.shape[2]))
+    profiles = profiles + profiles.transpose(0, 2, 1)
+    mix = rng.normal(size=(V.shape[0], 2))
+    V = np.einsum('pk,kmn->pmn', mix, profiles)
+
+    full = ERIFitOperator(R, V, rank_tol=0.0)
+    reduced = ERIFitOperator(R, V, rank_tol=1e-10)
+    assert reduced.shape[0] < full.shape[0]
+    assert reduced.k_right == 2
+
+    w_true = np.zeros(R.shape[0])
+    w_true[[2, 11, 19]] = [0.7, 0.2, 1.3]
+    quad = np.einsum('p,pm,pn,pls->mnls', w_true, R, R, V, optimize=True)
+
+    for op in (full, reduced):
+        np.testing.assert_allclose(
+            lawson_hanson(op, op.pack(quad), weight_threshold=1e-13), w_true, atol=1e-9)
+
+    # And the gradients agree exactly, which is the statement that the discarded rows
+    # are orthogonal to every column.
+    w = rng.random(R.shape[0])
+    for op in (full, reduced):
+        op._r = op.pack(quad) - np.stack(
+            [op.column(j) for j in range(R.shape[0])], axis=1) @ w
+    np.testing.assert_allclose(full.gradient(full._r), reduced.gradient(reduced._r),
+                               atol=1e-11)
+
+
+def test_eri_rank_reduction_accounts_for_what_it_dropped(eri_operator):
+    """
+    A lossy cutoff is allowed, but it must not be silent: the weight it puts out of
+    reach is exactly what ``dropped_norm_sq`` reports, so a residual can still be quoted
+    against the whole target.
+    """
+    _, R, V, _ = eri_operator
+    rng = np.random.default_rng(8)
+    e = rng.normal(size=(R.shape[1],) * 4)
+    e = e + e.transpose(2, 3, 0, 1)
+
+    full = ERIFitOperator(R, V, rank_tol=0.0)
+    lossy = ERIFitOperator(R, V, rank_tol=0.5)          # absurdly aggressive, on purpose
+    assert lossy.shape[0] < full.shape[0]
+
+    np.testing.assert_allclose(
+        lossy.dropped_norm_sq(e),
+        np.sum(full.pack(e) ** 2) - np.sum(lossy.pack(e) ** 2), atol=1e-10)
+
+
+def test_eri_operator_rejects_mismatched_inputs(eri_operator):
+    op, R, V, _ = eri_operator
+    with pytest.raises(ValueError):
+        ERIFitOperator(R, V[:, :, :3])
+    with pytest.raises(ValueError):
+        ERIFitOperator(R, V[:-1])
+    with pytest.raises(ValueError):
+        op.pack(np.zeros((op.n_ao,) * 3))
+
+
+def test_eri_quadrature_identity_holds_on_a_real_grid(mol):
+    """
+    The identity the whole target rests on, on a molecule: a dense Becke grid weighting
+    ``phi_mu phi_nu V_{lambda sigma}`` reproduces ``(mu nu | lambda sigma)``. If PySCF's
+    ``int1e_grids`` were normalised differently, or ordered differently from
+    ``GTOval_sph``, this is where it would show.
+    """
+    g = gen_grid.Grids(mol)
+    g.level = 3
+    g.build()
+
+    R = _eval_basefuncs(mol, g.coords)
+    V = mol.intor('int1e_grids', grids=g.coords)
+    quad = np.einsum('p,pm,pn,pls->mnls', g.weights, R, R, V, optimize=True)
+    exact = mol.intor('int2e')
+
+    rel = np.linalg.norm(quad - exact) / np.linalg.norm(exact)
+    assert rel < 1e-5
+
+
+def test_eri_target_lifts_the_free_atom_support_ceiling():
+    """
+    The result this target exists for, as a regression test.
+
+    Lawson-Hanson cannot retain more points than the fit has equations, and a free
+    atom's overlap target has only ``n_AO (n_AO + 1) / 2`` - 15 for hydrogen in cc-pVDZ.
+    That ceiling is what makes the free-atom fit of ghosts.py fail structurally, and it
+    binds exactly, not approximately. The ERI target supplies ``225`` equations on the
+    same atom and the same 392-point grid, and the support it can reach must clear the
+    overlap ceiling by a wide margin.
+    """
+    atom = gto.M(atom="H 0.0 0.0 0.0", basis='cc-pvdz', spin=1, verbose=0)
+    g = gen_grid.Grids(atom)
+    coords, weights = g.gen_atomic_grids(atom, level=0, prune=treutler_prune)['H'][:2]
+
+    R = _eval_basefuncs(atom, coords)
+    V = atom.intor('int1e_grids', grids=coords)
+    n_pair = atom.nao_nr() * (atom.nao_nr() + 1) // 2
+
+    ovl = OverlapFitOperator(R)
+    b_ovl = ovl.pack((R * weights[:, None]).T @ R)
+    n_ovl = np.count_nonzero(lawson_hanson(ovl, b_ovl / np.linalg.norm(b_ovl),
+                                           weight_threshold=1e-13))
+
+    eri_op = ERIFitOperator(R, V, rank_tol=1e-10)
+    quad = np.einsum('p,pm,pn,pls->mnls', weights, R, R, V, optimize=True)
+    b_eri = eri_op.pack(quad)
+    w_eri = lawson_hanson(eri_op, b_eri / np.linalg.norm(b_eri), weight_threshold=1e-13)
+
+    assert n_ovl == n_pair == 15               # the ceiling, exactly
+    assert eri_op.shape[0] == n_pair ** 2 == 225
+    assert np.count_nonzero(w_eri) > 3 * n_ovl
+
+    # And the extra points are not decoration: they reproduce a target the overlap fit
+    # could not even express, to seven decades.
+    kept = np.flatnonzero(w_eri)
+    unit = b_eri / np.linalg.norm(b_eri)
+    resid = np.linalg.norm(
+        unit - np.stack([eri_op.column(j) for j in kept], axis=1) @ w_eri[kept])
+    assert resid < 1e-6
 
 
 # --------------------------------------------------------------------------------------

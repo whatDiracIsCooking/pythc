@@ -33,6 +33,7 @@ which turns a formally quartic contraction over grid points into two GEMMs of co
 intermediate; see :func:`peak_memory_estimate` before running this on a large grid.
 """
 import logging
+from typing import Optional
 
 import numpy as np
 from pyscf.gw.gw_ac import _get_scaled_legendre_roots
@@ -63,6 +64,50 @@ def laplace_factors(mo_energy: np.ndarray, n_occ: int, n_laplace: int = 10):
     return t, tau_o, tau_v
 
 
+def loewner(eps: np.ndarray, factors: np.ndarray, t: float) -> np.ndarray:
+    """
+    The Löwner (divided-difference) matrix of ``f(e) = w^(1/4) exp(t e)``.
+
+    This is the Fréchet derivative of a matrix exponential evaluated at a *diagonal*
+    argument, which is what the canonical basis makes the occupied and virtual Fock
+    blocks. It is the one piece of machinery the orbital-response layer needs that the
+    fixed-orbital gradient did not: the energy's dependence on ``e_i`` is really a
+    dependence on the Fock matrix ``F_oo``, and off the diagonal those differ.
+
+        L[i,j] = (f_i - f_j) / (e_i - e_j)   i != j,      L[i,i] = f'(e_i) = t f_i
+
+    :param eps: Orbital energies of one block, ``(n,)``.
+    :param factors: ``f(e_i)`` for the same block - a row of ``tau_o`` or ``tau_v``.
+    :param t: The Laplace node, signed: ``+t`` for the occupied factors and ``-t`` for
+        the virtual ones, matching ``tau_o = w^(1/4) exp(+t e)`` and
+        ``tau_v = w^(1/4) exp(-t e)``.
+    :return: The symmetric ``(n, n)`` divided-difference matrix.
+
+    Neither closed form is usable on its own over the spread of a real virtual spectrum.
+    The literal difference quotient loses all its digits as ``e_i -> e_j``, while the
+    stable ``t f_j expm1(d)/d`` with ``d = t (e_i - e_j)`` overflows once ``d`` is large -
+    which it is for a virtual block spanning tens of Hartree. So each is used where it is
+    good: ``expm1`` inside ``|d| < 1``, where cancellation is the danger and no overflow
+    is possible, and the plain quotient outside it, where the two values differ by enough
+    that subtracting them is exact. The ``expm1`` form is symmetric under ``i <-> j``
+    because ``f_i exp(-d) = f_j``.
+    """
+    diff = eps[:, None] - eps[None, :]
+    d = t * diff
+    small = np.abs(d) < 1.0
+
+    # t f_j expm1(d)/d, continued to its limit t f_j at d = 0. Guarded so the large-|d|
+    # entries, which this branch does not supply, never reach expm1 or the division.
+    d_s = np.where(small, d, 1.0)
+    ratio = np.where(np.abs(d_s) < 1e-12, 1.0, np.expm1(d_s) / np.where(d_s == 0, 1.0, d_s))
+    near = t * factors[None, :] * ratio
+
+    # (f_i - f_j) / (e_i - e_j), exact once the two are well separated.
+    far = (factors[:, None] - factors[None, :]) / np.where(small, 1.0, diff)
+
+    return np.where(small, near, far)
+
+
 def peak_memory_estimate(n_grid: int, n_occ: int) -> float:
     """
     Rough peak working-set of :func:`energy_and_adjoints`, in bytes.
@@ -81,7 +126,10 @@ def energy_and_adjoints(X_o: np.ndarray,
                         tau_o: np.ndarray,
                         tau_v: np.ndarray,
                         t: np.ndarray,
-                        want_orbital_adjoints: bool = True):
+                        want_orbital_adjoints: bool = True,
+                        want_fock_adjoints: bool = False,
+                        eps_o: Optional[np.ndarray] = None,
+                        eps_v: Optional[np.ndarray] = None):
     """
     The Laplace THC-MP2 correlation energy together with its first derivatives.
 
@@ -93,8 +141,26 @@ def energy_and_adjoints(X_o: np.ndarray,
     :param t: ``(n_laplace,)`` Laplace nodes, needed only for the orbital-energy adjoint.
     :param want_orbital_adjoints: Compute ``dE/de`` as well. Costs two extra einsums per
         node; switch it off when only the geometric gradient is wanted.
-    :return: ``(energy, X_o_bar, X_v_bar, Z_bar, eps_o_bar, eps_v_bar)``. The orbital
+    :param want_fock_adjoints: Also compute ``dE/dF_oo`` and ``dE/dF_vv``, the *matrix*
+        generalisation of ``dE/de`` that the orbital-response layer needs. Requires
+        ``eps_o`` and ``eps_v``. Appends two arrays to the returned tuple.
+    :param eps_o: Occupied orbital energies, ``(n_occ,)``. Required with
+        ``want_fock_adjoints``.
+    :param eps_v: Virtual orbital energies, ``(n_vir,)``. Likewise.
+    :return: ``(energy, X_o_bar, X_v_bar, Z_bar, eps_o_bar, eps_v_bar)``, with
+        ``(F_oo_bar, F_vv_bar)`` appended when ``want_fock_adjoints``. The orbital
         adjoints are ``None`` when not requested.
+
+    **Why a Fock adjoint and not just an orbital-energy one.** Written with ``e_i`` in
+    the Laplace factors, this energy is not invariant under a rotation among the occupied
+    orbitals, so a nuclear gradient would need the occupied-occupied and
+    virtual-virtual blocks of the orbital response - which a CPHF solver does not supply
+    and which the canonical condition only determines through a further coupled
+    equation. Written with ``Theta_o = w^(1/4) exp(t F_oo)`` in place of
+    ``diag(w^(1/4) exp(t e_i))`` it is the *same function* at the canonical point but
+    manifestly invariant, so those blocks enter only through the overlap derivative and
+    the response reduces to the standard occupied-virtual one. ``F_oo_bar`` is the
+    adjoint of that reformulation, and its diagonal is exactly ``eps_o_bar``.
     """
     n_grid, n_occ = X_o.shape
     n_vir = X_v.shape[1]
@@ -115,6 +181,16 @@ def energy_and_adjoints(X_o: np.ndarray,
     Z_bar = np.zeros_like(Z)
     eps_o_bar = np.zeros(n_occ) if want_orbital_adjoints else None
     eps_v_bar = np.zeros(n_vir) if want_orbital_adjoints else None
+
+    if want_fock_adjoints:
+        if eps_o is None or eps_v is None:
+            raise ValueError("want_fock_adjoints needs eps_o and eps_v")
+        eps_o = np.asarray(eps_o, dtype=float)
+        eps_v = np.asarray(eps_v, dtype=float)
+        F_oo_bar = np.zeros((n_occ, n_occ))
+        F_vv_bar = np.zeros((n_vir, n_vir))
+    else:
+        F_oo_bar = F_vv_bar = None
 
     # E = sum_v (c_J J_v + c_K K_v); carrying the coefficients into the adjoints keeps
     # every accumulation below a derivative of the total energy rather than of a piece.
@@ -162,6 +238,13 @@ def energy_and_adjoints(X_o: np.ndarray,
             # dK/dtau_o at fixed Ao and Psi - the tau_o that sits in the sum over i.
             tau_o_bar += c_K * np.einsum("pr,pri,pri->i", Ao, Psi, Psi_T, optimize=True)
 
+        if want_fock_adjoints:
+            # The same object off the diagonal as well. Invariantly K is
+            #   sum_ij Theta_o[i,j] sum_PR Ao[P,R] Psi[P,R,i] Psi[R,P,j],
+            # and only the canonical basis collapses Theta_o to its diagonal. Symmetric
+            # under i <-> j by relabelling P <-> R, since Ao is.
+            Theta_o_bar = c_K * np.einsum("pr,pri,prj->ij", Ao, Psi, Psi_T, optimize=True)
+
         # dK/dPsi[a,b,i] = 2 tau_o_i Ao[a,b] Psi[b,a,i]  (Ao symmetric).
         Psi_bar = (2.0 * c_K) * (Ao[:, :, None] * Psi_T) * to
 
@@ -187,6 +270,22 @@ def energy_and_adjoints(X_o: np.ndarray,
             # tau_o = w^(1/4) exp(+t e_i), tau_v = w^(1/4) exp(-t e_a).
             eps_o_bar += t[v] * to * tau_o_bar
             eps_v_bar += -t[v] * tv * tau_v_bar
+
+        if want_fock_adjoints:
+            # Ao = X_o Theta_o X_o^T: the same contraction tau_o_bar takes just above,
+            # kept as a matrix instead of collapsed to its diagonal.
+            Theta_o_bar += X_o.T @ Ao_bar @ X_o
+            Theta_v_bar = X_v.T @ Av_bar @ X_v
+
+            # Theta is a matrix function of the Fock block, so its adjoint is the Loewner
+            # matrix times the Theta adjoint. The Loewner diagonal is t*to and -t*tv, so
+            # diag(F_oo_bar) comes out equal to eps_o_bar - which the tests assert.
+            F_oo_bar += loewner(eps_o, to, t[v]) * (0.5 * (Theta_o_bar + Theta_o_bar.T))
+            F_vv_bar += loewner(eps_v, tv, -t[v]) * (0.5 * (Theta_v_bar + Theta_v_bar.T))
+
+    if want_fock_adjoints:
+        return (energy, X_o_bar, X_v_bar, Z_bar, eps_o_bar, eps_v_bar,
+                F_oo_bar, F_vv_bar)
 
     return energy, X_o_bar, X_v_bar, Z_bar, eps_o_bar, eps_v_bar
 

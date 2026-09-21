@@ -227,3 +227,50 @@ mp2_e_thc = LaplaceRMP2(mol, mf, thc_eri, n_laplace=10).kernel()
 
 The THC representation **must** be built in `mode='ov'` for the MP2 calculation.
 
+
+### Analytic nuclear gradients and AIMD on a frozen grid
+
+`pythc.grad` differentiates the Laplace THC-MP2 energy analytically with respect to the
+nuclei. It requires a **frozen** grid — one point set per atom, stored relative to that
+atom's nucleus and attached by rigid translation — because a grid re-selected at every
+geometry is a discrete function of geometry and has no derivative:
+
+```python
+from pythc.grad import FrozenGrid, thc_mp2_gradient
+
+grid = FrozenGrid(mol, per_atom)     # per_atom: [(coords_rel_to_nucleus, weights), ...]
+res = thc_mp2_gradient(mol, mf, grid, auxbasis='cc-pvdz-ri', metric_ridge=1e-4)
+res.de          # (n_atm, 3) fixed-orbital correlation gradient, Hartree/Bohr
+res.torque      # (n_atm, 3) torque on each atom's point set about its own nucleus
+```
+
+`thc_mp2_gradient` returns the correlation gradient at a **fixed** SCF reference. For the
+derivative of a total energy — which is what dynamics needs — add the Hartree-Fock
+gradient and the orbital response:
+
+```python
+from pythc.grad.total import total_mp2_gradient
+
+e_tot, de = total_mp2_gradient(mol, mf, grid, auxbasis='cc-pvdz-ri', metric_ridge=1e-4)
+```
+
+The whole pipeline is a PySCF gradient scanner, so `pyscf.md` drives it directly. The
+per-element point sets stay fixed for the entire trajectory; the only thing that happens
+to the grid between steps is that it is translated onto the new nuclear positions:
+
+```python
+from pyscf import md
+from pythc.grad.total import ThcMP2Gradients
+
+grad = ThcMP2Gradients(per_atom=per_atom, auxbasis='cc-pvdz-ri', metric_ridge=1e-4)
+md.NVE(grad.as_scanner(mol), dt=20, steps=100).run()
+```
+
+Two caveats worth knowing before using this. The orbital response currently solves the
+coupled-perturbed equations once per nuclear degree of freedom, so a gradient costs
+Hessian-level work rather than the single Z-vector solve a production implementation
+would use. And the regularisation window for a *gradient* is much narrower than for an
+energy — prefer `metric_scheme='damped'`, and see
+[`experiments/atom_centered_grids/FINDINGS.md`](experiments/atom_centered_grids/FINDINGS.md)
+sections 11–12 for why a ridge that the energy is happy at can be three decades too small
+for its derivative.

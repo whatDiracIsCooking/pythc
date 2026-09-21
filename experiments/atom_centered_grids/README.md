@@ -40,7 +40,8 @@ molecule and never re-selected - and prices it against that lower bound.
 | `window.py` | what sets that floor, whether a different filter moves it, and what the torque is once the regulariser is taken out of it |
 | `torque_ladder.py` | whether the torque `window.py` is left holding converges away with grid size, the way the energy spread did |
 | `trajectory.py` | what that torque does over a trajectory, and whether it is worse than the quadrature the grid is pruned from |
-| `insitu.py` | whether a per-element support and weight set fitted against *real* neighbours beats one fitted against ghosts, and whether the gain survives on molecules no fit saw |
+| `atomic_eri.py` | whether a **richer purely-atomic target** - the free atom's own ERIs rather than its overlap matrix - lifts the equation-count ceiling that forced ghosts, and what the support it selects is worth |
+| `insitu.py` | whether fitting against *real* neighbours beats fitting against ghosts, and - by pairing a support with weights fitted for a different objective - whether a support and its weights can be chosen separately at all |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -77,15 +78,21 @@ uv run python trajectory.py methanol --modes hf,blocked,ghost --steps 5000 \
 uv run python trajectory.py methanol --modes hf --reference rks --xc pbe \
     --grid-level 0 --steps 2000 --out data/traj_methanol_rks.json   # the DFT control
 uv run python trajectory.py --report data/traj_*.json
+uv run python atomic_eri.py --saturate H,C,N,O            # the ceiling, per target, no SCF
+uv run python atomic_eri.py --calibrate H,C,O --with-ghost   # the ladder, no SCF
+uv run python atomic_eri.py methanol --out data/eri_methanol.json
+uv run python analyse.py data/eri_methanol.json
+uv run python torque_ladder.py methanol --modes eri,eriw,ghost --scheme damped \
+    --ridges 1e-8 --pinv --draws 4 --out data/torque_ladder_methanol_eri.json
 uv run python insitu.py --calibrate                  # supports + weight sums, no SCF
 uv run python insitu.py --out data/insitu.json       # train/held-out, energy and spread
 uv run python torque_ladder.py formaldehyde --modes ghost,ghostw,molw,molfit,molfit1 \
-    --ridges "" --pinv --draws 4                     # the same modes, as torque
+    --ridges "" --pinv --draws 4                     # the mixed-footing control, as torque
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Sixteen headlines:
+See [`FINDINGS.md`](FINDINGS.md). Eighteen headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -93,7 +100,7 @@ See [`FINDINGS.md`](FINDINGS.md). Sixteen headlines:
   fit's real product is its support. Where the metric is full-rank, all-ones weights give
   bit-identical energies. That removes most of the gradient difficulty from the proposal,
   since `X = phi(r_P)` has no weight to differentiate. *(This is the pseudoinverse result.
-  §12 and §14 qualify it: under the ridge or damped filter the weights are worth 2-2.5x at
+  §12 and §16 qualify it: under the ridge or damped filter the weights are worth 2-2.5x at
   matched support, and they cost the gradient nothing either way, so the offline object
   should carry them.)*
 * With the grid frozen, the metric's **eigenvalue truncation is the last discrete step**
@@ -159,7 +166,8 @@ See [`FINDINGS.md`](FINDINGS.md). Sixteen headlines:
   (17667x). The complete 3284-point parent grid sits at **0.24** uHa/rad and the *pruned*
   670-point weighted grid at **0.02**, so pruning is a benefit rather than a cost. What a
   transferable support cannot do is carry in-molecule weights - which made fitting
-  per-element weights for that objective the highest-leverage thing left. §14 ran it.
+  per-element weights for that objective the highest-leverage thing left. §14 ran it, and
+  §16 shows why the pairing rather than the objective is what carries it.
 * **Over a trajectory the leak reorients rather than heats, and it is smaller than the
   grid it is pruned from.** 2.5 ps of thermal tumbling on methanol: the torque is 95%
   incoherent, the spin-up component is pinned by energy conservation at the size of the
@@ -170,24 +178,48 @@ See [`FINDINGS.md`](FINDINGS.md). Sixteen headlines:
   times better at it than its own parent. A level-3 grid is ~25x better still, on 163x the
   points; the in-molecule `blocked` grid is within **2.3x of level-3 DFT on 224x fewer
   points**, which localises the remaining gap to the weights.
-* **The orbital response is now a prerequisite, not a refinement.** On the fixed-orbital
-  surface the force is not the gradient of the propagated energy, and that alone breaks
-  rotational invariance at **~8300 uHa/rad** - fifty times the transferable grid's own
-  torque, and identical on a grid with five thousand times less. No AIMD runs on the
-  present gradient whatever the grid does.
-* **Support and weights are one object, and the weight footing is worth ~2-3x rather
-  than the 450x §13 implied.** Per-element weights fitted against *real* atoms in real
-  molecules, trained on three and held out on three. Laid onto the existing ghost support
-  (`molw`) they beat `ghostw` **0 times out of 12** on held-out molecules, on energy and
-  rotation spread alike - despite carrying much the better overlap residual. Refit the
-  *support and the weights together* (`molfit`) and it wins **8/10** on energy at a median
-  of ~3x, the best transferable grid here. A weight set is worth nothing on a support
-  selected by a different fit. Two methodology notes come with it: read these at **matched
-  point count**, and do not take a ratio from a torque quoted at one rung - `ghostw` on
-  formaldehyde runs 163 uHa/rad at 344 points, 1.0 at 427 and 3.7 at 486, which is a
-  caveat on §13's own headline numbers. What now blocks further offline tuning is the
-  *target*: two grids matched on the overlap objective to 10% differ by 1.5-2.8x in what
-  matters, in the opposite order, so `S` can no longer rank the candidates.
+* **The orbital response is built, and AIMD runs on the THC surface.** It was the
+  programme's last unbuilt component. The obstacle was not the CPHF solve but the Laplace
+  factors: carrying orbital *energies*, they make the energy non-invariant under a
+  rotation among the occupied orbitals, so the response needs blocks of `U` that no
+  solver returns. Written `Theta_o = w^(1/4) exp(t F_oo)` the energy is the same at the
+  canonical point and manifestly invariant, leaving only the standard occupied-virtual
+  response. Section 11's rotational identity now closes to **6.1e-9** relative where the
+  fixed-orbital force sits at 9.1e-3, and NVE through `pyscf.md` conserves energy to
+  **0.247 uHa/step against 21.68** - the fixed-orbital number being exactly the "tens of
+  microhartree per step" section 13 reported. What is left is making it cost one
+  coupled-perturbed solve rather than `3 N`.
+* **The ghosts turn out not to be necessary: fit the atom's own ERIs instead.** §4(3)
+  killed the free-atom fit on an *equation count* - an isolated atom's overlap target
+  supplies `n_AO(n_AO+1)/2` equations, 15 for hydrogen in cc-pVDZ, and NNLS can never
+  retain more points than that. Ghosts lift the count by stacking environments. So does a
+  richer observable of the same isolated atom: `(mu nu|lambda sigma) = int dr phi_mu
+  phi_nu V_{lambda sigma}` makes the ERI *linear* in the quadrature weights, so the same
+  solver fits it unchanged against `O(n_AO^4)` equations instead of `O(n_AO^2)`. The
+  ceiling lifts **4.6-6.5x** (H 15 -> 97, C 92 -> 463, N 92 -> 467, O 92 -> 423) and the
+  support - no ghosts, no partners, no training molecules - costs **0.89-1.16x** the
+  in-molecule `blocked` grid at matched accuracy and matched weight footing, where
+  thirteen ghost environments cost 1.11-1.78x.
+* **And the weights that same fit produces are the first transferable ones that help.**
+  §13 put the whole remaining orientation gap on the weight footing and found `ghostw`
+  *worse* than `w = 1`. `eriw` converges on the `pinv` torque ladder at **1481x**, next to
+  weighted `blocked`'s 17667x and against 13-40x for `blocked1`, `ghost`, `ghostw` and
+  `eri` alike, reaching **0.19 uHa/rad on 565 points** - below the 0.24 the complete
+  3284-point parent grid sits at - while landing within 0.05 uHa of that parent grid's
+  energy. A transferable support *can* carry usable weights; they just have to be fitted
+  against something LS-THC cares about.
+* **Support and weights cannot be chosen separately.** §14 fits both against the atom's
+  ERIs and wins; this is the control that says the *pairing* is why. Per-element weights
+  fitted against real atoms in real molecules - trained on three, held out on three - are
+  laid onto the ghost support they were not selected with (`molw`), and beat `ghostw`
+  **0 times out of 12** on held-out molecules, on energy and rotation spread alike,
+  despite carrying much the better overlap residual. Refit the support *and* the weights
+  together (`molfit`) and it wins **8/10** on energy at a median of ~3x. So §14's
+  instruction not to read an `eriw` number against a `w = 1` one is the weak form: a
+  weight set is worth nothing at all on a support selected by a different fit. Two
+  methodology notes come with it - read these at **matched point count**, and take no
+  ratio from a torque quoted at one rung, since `ghostw` on formaldehyde runs 163 uHa/rad
+  at 344 points, 1.0 at 427 and 3.7 at 486.
 * **The gradient exists and verifies to machine precision** (`pythc.grad`, driven by
   `gradient.py`): quadratic convergence against a finite difference, and forces that sum
   to zero to 2.4e-15 with no finite difference involved. Two things came back with it
