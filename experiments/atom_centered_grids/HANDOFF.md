@@ -540,8 +540,11 @@ rotation fed back; the internal coordinates are still the RHF trajectory's, so t
 treatment is first order in the leak. A fully coupled run needs the orbital response
 first. One molecule that does not saturate, one initial condition per arm, gas phase.
 
-**(8) Fit per-element weights against the in-molecule objective. NOT STARTED, and it is
-now the highest-leverage thing on this list.** 4(7) localises the entire orientation gap
+**(8) Fit per-element weights against the in-molecule objective. NOT STARTED. Section 14
+promotes it from the highest-leverage thing on this list to a prerequisite for any basis
+larger than cc-pVDZ** - discarding the weights costs ~1.5 uHa on 670 cc-pVDZ points and
+**~19 uHa on 1746 cc-pVTZ points**, and a transferable support cannot carry in-molecule
+weights.** 4(7) localises the entire orientation gap
 to the weight footing: same support, `w = 1` gives 9.02 uHa/rad and NNLS weights give
 0.02. `ghostw` - the ghost fit's own weights, transferred - gives 52.3 and is *worse* than
 `w = 1`, which is consistent with 4(6)'s note that those weights condition the ghost
@@ -620,18 +623,28 @@ varied, as a ceiling (SCF-free, seconds) and as points per microhartree on metha
   `cage`'s ladder is still falling steeply at its tightest rung while `ghost`'s has
   converged, so that ranking is provisional. **Quote section 8's tax, not section 14's**,
   and treat the cage as a cc-pVDZ best case.
-* **And the extended ladder took `blocked` out from under section 1 and section 8.** The
-  `blocked` baseline in cc-pVTZ does not fail to converge - it **plateaus** at ~19 uHa
-  above the floor while its support grows 1293 -> 1746 points, and `ghost` passes it and
-  reaches 2.5. As measured, the transferable grid beats the in-molecule fit, so the
-  premise that `blocked` is a *strict lower bound* on any frozen scheme - which is what
-  makes §1 and §8 arguments about the programme rather than about two fitting modes -
-  does not hold in this basis. Before believing that, note the alternative: a support
-  growing 35% for no accuracy is the **footing** failing, not the grid, and this row is
-  `w = 1` under `metric_ridge = 1e-8` at 1700+ points, exactly where 4(1) and 4(6) say
-  the ridge inverts near-null directions. **Re-run the cc-pVTZ `blocked` ladder with NNLS
-  weights kept, and under `--scheme damped`, before concluding anything.** That is the
-  cheapest experiment on this list and it guards a load-bearing premise.
+* **The cc-pVTZ `blocked` plateau was the weights, and it is the most consequential
+  thing in section 14.** The extended ladder showed `blocked` flat at ~19 uHa above the
+  floor while its support grew 1293 -> 1746 points, with `ghost` passing it - which would
+  have broken §1 and §8's strict-lower-bound premise. `levers.py --blocked-diagnostic`
+  ran the 2x2 that separates grid from footing on one set of supports, and the premise
+  survives: **with its own NNLS weights `blocked` sits ON the parent-grid floor from 1053
+  points up** (+0.36, -0.08, -0.04, +0.00 uHa). The filter is worth a factor of three
+  (`w = 1` ridge 19 -> damped 6, 4(6) reproducing in a second basis on a grid five times
+  larger than it was measured on); the weights are worth all of it.
+* **What that costs the programme is the point.** A transferable support can carry
+  `w = 1` or its ghost-fit weights and nothing else - 4(7) already localised the
+  *orientation* gap to exactly this - so the penalty this prices is one acTHC pays and an
+  in-molecule fit does not. And it grows with basis: discarding the weights costs ~1.5
+  uHa on 670 cc-pVDZ points and **~19 uHa on 1746 cc-pVTZ points**. The ghost gap is
+  therefore worse in a production basis, not better, and **(8) is no longer the
+  highest-leverage idea on this list - it is a prerequisite for using the scheme in
+  cc-pVTZ at all.**
+* **A caveat it puts on 4(3), 4(4) and section 14 together:** every ghost-gap number in
+  this directory is measured against a `blocked` row that is itself at `w = 1`. That is
+  the right control for isolating the selection and a handicapped baseline for everything
+  else, increasingly so with basis size. The published gaps flatter the transferable
+  scheme.
 * `levers_methanol_tz_wide.json` was killed by the machine during its second `cage` rung
   - a cc-pVTZ cage environment carries ~360 AOs across 9 environments and is the heaviest
   solve here. Re-run the cage rungs chunked, so a kill costs one rung.

@@ -45,6 +45,146 @@
       "err_uha": 26.613412996090435,
       "fit_seconds": 16.90330147743225,
       "scheme": "ridge"
+    },
+    {
+      "mode": "blocked:ones:ridge",
+      "threshold": 1e-06,
+      "n_points": 1531,
+      "rmsd_S": 4.311321269284383,
+      "e_corr": -0.45764285190709203,
+      "err_uha": 25.859574313835676,
+      "fit_seconds": 24.4884991645813,
+      "scheme": "ridge"
+    },
+    {
+      "mode": "blocked:ones:ridge",
+      "threshold": 1e-07,
+      "n_points": 1746,
+      "rmsd_S": 6.519451002083996,
+      "e_corr": -0.45764246760059407,
+      "err_uha": 26.24388081179374,
+      "fit_seconds": 36.34230041503906,
+      "scheme": "ridge"
+    },
+    {
+      "mode": "blocked:ones:damped",
+      "threshold": 0.0001,
+      "n_points": 1053,
+      "rmsd_S": 1.9840786163070203,
+      "e_corr": -0.4576529289812848,
+      "err_uha": 15.782500121075405,
+      "fit_seconds": 10.702404499053955,
+      "scheme": "damped"
+    },
+    {
+      "mode": "blocked:ones:damped",
+      "threshold": 1e-05,
+      "n_points": 1293,
+      "rmsd_S": 2.9769695966000915,
+      "e_corr": -0.4576558857525815,
+      "err_uha": 12.82572882438382,
+      "fit_seconds": 16.90330147743225,
+      "scheme": "damped"
+    },
+    {
+      "mode": "blocked:ones:damped",
+      "threshold": 1e-06,
+      "n_points": 1531,
+      "rmsd_S": 4.311321269284383,
+      "e_corr": -0.45765481524132107,
+      "err_uha": 13.896240084798617,
+      "fit_seconds": 24.4884991645813,
+      "scheme": "damped"
+    },
+    {
+      "mode": "blocked:ones:damped",
+      "threshold": 1e-07,
+      "n_points": 1746,
+      "rmsd_S": 6.519451002083996,
+      "e_corr": -0.45765553803848996,
+      "err_uha": 13.17344291590361,
+      "fit_seconds": 36.34230041503906,
+      "scheme": "damped"
+    },
+    {
+      "mode": "blocked:nnls:ridge",
+      "threshold": 0.0001,
+      "n_points": 1053,
+      "rmsd_S": 0.0013385243253580957,
+      "e_corr": -0.4576611695943989,
+      "err_uha": 7.541887006967674,
+      "fit_seconds": 10.702404499053955,
+      "scheme": "ridge"
+    },
+    {
+      "mode": "blocked:nnls:ridge",
+      "threshold": 1e-05,
+      "n_points": 1293,
+      "rmsd_S": 0.0010060928360650294,
+      "e_corr": -0.45766161457859406,
+      "err_uha": 7.0969028118095245,
+      "fit_seconds": 16.90330147743225,
+      "scheme": "ridge"
+    },
+    {
+      "mode": "blocked:nnls:ridge",
+      "threshold": 1e-06,
+      "n_points": 1531,
+      "rmsd_S": 0.0009399345053329755,
+      "e_corr": -0.4576615753110016,
+      "err_uha": 7.136170404264952,
+      "fit_seconds": 24.4884991645813,
+      "scheme": "ridge"
+    },
+    {
+      "mode": "blocked:nnls:ridge",
+      "threshold": 1e-07,
+      "n_points": 1746,
+      "rmsd_S": 0.0009387529635394388,
+      "e_corr": -0.4576615317882701,
+      "err_uha": 7.179693135739296,
+      "fit_seconds": 36.34230041503906,
+      "scheme": "ridge"
+    },
+    {
+      "mode": "blocked:nnls:damped",
+      "threshold": 0.0001,
+      "n_points": 1053,
+      "rmsd_S": 0.0013385243253580957,
+      "e_corr": -0.45766124685176823,
+      "err_uha": 7.464629637632392,
+      "fit_seconds": 10.702404499053955,
+      "scheme": "damped"
+    },
+    {
+      "mode": "blocked:nnls:damped",
+      "threshold": 1e-05,
+      "n_points": 1293,
+      "rmsd_S": 0.0010060928360650294,
+      "e_corr": -0.45766169640288606,
+      "err_uha": 7.015078519800877,
+      "fit_seconds": 16.90330147743225,
+      "scheme": "damped"
+    },
+    {
+      "mode": "blocked:nnls:damped",
+      "threshold": 1e-06,
+      "n_points": 1531,
+      "rmsd_S": 0.0009399345053329755,
+      "e_corr": -0.45766160537549844,
+      "err_uha": 7.106105907428439,
+      "fit_seconds": 24.4884991645813,
+      "scheme": "damped"
+    },
+    {
+      "mode": "blocked:nnls:damped",
+      "threshold": 1e-07,
+      "n_points": 1746,
+      "rmsd_S": 0.0009387529635394388,
+      "e_corr": -0.45766160315150106,
+      "err_uha": 7.10832990480359,
+      "fit_seconds": 36.34230041503906,
+      "scheme": "damped"
     }
   ]
 }

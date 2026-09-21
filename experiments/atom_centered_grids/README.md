@@ -185,8 +185,18 @@ See [`FINDINGS.md`](FINDINGS.md). Fifteen headlines:
   in-molecule fit (0.96x) while `ghost` cannot reach that target at all. Compounded
   against a global molecular fit that is **1.85x rather than 2.7x**, i.e. 3.4x rather
   than 7.3x on the `n_P^2` parts. **All of that is cc-pVDZ, and cc-pVTZ reverses it** -
-  there the cage is 1.2-1.4x *worse* than the single-ghost ensemble, on ladders that have
-  not converged in either direction. Treat the halved tax as a best case, not a result. Two more levers behave as §9 predicts: a finer parent
+  there the cage is 1.2-1.4x *worse* than the single-ghost ensemble. Treat the halved tax
+  as a best case, not a result.
+* **The bigger cc-pVTZ finding is not about the cage: discarding the NNLS weights costs
+  ~19 uHa there against ~1.5 in cc-pVDZ.** A `blocked` ladder that looked like it had
+  hit an accuracy ceiling at ~19 uHa above the floor - and that `ghost` appeared to beat,
+  which would have broken the strict-lower-bound premise of sections 1 and 8 - turns out
+  to sit exactly **on** the floor once its own weights are restored (+0.36 to +0.00 uHa
+  from 1053 points up). The filter is worth a factor of three, the weights are worth all
+  of it, and a transferable support can carry neither. **The weight penalty grows with
+  basis size**, so the ghost gap is worse in a production basis, not better, and fitting
+  per-element weights for the in-molecule objective is now a prerequisite rather than an
+  improvement. Two more levers behave as §9 predicts: a finer parent
   grid moves the ceiling 1.26-1.42x *at unchanged equation count* - which contradicts the
   premise HANDOFF 4(9) is written on - and a tetrahedral direction set is the cheapest
   thing measured at 50 uHa and cannot reach 10 uHa at any threshold, which is §9's rank

@@ -1716,45 +1716,73 @@ are off-scale in this basis, as §10 warns they go:
   artefact of an unconverged denominator and not a measurement." Extended two decades it
   does not fall. It plateaus.**]**
 
-### The `blocked` baseline plateaus in cc-pVTZ, and the lower bound stops being one
+### The `blocked` plateau was the weights, and the lower bound holds after all
 
-`levers_methanol_tz_wide.json`, the extended run. It was killed by the machine during its
-second `cage` rung - the same silent kill that took the parent ladder in the `torque_ladder`
-history, a cc-pVTZ cage environment carrying ~360 AOs across 9 environments being the
-heaviest solve in this directory - so the cage question above is still open. What it did
-deliver first settles the `blocked` one, the other way:
+`levers.py --blocked-diagnostic`. The extended ladder above grows `blocked`'s support
+1293 -> 1746 points for no accuracy at all, ~19 uHa above the parent-grid floor
+throughout, while `ghost` passes it and reaches 2.5. Read at face value that breaks the
+premise §1 and §8 rest on - that the in-molecule fit is a *strict lower bound* on any
+frozen atom-centred scheme. **It does not survive the diagnostic, and what it was is the
+weights.**
 
-| above floor (+7.14 uHa) | curve |
+One set of `blocked` supports, fitted once and re-weighted, evaluated four ways at the
+same `lambda = 1e-8` on both filters, so that everything that moves between arms is the
+footing rather than the grid. Methanol, cc-pVTZ, uHa **above the +7.18 floor**:
+
+| arm | 1053 pts | 1293 | 1531 | 1746 |
+| --- | --- | --- | --- | --- |
+| `w = 1`, ridge | +32.15 | +19.43 | +18.68 | +19.06 |
+| `w = 1`, damped | +8.60 | +5.65 | +6.72 | +5.99 |
+| NNLS weights, ridge | +0.36 | -0.08 | -0.04 | **+0.00** |
+| NNLS weights, damped | +0.29 | -0.16 | -0.07 | **-0.07** |
+
+**With its own weights the in-molecule fit sits on the parent-grid floor from 1053 points
+upward.** Not near it - on it, to within 0.4 uHa at the loosest rung and 0.1 at the rest.
+The plateau is gone, and so is everything that was read off it:
+
+* **RETRACTED: "in cc-pVTZ the transferable grid beats the in-molecule fit."** It does
+  not. `blocked` is at the floor at 1053 points; `ghost` needs 1485 to reach 2.5 uHa
+  above it and never reaches it on the ladder run. §1 and §8's lower-bound premise holds
+  in cc-pVTZ, and holds *harder* than in cc-pVDZ.
+* **The filter is worth a factor of three and the weights are worth everything.** Ridge
+  to damped takes the `w = 1` plateau from 19 to 6 uHa - §12's result reproducing in a
+  second basis, on a grid five times larger than anything it was measured on. Restoring
+  the weights takes it from 19 to zero. Both matter; they are not the same size.
+
+**And that is the result, because a transferable support cannot carry those weights.**
+§13 localised the orientation gap to exactly this - `ghost` converges like `blocked1`
+(`w = 1`) and not like weighted `blocked`, 35.6x against 17667x - and this prices the
+same footing in *energy*, in a basis where it is no longer a rounding error:
+
+| | cost of discarding the weights, in-molecule support |
 | --- | --- |
-| `blocked` | 767/+105.7, 1053/+32.2, 1293/+19.5, 1531/**+18.7**, 1746/**+19.1** |
-| `ghost` | 1063/+8.6, 1202/+4.1, 1351/+4.6, 1423/+3.6, 1485/**+2.5** |
+| cc-pVDZ, 670 pts | ~1.5 uHa |
+| cc-pVTZ, 1746 pts | **~19 uHa** |
 
-**`blocked` is not unconverged. It is flat.** Two further decades of threshold grow its
-point count 1293 -> 1746 and buy nothing at all, while `ghost` passes it and reaches
-2.5 uHa above the floor. So the apparent result stands as measured: **in cc-pVTZ the
-transferable grid beats the in-molecule fit it is supposed to be paying a penalty
-against**, and §1 and §8's premise - that `blocked` is a *strict lower bound* on any
-frozen atom-centred scheme - does not hold in this basis.
+§3 concluded the weights barely matter, on the strength of bit-identical energies under
+the *pseudoinverse*. §12 walked that back for conditioning. §13 walked it back for
+orientation. This walks it back for the energy, and adds the part that matters for where
+the programme goes: **the penalty grows with basis size.** So the ghost gap is not merely
+unimproved in cc-pVTZ - measured against a `blocked` that is allowed its own weights, it
+is far worse than the 1.1-1.8x §8 reports in cc-pVDZ, and HANDOFF 4(8) - fit per-element
+weights *for* the in-molecule objective - stops being the highest-leverage idea on the
+list and becomes a prerequisite for using this scheme in a production basis.
 
-That premise is load-bearing for the whole programme, so the alternative explanation
-deserves more weight than the headline. A curve whose support grows 35% with no accuracy
-gain does not look like a grid running out of points; it looks like the **footing**
-failing. This `blocked` is `w = 1` under `metric_ridge = 1e-8` at 1700+ points, which is
-precisely the regime this file flags twice: §6 on ridge inverting near-null directions at
-`1/lambda` in a redundant metric, and §8's caveat that `blocked` with `w = 1` under ridge
-and `blocked` with NNLS weights are not the same curve. The parent-grid floor's 0.18 uHa
-irreproducibility reappearing in this basis (+7.14 here against +7.32 in the narrow run,
-identical grid and SCF settings) points the same way.
+**One caveat this puts on §8, §10 and §14 alike.** Every ghost-gap number in this
+directory is measured against a `blocked` row that is itself at `w = 1`, deliberately, so
+that the only difference between the modes is where the points came from. That is the
+right control for isolating the *selection*, and this diagnostic shows it is a materially
+handicapped baseline - increasingly so with basis size. The published gaps therefore
+flatter the transferable scheme relative to what an in-molecule fit can actually do. They
+are not wrong; they are answering a narrower question than their phrasing suggests.
 
-**The diagnostic is cheap and specific, and nothing should be concluded before it is
-run:** re-run the cc-pVTZ `blocked` ladder with its NNLS weights kept, and again under
-`--scheme damped`. If the plateau lifts, the baseline was degenerate and `ghost`-beats-
-`blocked` evaporates. If it stays, §8's lower-bound premise needs qualifying by basis.
-
-So what cc-pVTZ establishes is narrow and negative: **the cage's cc-pVDZ win does not
-generalise across basis sets as measured**, and the ladders need extending (`1e-6`,
-`1e-7`) before either the cage's ranking or the ghost gap in a larger basis means
-anything. That run is `levers_methanol_tz_wide.json`.
+So cc-pVTZ establishes two things, one narrow and one not. The narrow one: **the cage's
+cc-pVDZ win does not generalise across basis sets as measured**, and that ranking is
+still provisional, because `cage`'s ladder is the one arm never driven to convergence -
+`levers_methanol_tz_wide.json` was killed by the machine on its second cage rung, a
+cc-pVTZ cage environment carrying ~360 AOs across 9 environments being the heaviest solve
+in this directory. The broad one is the weight footing above, which is not about the cage
+at all.
 
 What does carry across is stage A's mechanism. cc-pVTZ raises the per-element ceilings
 1.55-2.34x and the supports are correspondingly larger at every threshold - `ghost` spans
