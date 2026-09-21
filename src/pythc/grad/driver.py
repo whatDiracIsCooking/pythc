@@ -129,7 +129,11 @@ def thc_mp2_gradient(mol: gto.Mole,
     :param metric_scheme: Which regularised inverse to use where a ridge is requested:
         ``"ridge"`` for ``(S + lambda I)^-1``, ``"damped"`` for the Tikhonov-filtered
         ``S (S^2 + mu^2 I)^-1``, which sends the numerically null directions to zero
-        instead of to the largest gain in the operator. See :func:`pythc.lib.damped_inv`.
+        instead of to the largest gain in the operator, either with a ``"_jacobi"``
+        suffix for the symmetrically preconditioned form. The preconditioned filter is
+        invariant to the collocation weights, which for a frozen grid is the difference
+        between a support that has to carry fitted weights and one that does not. See
+        :func:`pythc.lib.damped_inv` and :func:`pythc.lib.jacobi_scaling`.
     """
     C, eps = _resolve_reference(mf, mo_coeff, mo_energy)
     n_occ = mol.nelectron // 2

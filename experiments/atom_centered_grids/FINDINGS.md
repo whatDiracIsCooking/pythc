@@ -2378,17 +2378,19 @@ NNLS weights, under both filters, and does not hurt where weights are already pr
 19 uHa that discarding the weights costs in cc-pVTZ is recovered in full by a scaling read
 off `S` in closed form - no offline object, no training molecules, nothing transferred.
 
-**This is an energy result and nothing more, for a reason that is a defect rather than a
-caveat.** `invert_metric_adjoint` has no `_jacobi` branch. The forward scheme was added
-without one, the dispatch fell through to the *ridge* adjoint, and the reverse pass
-therefore differentiated a different operator than the forward pass applied: `E` depends
-on `S`, so `d(E filter(E S E) E)/dS` carries a term through `E` that nothing computes.
-Energies right, gradients silently wrong - measured, net torques of ~4e5 uHa/rad against
-~1e-1 for the same grids under `damped`. It now raises `NotImplementedError` naming the
-missing term, and an unknown scheme raises rather than falling through. **There is no
-Jacobi torque measurement, and §15 raises the stakes on getting one**: the orbital
-response is built and AIMD now runs on this surface, so a metric scheme whose gradient is
-undefined is a gap in the pipeline rather than a curiosity.
+**This was an energy result and nothing more, for a reason that was a defect rather than
+a caveat - and §18 has since removed it.** `invert_metric_adjoint` had no `_jacobi`
+branch. The forward scheme was added without one, the dispatch fell through to the *ridge*
+adjoint, and the reverse pass therefore differentiated a different operator than the
+forward pass applied: `E` depends on `S`, so `d(E filter(E S E) E)/dS` carries a term
+through `E` that nothing computed. Energies right, gradients silently wrong - measured,
+net torques of ~4e5 uHa/rad against ~1e-1 for the same grids under `damped`. It then
+raised `NotImplementedError` naming the missing term, and an unknown scheme raises rather
+than falling through. **§18 derives the term, verifies it three ways and runs the torque
+ladder this section could not**, and what comes back is larger than the gap it was meant
+to close: the preconditioned metric inverse is *exactly* invariant to the collocation
+weights, so the weight footing §13 and §16 put the whole remaining orientation gap on
+ceases to exist.
 
 One implementation note that is not cosmetic: `diag(S)_PP` is exactly zero for a point
 carrying no amplitude, which is what a weight fit produces whenever it drops a point - the
@@ -2413,10 +2415,8 @@ single-ghost ensemble narrowed to 10, would separate the two. Nothing here does.
 gradient. A lever that wins on energy has to be re-read under `--scheme damped` before it
 means anything for the application, and none of these settings has been through
 `window.py`, `torque_ladder.py` or `trajectory.py`. **In particular no torque has been
-measured for the cage**, and §13 puts the whole remaining gap to production DFT on the
-weight footing and orientation rather than on the energy - so the lever that halves the
-point-count tax is not yet known to help, or not to hurt, the quantity that actually
-blocks AIMD.
+measured for the cage** - §18 measures one for the preconditioner and for nothing else
+here, and the four levers remain energy-only.
 
 One molecule, one geometry, one ensemble family **in cc-pVDZ - and the one basis it was
 carried to reverses its ranking**, on ladders that are not converged in either direction.
@@ -2431,6 +2431,135 @@ the fit cost. The cage's fit is also the slowest thing in stage A by a wide marg
 (76-80 s per heavy element at saturation against 1-2 s), which is irrelevant to an
 offline object run once per element but is what makes a stage-A sweep over cages
 expensive.
+
+## 18. The preconditioner has a derivative, and it erases the weight footing the whole programme was stuck on
+
+**Read §17 last, and this section against it.** §17 found that `E = diag(1 / sqrt(diag S))`
+applied at runtime recovers, in the energy, the ~19 uHa that discarding the NNLS weights
+costs in cc-pVTZ - and then had to stop, because `invert_metric_adjoint` had no `_jacobi`
+branch. The forward scheme had been added without one, the dispatch fell through to the
+*ridge* adjoint, and the reverse pass differentiated an operator the forward pass never
+applied. The scheme has since been raising `NotImplementedError`, which left the one lever
+that replaces the weights usable for single points and for nothing else.
+
+The adjoint now exists (`pythc.grad.linalg.jacobi_inv_adjoint`), and with it the
+measurement §17 could not make. The result is larger than the gap it was meant to close.
+
+### The derivative
+
+Write `Mj = E S E`, `G = f(Mj)` and `B = E G E`. `E` is a function of `S`, so it appears in
+two places and contributes twice:
+
+    G_bar   = E B_bar E,        Mj_bar = adjoint of the inner filter at Mj
+    e_bar   = 2 (Mj_bar o S) e  +  2 (B_bar o G) e
+    S_bar   = E Mj_bar E        +  diag(e_bar o (-e^3 / 2))
+
+The last term runs through `de_P / dS_PP = -e_P^3 / 2`, and is zero on the rows
+`lib.jacobi_scaling` leaves unscaled - `S_PP = (sum_mu X_muP^2)^2` is exactly zero for a
+point carrying no amplitude, which is what a weight fit produces whenever it drops one.
+
+Three checks, of which the second needs no finite difference. A central difference on a
+matrix whose *diagonal* spans four decades agrees to 1e-8 relative, for `ridge`,
+`ridge_eigh` and `damped` inner filters under all three ridge scalings. An exact inverse
+cannot see a similarity transform - `E (E S E)^-1 E = S^-1` for any invertible diagonal -
+so at `lambda = 0` the three paths must cancel to `-S^-1 S_bar S^-1`, and they do to 1e-12.
+And the assembled nuclear gradient finite-differences under `ridge_jacobi` and
+`damped_jacobi` on water, with the torque agreeing with actually rotating each point set
+about its own nucleus. Both ways of getting it wrong are pinned as wrong against the same
+difference: the historic fall-through, and the near miss of taking the inner filter's term
+at `Mj` while holding `E` fixed.
+
+### The ladder, against a matched control
+
+`torque_ladder.py methanol --modes blocked,blocked1,ghost --ridges 1e-8 --pinv --draws 4`,
+run twice and differing in `--scheme` alone - same supports, same draws, same seed, same
+machine. The control reproduces §13 (`blocked1` 39.62x against 39.6x, `ghost` 35.56x
+against 35.6x over the same rungs), which is what makes the arm readable.
+
+Net torque, uHa/rad, at `1e-8`:
+
+| mode | 235/223 | 301/414 | 410/512 | 491/627 | 670/702 | converges |
+| --- | --- | --- | --- | --- | --- | --- |
+| `blocked` damped | 341.70 | 45.72 | 1.04 | 0.11 | 0.02 | 14065x |
+| `blocked` **damped_jacobi** | 357.33 | 57.05 | 0.21 | 0.06 | 0.02 | 17203x |
+| `blocked1` damped | 316.61 | 75.69 | 6.17 | 3.26 | 1.32 | 240x |
+| `blocked1` **damped_jacobi** | 357.33 | 57.08 | 0.22 | 0.03 | **0.01** | **69121x** |
+| `ghost` damped | 814.31 | 109.49 | 630.20 | 21.37 | 15.15 | 54x |
+| `ghost` **damped_jacobi** | 731.91 | 2.97 | 22.08 | **0.09** | **0.21** | **3511x** |
+
+The energies move the same way and further: every preconditioned row from 410 points up
+sits at **+2.75 uHa**, the parent-grid floor `blocked` reaches, where `ghost` under
+`damped` is at +4.22 and +3.18 on its last two rungs and `blocked1` at +3.08. The
+rotation spread falls with it - `ghost` at 702 points goes 0.40 to 0.028 uHa.
+
+### What the numbers are saying: the weights are gone, exactly
+
+`blocked` and `blocked1` are the same support at two weight footings, and §13's whole
+account of the remaining orientation gap rests on the distance between them. Under the
+preconditioner that distance is not reduced. It is **zero**:
+
+| points | `blocked` energy | `blocked1` energy | `blocked` tau | `blocked1` tau |
+| --- | --- | --- | --- | --- |
+| 235 | -0.34335895057407 | -0.34335895055798 | 357.334 | 357.334 |
+| 410 | -0.34339917009482 | -0.34339916940064 | 0.2147 | 0.2162 |
+| 670 | -0.34339918873177 | -0.34339918912093 | 0.0208 | 0.0052 |
+
+Ten digits of agreement in the energy is not a coincidence, and the algebra says it had to
+happen. §17 established `S(w)_PQ = sqrt(w_P w_Q) S(1)_PQ`. Then
+`diag(S(w))_PP = w_P S(1)_PP`, so
+
+    e(w)_P = 1 / sqrt(w_P S(1)_PP) = e(1)_P / sqrt(w_P)
+    =>  E(w) S(w) E(w) = E(1) S(1) E(1)      exactly, for any positive w.
+
+**The Jacobi-preconditioned metric inverse is invariant to the collocation weights.** Not
+approximately, not up to the filter: the weights cancel before the filter is ever applied.
+Where §3 found the weights irrelevant under the *pseudoinverse* and §12, §16 and §17 found
+them worth 2-2.5x and then ~19 uHa once a regulariser with an absolute shift entered, the
+preconditioner restores the pseudoinverse's invariance to a filter that is analytic in `S`.
+
+That is why `ghost` moves so much further than `blocked` does. §13 localised the entire
+remaining gap between a transferable support and an in-molecule one to the weight footing;
+§16 then showed the footing cannot be fixed by transplanting a weight set, because support
+and weights are one object. Both are statements about a quantity that no longer exists.
+A transferable support does not need to carry weights, and cannot be penalised for not
+carrying them, because the metric supplies the scaling itself - in closed form, from the
+geometry it is already at, with nothing fitted, nothing stored and nothing transferred.
+
+At 627 points the transferable grid's net torque is **0.09 uHa/rad**, below the **0.24**
+§13 measures for the complete 3284-point parent grid, and its energy is on the floor.
+
+### What this does not settle
+
+**One molecule, one basis, one seed.** Methanol, cc-pVDZ, `ov`, four draws at `damped
+1e-8`. §17's own energy result is cc-pVTZ, and the two have not been run together.
+
+**The gain appears only once the grid resolves.** On the smallest rungs the preconditioner
+does nothing useful and can be slightly worse - `blocked` goes 341.7 to 357.3 at 235
+points, and `ghost`'s first rung is 814 to 732 while its energy is still 193 uHa off. It
+is not a rescue for a rank-starved grid; it starts paying at 410 points here.
+
+**The ladder is still not monotone.** `ghost` reads 2.97 at 414 points, 22.08 at 512 and
+0.09 at 627. That is §9's threshold-ladder artefact, which §16 warns against taking any
+ratio from at a single rung. Read the column, not a cell.
+
+**Nothing here is a trajectory.** §13's leak was measured by integrating a torque along a
+DF-RHF trajectory, and §15 made propagation on the THC surface possible. The obvious next
+run - `trajectory.py --scheme damped_jacobi`, which the script now accepts - has not been
+made, and a 72x smaller torque is a prediction about rotational diffusion rather than a
+measurement of it.
+
+**The invariance is exact for the *metric*, and the metric is not the whole pipeline.**
+`X = w^(1/4) R` still enters `W` and `D`; what cancels is the weights' effect on
+`S^-1`, which §17 shows is where essentially all of it was. The ten-digit energy agreement
+above is the evidence, not the algebra alone, and it is one molecule's worth.
+
+**The auxiliary Coulomb metric is not preconditioned** and does not need to be, but note
+that until this section it was silently *un-damped* whenever a `_jacobi` scheme was
+requested: `build_aux_coulomb_inv` did not recognise the suffix and fell through to the
+ridge, on both the forward and the reverse side. §17's energy table was produced with that
+behaviour in place. It is a ridge on a well-conditioned metric rather than a wrong
+derivative, so nothing there is invalidated, but the numbers are not exactly reproducible
+against today's code.
 
 ## Verdict
 
@@ -2537,6 +2666,23 @@ to **6.1e-9** relative where the fixed-orbital force sits at 9.1e-3 - and an NVE
 trajectory on the THC surface conserves energy to **0.247 uHa per step against the
 fixed-orbital force's 21.68**. The programme has no unbuilt component left.
 
+**§18 closes §17's defect and, with it, the question §13 and §16 left as the programme's
+last structural one.** The preconditioner §17 found - `E = diag(1 / sqrt(diag S))`, read
+off the metric at runtime - had no adjoint, so it was usable for single points and not
+for the application. It has one now, verified against a finite difference, against the
+identity that an exact inverse cannot see a similarity transform, and end to end on an
+assembled nuclear gradient and torque. The ladder it unlocks says more than that the
+scheme is differentiable. On methanol at matched supports and matched draws, `ghost` -
+the transferable object, at `w = 1` - goes from **15.15 to 0.21 uHa/rad** at 702 points
+and from 21.37 to **0.09** at 627, below the 0.24 §13 measures for the complete
+3284-point parent grid, while its energy drops onto the same +2.75 uHa floor the
+in-molecule fit reaches. The reason is exact rather than empirical: `diag(S(w))_PP =
+w_P diag(S(1))_PP`, so `E(w) S(w) E(w) = E(1) S(1) E(1)` for any positive weights, and
+the preconditioned metric inverse is invariant to the weight footing that §13 localised
+the entire transferable-support gap to and §16 showed could not be fixed by transplanting
+a weight set. `blocked` and `blocked1` - the same support at two footings - agree to ten
+digits in the energy under it.
+
 What remains to be measured, in order:
 
 1. ~~**The ghost gap.**~~ **Done - see §8, and the answer is yes.** 1.1-1.8x over
@@ -2630,6 +2776,16 @@ What remains to be measured, in order:
 
 
 
+12. ~~**Give the Jacobi preconditioner a derivative, and find out what it does to
+    orientation.**~~ **Done - see §18.** §17's preconditioner recovers in the energy
+    what discarding the NNLS weights costs, and had no adjoint, so nothing could be
+    asked of it beyond a single point. With one, the transferable support's torque falls
+    72x at 702 points and 237x at 627, its energy lands on the parent-grid floor, and the
+    weight footing turns out to cancel out of the preconditioned metric inverse exactly.
+    What is left is to run it on a second molecule and a second basis, and to put it on a
+    trajectory - `trajectory.py --scheme damped_jacobi` now accepts it and nothing has
+    run it.
+
 ## Caveats
 
 §15 is water only, one grid, twelve steps from rest, and ridge `1e-2` rather than the
@@ -2662,6 +2818,12 @@ The `molw` ladder sits at smaller point counts than `ghost` at every threshold, 
 NNLS zeroes part of a held support wherever non-negativity binds. The matched-size
 interpolation only quotes inside the window both ladders cover, so this does not bias the
 0/12, but it does mean `molw` was never measured at the sizes `ghost`'s top rungs reach.
+
+§18 is one molecule, one basis, one seed and four draws, at `damped 1e-8` - while §17's
+energy result, which it is the sequel to, is cc-pVTZ; the two have never been run
+together. Its gain appears only once the grid resolves: on the smallest rungs the
+preconditioner does nothing useful and is slightly worse. And it changes no trajectory
+number in §13, because no trajectory has been run on the preconditioned surface.
 
 cc-pVDZ only; MMFF geometries; `ov` mode and MP2 only. The rank and weight analyses are
 on methanol and ethanol; §10 widens the molecule set to twelve but widens neither the
