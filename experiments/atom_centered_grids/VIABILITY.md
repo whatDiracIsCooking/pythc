@@ -59,6 +59,19 @@ it**, and the configuration every compression ratio was taken under (`ridge 1e-8
 ghost-gap ratio here is quoted against a `blocked` row held at `w = 1`, which handicaps the
 in-molecule baseline and **flatters the transferable scheme**, worse with basis size.
 
+**What *is* held fixed, checked against every result file rather than the write-ups:** the
+AO basis. 46 of the 49 data files that record one are `cc-pVDZ` / `cc-pVDZ-RI`; the eight
+scripts that record no basis (`rank`, `ridge`, `scan`, `rotate`, `weights`, `window`,
+`gradient`, `orbits`) all `from sweep import BASIS`, which is `cc-pVDZ`. **The only
+exceptions are §17's three `levers.py` runs**, which are cc-pVTZ. So the directory is
+single-basis apart from §17 - and that is precisely the problem T9 records, since §17
+(cc-pVTZ) and §18 (cc-pVDZ) are the two most recent results and have never been run
+together. Both arms of the trajectory comparison are cc-pVDZ, so the DFT head-to-head in
+T8 is basis-matched; what it is *not* matched in is method, since it puts MP2 correlation
+on a THC grid against RKS/PBE on a Becke grid. That is the right comparison for `how fast
+does a lab-fixed atom-centred grid leak angular momentum` and the wrong one for anything
+else.
+
 Three further things are simply absent:
 
 * **No cost measurement of any kind.** There is no wall-clock or crossover study anywhere
@@ -196,7 +209,7 @@ molecule tumbles more slowly, giving the torque longer to act coherently, and th
 the plateau is what changes. Methanol at 48 AOs is the smallest molecule here that does not
 rank-saturate; ethanol or propene would say. Run T1 and T6 on one of them.
 
-### Tier 3 - the requirement. The bar is DFT, not a tolerance.
+### Tier 3 - the requirement. The bar is DFT, not a tolerance - and both sides have a grid-level knob.
 
 **T8. Find acTHC parameters whose rotational diffusion is no worse than production DFT's.**
 
@@ -214,9 +227,9 @@ So state the requirement comparatively, and existentially:
 
 That is a decidable claim with no invented threshold in it, because the baseline is a
 competing method's measured number rather than a tolerance nobody has set. It is also
-weaker and cheaper to establish than what T8 previously asked for: the deliverable is a
-**witness** - one configuration (support type, threshold, `n_P`, filter, `lambda`) - not a
-property of every configuration.
+weaker and cheaper to establish than an absolute standard would be: the deliverable is a
+**witness** - one configuration (support type, threshold, `n_P`, parent level, filter,
+`lambda`) - not a property of every configuration.
 
 **Where §13 leaves the claim today, which is the honest starting point:** acTHC sits
 *between* the two DFT baselines. Against RKS/PBE on level-0 Becke - the grid the fits are
@@ -226,33 +239,94 @@ points. So "less bad than DFT" is already true of the DFT you would not run, and
 true of the DFT you would. **Which baseline is named decides whether the claim is
 interesting**, and only level 3 (or whatever the production setting is) is.
 
+**Levels 1 and 2 have never been run, and the crossing has to be in there.** §13 samples
+the DFT knob at exactly two points, at opposite ends:
+
+| Becke level | points (methanol, cc-pVDZ) | vs level 0 | `\|L - L0\|` measured |
+| --- | --- | --- | --- |
+| 0 | 4,656 | 1.0x | 0.638 / 2.380 / 9.250 hbar |
+| **1** | **20,248** | **4.3x** | **never run** |
+| **2** | **43,904** | **9.4x** | **never run** |
+| 3 | 67,432 | 14.5x | 0.004 / 0.028 hbar |
+
+acTHC on ~700 points is 8x better than the top row and 25x worse than the bottom one, so
+it crosses DFT *somewhere in the two rows nobody has measured*, and locating that crossing
+is the whole content of the claim: "as rotationally clean as a level-2 Becke grid on 60x
+fewer points" is a result, and "between level 0 and level 3" is not. **Run these two
+first.** They are by far the cheapest thing in this file - an existing, working code path
+(`--reference rks --grid-level 1,2`), one SCF and one gradient per step, no THC, no frozen
+grid, no `3 N` coupled-perturbed solves - and they sharpen the target T6 is aiming at
+before T6 is paid for.
+
 The reason to expect the gap to have moved: every §13 trajectory number was integrated
 from a torque **72x larger** than the one §18 measures under the preconditioner, on a
 surface that was not even the THC one. Nothing has re-measured the leak since.
 
 *How to run it.* Both methods have a knob - DFT buys less rotational diffusion with grid
-level, acTHC with `n_P` - so this is a comparison of two curves, not two points. A
+level, acTHC with `n_P` and, per T8b, with its own parent level - so this is a comparison
+of curves, not of two points. A
 trajectory ladder is unaffordable (T6 costs `3 N` coupled-perturbed solves per step), so
 screen first and propagate only the candidates:
 
-1. **Screen on the torque**, which needs no SCF beyond the reference and is already
-   laddered. §13 reports `log|tau|` tracking the rotation spread at Spearman **+0.89** and
-   grid accuracy at **+0.86** over 20 rungs, so it orders candidates cheaply. Treat it as
-   a screen and not as proof - §13's own warning is that a torque quoted at one rung is
-   not a statistic, and §16's `ghostw` swings 163 -> 1.00 -> 3.74 uHa/rad across three
-   consecutive rungs.
-2. **Propagate the best two or three rungs** plus the DFT ladder on one initial condition,
-   `--reference rks --grid-level 0,3` (and 5 if level 3 is beaten), reporting `|L - L0|` at
-   matched times. `trajectory.py` already carries several grids along one trajectory, so
-   the acTHC arms cost nothing extra in sampling.
+1. **Fill in the DFT ladder at levels 1 and 2** - the table above, and the cheapest run
+   in this file. Needs no code and no THC:
+
+   ```shell
+   for lv in 1 2; do
+     uv run python experiments/atom_centered_grids/trajectory.py methanol --modes hf \
+         --reference rks --xc pbe --grid-level $lv --steps 2000 \
+         --out data/viab_traj_rks_l$lv.json
+   done
+   ```
+
+2. **Screen the acTHC candidates on the torque**, which needs no SCF beyond the reference
+   and is already laddered. §13 reports `log|tau|` tracking the rotation spread at Spearman
+   **+0.89** and grid accuracy at **+0.86** over 20 rungs, so it orders candidates cheaply.
+   Treat it as a screen and not as proof - §13's own warning is that a torque quoted at one
+   rung is not a statistic, and §16's `ghostw` swings 163 -> 1.00 -> 3.74 uHa/rad across
+   three consecutive rungs.
+3. **Propagate the best two or three rungs** on one initial condition, reporting
+   `|L - L0|` at matched times against the four-level DFT ladder. `trajectory.py` already
+   carries several grids along one trajectory, so the acTHC arms cost nothing extra in
+   sampling. Add level 4-5 only if level 3 is beaten.
 
 *Pass, in increasing strength:* (a) some acTHC configuration beats level-0 DFT - **already
-true in §13**, and the re-run should widen it; (b) some configuration is **within a small
-factor of level 3** at a point count 100x smaller, which makes the claim a cost argument
-and hands off to T13; (c) some configuration **beats level 3 outright**, which ends the
-orientation question permanently. *Falsify:* no rung reaches (b) even as `n_P` grows -
-i.e. the leak plateaus above production DFT and cannot be bought down - which would mean
-the frozen grid has a floor the quadrature it replaces does not.
+true in §13**, and the re-run should widen it; (b) some configuration **matches level 1 or
+level 2** at 30-60x fewer points, which is a publishable statement and the outcome to
+expect; (c) some configuration is **within a small factor of level 3**, which makes the
+claim a cost argument and hands off to T13; (d) some configuration **beats level 3
+outright**, which ends the orientation question permanently. *Falsify:* no rung reaches (b)
+even as `n_P` grows - i.e. the leak plateaus above the cheapest DFT anyone would run and
+cannot be bought down - which would mean the frozen grid has a floor the quadrature it
+replaces does not.
+
+**T8b. The other level knob: prune from a level-1 or level-2 parent and measure the
+torque.** There are *two* grid-level ladders in this comparison, and the second one is
+acTHC's own. Every support in this directory is selected from a **level-0** atomic parent,
+and 4(10) is marked `PARTLY DONE` for exactly this reason: `levers.py` measured a level-1
+parent on the **ceiling and the energy** (ceilings H 132 -> 187, C 155 -> 216, O 199 -> 251
+at *unchanged* equation count; methanol 1.78x -> 1.46x at 10 uHa) and **nothing has ever
+measured a torque or a rotation spread on a finer-parent support**. Level 2 has not been
+tried at all.
+
+This is the one lever whose original motivation was orientation, and it is the obvious
+suspect for the remaining gap: §13's own control shows the level-0 Becke grid is a **poor
+grid to be rotationally invariant on** - it is the 4656-point row that acTHC beats 8x and
+level 3 beats 25x - so a support pruned from it may be inheriting its parent's anisotropy.
+If the crossing T8 is looking for sits at level 1 or 2 on the DFT side, the cheapest way to
+move acTHC past it may be to prune from a level 1-2 parent rather than to add points at
+level 0. 4(10) already shows the ceiling and the energy both improve, so the point tax of
+doing so is bounded and known.
+
+*Code work:* `ghosts.element_grid`, `element_supports` and `assemble_from_supports` all
+take `level` already, but **`torque_ladder.py` hardcodes `level=0`** (line 137) and so does
+**`trajectory.py`** (line 128), so neither instrument can see this lever today. Thread
+`--parent-level` through both. Small, and it unlocks the one 4(10) item that is still open.
+
+*Pass:* a finer-parent support at matched `n_P` has a lower torque, which would convert
+4(10) from an energy lever into an orientation lever and feed straight back into T1's
+choice of support. *Falsify:* the torque is flat in parent level, which closes 4(10)
+entirely and says the anisotropy is the support's own rather than inherited.
 
 *Optional, and no longer load-bearing:* a **dipole autocorrelation spectrum** on both
 surfaces. Under the comparative framing this is no longer needed to set the bar - `|L - L0|`
@@ -371,6 +445,7 @@ of them twice:
 | T2 | `mf.conv_tol = 1e-12` in `sweep.py` and `ghosts.py` | trivial |
 | T6 | `ThcMP2Gradients.as_scanner()` into `trajectory.py`'s `Surface`, for `--propagate full` | moderate |
 | T8 | none - `trajectory.py` already takes `--reference rks --grid-level`, and carries several grids along one trajectory | none |
+| T8b | `--parent-level` through `torque_ladder.py` (hardcoded `level=0`, line 137) and `trajectory.py` (line 128); `ghosts.element_grid` / `element_supports` / `assemble_from_supports` already take it | small |
 | T8 (optional) | dipole ACF + FFT on a finished trajectory, only if the witness lands within a factor rather than beating level 3 | moderate |
 | T13 | Z-vector contraction of `response_lagrangian`'s intermediate; least-squares `Z` fit in place of forming `S^-1` twice | substantial |
 
