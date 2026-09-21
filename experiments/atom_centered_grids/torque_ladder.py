@@ -418,7 +418,8 @@ if __name__ == "__main__":
     p.add_argument("--draws", type=int, default=4,
                    help="random per-atom orientations; 0 for the as-fitted row only")
     p.add_argument("--seed", type=int, default=7)
-    p.add_argument("--scheme", default="ridge", choices=["ridge", "damped"],
+    p.add_argument("--scheme", default="ridge",
+                   choices=["ridge", "damped", "ridge_jacobi", "damped_jacobi"],
                    help="metric filter; section 4(6) says a torque must be quoted "
                         "with the regularisation that produced it")
     p.add_argument("--pinv", action="store_true",

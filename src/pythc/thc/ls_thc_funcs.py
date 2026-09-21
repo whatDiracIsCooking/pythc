@@ -165,7 +165,7 @@ def invert_metric(S: np.ndarray, ridge: Optional[float] = None,
     if ridge is None:
         return lib.pinv(S)
 
-    if scheme.endswith("_jacobi"):
+    if scheme.endswith(lib.JACOBI_SUFFIX):
         # Symmetric Jacobi preconditioning around the filter. The weights enter the
         # metric ONLY as S(w) = D S(1) D with D = diag(sqrt(w)) - a symmetric diagonal
         # scaling and nothing else - so a collocation weighting and a diagonal
@@ -178,12 +178,12 @@ def invert_metric(S: np.ndarray, ridge: Optional[float] = None,
         # this costs no offline object and stays differentiable.
         # S_PP = (sum_mu X_muP^2)^2 is exactly zero for a point carrying no amplitude -
         # which a weight fit produces whenever it drops a point (the oracle fit of
-        # levers.py zeroes 250 of 702). Leave those rows unscaled; the filter sends them
-        # to zero anyway, and dividing by zero turns the whole metric into NaN.
-        diag = np.diag(S).copy()
-        e = np.where(diag > 0, 1.0 / np.sqrt(np.where(diag > 0, diag, 1.0)), 1.0)
+        # levers.py zeroes 250 of 702). lib.jacobi_scaling leaves those rows unscaled;
+        # the filter sends them to zero anyway, and dividing by zero turns the whole
+        # metric into NaN. The adjoint reaches the same helper, so the two cannot drift.
+        e = lib.jacobi_scaling(S)
         inner = invert_metric(e[:, None] * S * e[None, :], ridge, ridge_scale,
-                              scheme[: -len("_jacobi")])
+                              lib.strip_jacobi(scheme))
         return e[:, None] * inner * e[None, :]
 
     if scheme == "damped":
@@ -212,6 +212,10 @@ def build_aux_coulomb_inv(auxmol, ridge: Optional[float] = None,
     """
     logger.info("Computing 2-center Coulomb metric and J^{-1/2}...")
     j2c = auxmol.intor('int2c2e', aosym='s1')
+    # A "_jacobi" scheme is about the THC metric's diagonal, which this metric does not
+    # share; strip it rather than letting an unrecognised name fall through to the ridge
+    # and silently un-damp a pipeline that asked to be damped.
+    scheme = lib.strip_jacobi(scheme)
     if ridge is None:
         j2c_cholesky = lib.pseudo_inv_sqrt(j2c)
     elif scheme == "damped":
