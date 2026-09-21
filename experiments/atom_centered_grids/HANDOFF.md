@@ -5,6 +5,12 @@ what the idea is, what was tried, **which parts of the prior design reasoning th
 measurements overturned**, and what to do next. The point of §3 is that a fresh session
 should not re-derive machinery that turned out to be unnecessary.
 
+§4 and §5 below are ordered by what is *left to learn*. If the question is instead whether
+the scheme is ready to be claimed as a method, read [`VIABILITY.md`](VIABILITY.md): it
+reorders the same open items by what a demonstration needs, and notes that the
+configuration 4(15) recommends has never had a point count, a cost, or a trajectory
+measured for it.
+
 ## 1. The idea
 
 **In one sentence:** run NNLS per atom (with ghost atoms to keep bonding-region points
