@@ -253,10 +253,17 @@ acTHC on ~700 points is 8x better than the top row and 25x worse than the bottom
 it crosses DFT *somewhere in the two rows nobody has measured*, and locating that crossing
 is the whole content of the claim: "as rotationally clean as a level-2 Becke grid on 60x
 fewer points" is a result, and "between level 0 and level 3" is not. **Run these two
-first.** They are by far the cheapest thing in this file - an existing, working code path
-(`--reference rks --grid-level 1,2`), one SCF and one gradient per step, no THC, no frozen
-grid, no `3 N` coupled-perturbed solves - and they sharpen the target T6 is aiming at
-before T6 is paid for.
+first.** They need no code at all - an existing, working path (`--reference rks
+--grid-level 1,2`), one SCF and one gradient per step, no THC, no frozen grid, no `3 N`
+coupled-perturbed solves - and they sharpen the target T6 is aiming at before T6 is paid
+for.
+
+Measured on 4 cores, methanol/cc-pVDZ, PBE with `grid_response=True`, the per-step cost is
+**nearly flat in grid level** - 1.5-1.6 s at levels 1, 2 and 3 alike, since a 48-AO
+molecule's SCF is not grid-bound at these sizes. So each 2000-step arm is **under an hour**
+and the refinement is close to free. Note the existing level-3 row was run to only 600
+steps, which is why its 1 ps cell is a dash; match level 0's 2000 so all three of §13's
+time points exist.
 
 The reason to expect the gap to have moved: every §13 trajectory number was integrated
 from a torque **72x larger** than the one §18 measures under the preconditioner, on a
