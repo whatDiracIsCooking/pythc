@@ -194,11 +194,14 @@ def ceilings(elements, axes, threshold=1e-12, out_path=None):
     return rows
 
 
-def thc_mp2(mol, mf, coords, weights, auxbasis, ridge=RIDGE):
+def thc_mp2(mol, mf, coords, weights, auxbasis, ridge=RIDGE, scheme='ridge'):
     """LS-THC MP2 correlation energy on a given point set. Mirrors `ghosts.thc_mp2`,
-    with the auxiliary basis exposed because the basis lever moves it too."""
+    with the auxiliary basis exposed because the basis lever moves it too, and the
+    inversion scheme exposed because section 14's cc-pVTZ `blocked` plateau is as likely
+    to be the filter as the grid - see `blocked_diagnostic`."""
     thc = LS_RI_Becke(mol=mol, auxbasis=auxbasis, mo_coeff=mf.mo_coeff,
-                      grid=FixedGrid(coords, weights), metric_ridge=ridge)
+                      grid=FixedGrid(coords, weights), metric_ridge=ridge,
+                      metric_scheme=scheme)
     return float(LaplaceRMP2(mol, mf, thc.build(mode='ov'), n_laplace=10).kernel())
 
 
@@ -271,6 +274,108 @@ def run(name, variants, thresholds, blocked_thresholds, out_path, basis=BASIS):
             record(label, thr, coords, weights, dt,
                    extra=dict(per_element={k: int(len(v)) for k, v in supports.items()},
                               level=level, lever=kw))
+
+    with open(out_path, 'w') as fh:
+        json.dump(dict(meta=meta, rows=rows), fh, indent=2)
+    return rows
+
+
+def blocked_diagnostic(name, thresholds, out_path, basis='cc-pvtz', resume=False):
+    """
+    Is section 14's cc-pVTZ `blocked` plateau the grid, or the footing it is measured on?
+
+    The extended cc-pVTZ ladder grows `blocked`'s support 1293 -> 1746 points for no
+    accuracy at all (~19 uHa above the parent-grid floor throughout) while the
+    transferable `ghost` grid passes it and reaches 2.5. Taken at face value that breaks
+    the premise sections 1 and 8 rest on - that the in-molecule fit is a *strict lower
+    bound* on any frozen atom-centred scheme.
+
+    Before believing it, note what that row actually is: `w = 1` under
+    `metric_ridge = 1e-8` at 1700+ points. Section 6 says a ridge hands the numerically
+    null directions the largest gain in the operator, section 12 says `Z = D^T D` carries
+    `S^-1` twice, and section 8's own caveat says `blocked` with `w = 1` and `blocked`
+    with NNLS weights are not the same curve. A support that grows 35% for nothing is
+    what a failing inversion looks like, not what a grid running out of points looks
+    like.
+
+    So this runs the 2x2 that separates them, at one `lambda` on both filters so that
+    only the filter differs:
+
+    * `ones` / `nnls` - the weights section 3 discards against the ones the fit produced.
+      A positive diagonal rescaling of `X` is absorbed exactly by the *pseudoinverse*,
+      and neither of these schemes is one, so the weights are doing conditioning work.
+    * `ridge` / `damped` - `(S + lambda I)^-1` against `S (S^2 + mu^2 I)^-1`.
+
+    If the plateau lifts in any arm, the baseline was degenerate and section 14's
+    cc-pVTZ reading goes with it. If it survives all four, section 8's lower-bound
+    premise needs qualifying by basis, which is a result rather than an artefact.
+    """
+    auxbasis = AUXBASIS_FOR[basis]
+    mol = gto.M(atom=MOLECULES[name](), basis=basis, verbose=0)
+    mf = scf.RHF(mol).density_fit(auxbasis=auxbasis)
+    mf.verbose = 0
+    mf.conv_tol = 1e-12
+    mf.kernel()
+    ref = DFMP2(mf).kernel()[0]
+    S = mol.intor('int1e_ovlp_sph')
+
+    # Resume: this run is long, the heaviest solves in this directory have twice been
+    # killed by the machine mid-run, and every row is independent of every other, so
+    # there is no reason for a kill to cost more than the row it lands on.
+    rows = []
+    if resume and os.path.exists(out_path):
+        rows = json.load(open(out_path)).get('rows', [])
+        print(f"  resuming: {len(rows)} rows already in {out_path}", flush=True)
+    done = {(r['mode'], r.get('threshold')) for r in rows}
+
+    meta = dict(experiment='levers_blocked_diagnostic', molecule=name, natm=mol.natm,
+                nao=int(mol.nao_nr()), basis=basis, auxbasis=auxbasis,
+                mp2_ri_reference=float(ref), ridge=RIDGE, thresholds=list(thresholds))
+    print(f"== blocked diagnostic: {name}, {mol.nao_nr()} AOs in {basis}, "
+          f"lambda = {RIDGE:g} on both filters", flush=True)
+
+    def record(mode, threshold, coords, weights, dt, scheme):
+        e = thc_mp2(mol, mf, coords, weights, auxbasis, scheme=scheme)
+        row = dict(mode=mode, threshold=threshold, n_points=len(coords),
+                   rmsd_S=_rmsd_overlap(_eval_basefuncs(mol, coords), weights, S),
+                   e_corr=e, err_uha=(e - ref) * 1e6, fit_seconds=dt, scheme=scheme)
+        rows.append(row)
+        print(f"  {mode:22s} thr={threshold if threshold is None else f'{threshold:.0e}'}"
+              f"  n={len(coords):5d}  err={row['err_uha']:+9.2f} uHa", flush=True)
+        with open(out_path, 'w') as fh:
+            json.dump(dict(meta=meta, rows=rows), fh, indent=2)
+        return row
+
+    if ('becke', None) not in done:
+        coords, weights = BeckeGrid(mol).build()
+        t0 = time.time()
+        record('becke', None, coords, weights, time.time() - t0, 'ridge')
+
+    # The per-atom fits are the expensive part and do not depend on the arm, so they are
+    # done once and re-weighted. That also guarantees the four arms compare the SAME
+    # supports, which is the whole point - anything that moves is the footing.
+    needed = [thr for thr in thresholds
+              if any((f'blocked:{w}:{sc}', thr) not in done
+                     for w in ('ones', 'nnls') for sc in ('ridge', 'damped'))]
+    fits = {}
+    for thr in needed:
+        t0 = time.time()
+        fits[thr] = (blocked_fit_per_atom(mol, thr), time.time() - t0)
+        n = sum(len(rel) for rel, _w in fits[thr][0])
+        print(f"  -- fitted blocked thr={thr:.0e}: {n} points "
+              f"({fits[thr][1]:.1f}s)", flush=True)
+
+    for weighting in ('ones', 'nnls'):
+        for scheme in ('ridge', 'damped'):
+            for thr in needed:
+                if (f'blocked:{weighting}:{scheme}', thr) in done:
+                    continue
+                per_atom, dt = fits[thr]
+                coords = np.vstack([rel + mol.atom_coord(ia)
+                                    for ia, (rel, _w) in enumerate(per_atom)])
+                w = (np.ones(len(coords)) if weighting == 'ones'
+                     else np.concatenate([wa for _rel, wa in per_atom]))
+                record(f'blocked:{weighting}:{scheme}', thr, coords, w, dt, scheme)
 
     with open(out_path, 'w') as fh:
         json.dump(dict(meta=meta, rows=rows), fh, indent=2)
@@ -367,10 +472,24 @@ if __name__ == '__main__':
                         'it rather than believing a curve that never reaches the target')
     p.add_argument('--blocked-thresholds', default='1e-3,1e-4,1e-5')
     p.add_argument('--saturation-threshold', type=float, default=1e-12)
+    p.add_argument('--resume', action='store_true',
+                   help='skip rows already present in --out. The heavy runs here have '
+                        'twice been killed by the machine; every row is independent, so '
+                        'a kill should cost one row')
+    p.add_argument('--blocked-diagnostic', action='store_true',
+                   help='is section 14\'s cc-pVTZ blocked plateau the grid or the '
+                        'footing? Runs the {ones,nnls} x {ridge,damped} 2x2 on one set '
+                        'of blocked supports and nothing else')
     a = p.parse_args()
 
     if a.report is not None:
         report(a.report or sorted(glob.glob('data/levers_*.json')))
+    elif a.blocked_diagnostic:
+        if not a.molecule or not a.out:
+            p.error('a molecule and --out are required for --blocked-diagnostic')
+        blocked_diagnostic(a.molecule,
+                           [float(x) for x in a.blocked_thresholds.split(',') if x],
+                           a.out, basis=a.basis, resume=a.resume)
     elif a.ceilings:
         axes = build_axes(dict(bases=a.bases.split(','),
                                levels=[int(x) for x in a.levels.split(',')]),

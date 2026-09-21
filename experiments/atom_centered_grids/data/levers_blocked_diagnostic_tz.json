@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "experiment": "levers_blocked_diagnostic",
+    "molecule": "methanol",
+    "natm": 6,
+    "nao": 116,
+    "basis": "cc-pvtz",
+    "auxbasis": "cc-pvtz-ri",
+    "mp2_ri_reference": -0.45766871148140587,
+    "ridge": 1e-08,
+    "thresholds": [
+      0.0001,
+      1e-05,
+      1e-06,
+      1e-07
+    ]
+  },
+  "rows": [
+    {
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 3288,
+      "rmsd_S": 0.0005399554231064027,
+      "e_corr": -0.457661532386702,
+      "err_uha": 7.179094703879674,
+      "fit_seconds": 4.76837158203125e-07,
+      "scheme": "ridge"
+    },
+    {
+      "mode": "blocked:ones:ridge",
+      "threshold": 0.0001,
+      "n_points": 1053,
+      "rmsd_S": 1.9840786163070203,
+      "e_corr": -0.4576293829118969,
+      "err_uha": 39.328569508945144,
+      "fit_seconds": 10.702404499053955,
+      "scheme": "ridge"
+    },
+    {
+      "mode": "blocked:ones:ridge",
+      "threshold": 1e-05,
+      "n_points": 1293,
+      "rmsd_S": 2.9769695966000915,
+      "e_corr": -0.4576420980684098,
+      "err_uha": 26.613412996090435,
+      "fit_seconds": 16.90330147743225,
+      "scheme": "ridge"
+    }
+  ]
+}
