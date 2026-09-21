@@ -1871,6 +1871,187 @@ propagated surface**, which is now possible for the first time and is the obviou
 experiment: the 4.5 degrees of axis tilt in 2.5 ps was measured along an RHF trajectory
 with the leak fed back, not along a trajectory the THC force actually drove.
 
+## 16. Support and weights cannot be chosen separately - the mixed-footing control, and what the weight footing is really worth
+
+This was run as the *in-molecule* route to HANDOFF step (8) - fit a per-element weight
+set against the objective the runtime actually faces - in parallel with §14, which
+reached the same step from the other side and answered it better. §14 settles (8): the
+free atom's own ERIs supply a rich enough target that no molecule and no ghost is needed,
+and `eriw` converges 1481x where `ghostw` manages 13.4x.
+
+What this section adds is the **decomposition**. §14 compares self-consistent pairings -
+a support and the weights the same fit produced - and warns in passing not to read an
+`eriw` number against a `w = 1` one. It does not measure what happens if you break the
+pairing. `insitu.py` does, because the in-molecule route makes the mixed case natural to
+build: weights fitted for one objective, laid onto a support selected for another. That
+control turns out to matter more than the route it came from, and it is the reason §14's
+warning is the weak form of a stronger statement.
+
+For element E the training blocks are the real atoms of E in real molecules. Block
+`(M, A)` presents E's candidate points, translated onto atom A of molecule M, against
+that atom's Becke share `S_A` of M's overlap matrix, integrated on A's own full sub-grid
+- the identical target `NNLSGrid._build_blocked` and `ghosts.fit_element` both fit, with
+a real neighbour at its real position instead of a ghost. All blocks stack into one
+`StackedOperator` and one Lawson-Hanson solve, so the variables are tied across every
+atom of E in every training molecule. The product is still `element -> (indices,
+weights)` with no molecular index in it; the training molecules are consumed by the
+offline fit exactly as a basis set's optimisation molecules are, and `dw/dR = 0` holds as
+it does for `ghostw`, so nothing in `pythc.grad` changes.
+
+Trained on water, methanol and ethane; held out on ethanol, formaldehyde and propene,
+the last two carrying a C=O / C=C bond shorter than any bond in training and shorter than
+the shortest ghost shell. Support and weights separate, so five modes:
+
+| mode | support | weights |
+| --- | --- | --- |
+| `ghost` | ghost fit | 1 |
+| `ghostw` | ghost fit | ghost fit |
+| `molw` | ghost fit | **in-molecule** |
+| `molfit` | **in-molecule, per element** | **in-molecule** |
+| `molfit1` | **in-molecule, per element** | 1 |
+
+### The fit reaches its own objective, and the gain transfers
+
+Relative residual `||Aw - b|| / ||b||` against the in-molecule overlap objective at
+threshold 1e-4, held-out column over ethanol / formaldehyde / propene:
+
+| mode | C train | C held | H train | H held | O train | O held |
+| --- | --- | --- | --- | --- | --- | --- |
+| `ghost` (`w = 1`) | 6.55 | 6.02 | 4.25 | 1.76 | 9.71 | 8.89 |
+| `ghostw` | 1.30 | 1.48 | 1.19 | 0.75 | 0.53 | 0.41 |
+| `molw` | 0.19 | 0.36 | 0.30 | 0.34 | 0.22 | 0.84 |
+| `molfit` | 0.17 | 0.32 | 0.28 | 0.34 | 0.22 | 0.37 |
+
+4x on carbon against `ghostw`, 2x on hydrogen, with training and held-out columns close
+enough that the fit is learning the objective rather than the molecules. So the offline
+fit does what it was asked to.
+
+### `molw` never wins
+
+Everything below is at **matched point count** - each mode's ladder interpolated onto
+shared sizes, errors taken as distance from that molecule's own unpruned parent grid -
+because the modes do not agree on size at a shared threshold. Median ratio against
+`ghostw` over the three rungs of each held-out molecule; below 1 means the mode beats
+`ghostw`:
+
+| molecule | metric | `ghost` | `molw` | `molfit` | `molfit1` |
+| --- | --- | --- | --- | --- | --- |
+| ethanol | err | 1.14 | 1.77 | **0.21** | 0.25 |
+| formaldehyde | err | 1.19 | 1.72 | **0.32** | 0.38 |
+| propene | err | 1.21 | 1.52 | **0.82** | 0.93 |
+| ethanol | spread | 1.37 | 1.23 | 1.46 | 1.48 |
+| formaldehyde | spread | 0.99 | 2.76 | **0.46** | 0.53 |
+| propene | spread | 1.10 | 1.72 | **0.31** | 0.32 |
+
+Counted rung by rung over the held-out molecules, `molw` beats `ghostw` **0 times out of
+12** on energy and **0 out of 12** on rotation spread. It is not close and it is not
+noise: better weights laid onto the ghost support are worse than the ghost's own weights
+on every held-out molecule at every size measured. Refitting the weights while keeping
+someone else's support does not work, whatever the weights are fitted against.
+
+`molfit` wins 8/10 on energy and 7/10 on spread, at a median of ~3x on energy. `molfit1`
+tracks it closely, which is the next result.
+
+### Support and weights are one object
+
+`molw` is the diagnostic. It carries the best-fitted weights in the table and the second
+worst grid, and the only thing distinguishing it from `molfit` is that its points were
+chosen by a different fit than its weights. A weight set is worth something only on the
+support it was selected with; mixing footings is worse than either self-consistent
+pairing.
+
+That sharpens two earlier readings. 4(6)'s "those weights condition the ghost metric
+rather than the in-molecule one" was the right mechanism one step too narrow - it is not
+that ghost *weights* are wrong, it is that a ghost *fit* is wrong, points and weights
+together. And §14's "do not read an `eriw` number against a `w = 1` number" is the
+cautious form: the footings are not merely incommensurate, a weight set carried onto the
+wrong support is *worse than nothing*. §14's own result is consistent with this and could
+not have shown it, since every pairing it measures is self-consistent - which is also why
+its 1481x is a property of the ERI *fit*, not of ERI weights that could be transplanted
+onto a ghost or in-molecule support.
+
+### What the weights are actually worth: ~2-2.5x, growing with grid size
+
+`molfit` and `molfit1` share a support exactly, so this needs no interpolation at all.
+Ratio of `w = 1` to weighted, so above 1 means the weights help:
+
+| molecule | points | err gain | spread gain |
+| --- | --- | --- | --- |
+| ethanol (held) | 424 / 723 / 957 | 1.06 / 2.40 / 2.36 | 1.01 / 1.06 / 1.51 |
+| formaldehyde (held) | 190 / 307 / 401 | 1.07 / 2.31 / 1.59 | 1.14 / 0.89 / 3.33 |
+| propene (held) | 426 / 744 / 984 | 1.04 / 1.71 / 2.06 | 0.88 / 1.56 / 2.23 |
+| methanol | 282 / 475 / 629 | 1.17 / 2.65 / 8.21 | 1.09 / 2.09 / 3.11 |
+| ethane | 376 / 664 / 884 | 1.05 / 2.34 / 2.52 | 1.00 / 1.38 / 1.82 |
+
+So 4(7)'s localisation of the gap to the weight footing survives in direction but not in
+magnitude. The weights are worth about **2-2.5x on the energy's distance from the floor
+and 1.5-3x on the rotation spread**, they are worth essentially *nothing* at the coarsest
+rung, and the gain grows with grid size. They are not the 450x that 4(7)'s single-rung
+`blocked` / `blocked1` pair (0.02 against 9.02 uHa/rad) suggested. Water is excluded from
+the table above as §8 and §13 both exclude it - at 24 AOs its co-density manifold
+saturates and every absolute error is sub-uHa, so its 7-17x ratios are division by noise.
+
+### The torque agrees in direction and is too noisy to rank with
+
+Run in the harness that produced §13 - the `ghost`, `blocked` and `blocked1` rows
+reproduce that table to the second decimal (175.09 against 175.1, 792.80 against 792.8,
+3.14 against 3.15), so these are the same numbers and not a parallel measurement. Net
+torque, `pinv`, uHa/rad, on held-out formaldehyde:
+
+| mode | points | err/uHa | net tau | rms draw tau | spread/uHa |
+| --- | --- | --- | --- | --- | --- |
+| `ghost` | 344 / 427 / 486 | 2.73 / -4.83 / -6.00 | 239.22 / 58.63 / 12.06 | 209.11 / 58.43 / 7.57 | 7.79 / 3.46 / 0.44 |
+| `ghostw` | 344 / 427 / 486 | -2.13 / -6.40 / -6.25 | 163.37 / 1.00 / 3.74 | 34.20 / 0.56 / 8.99 | 2.67 / 0.06 / 1.51 |
+| `molw` | 281 | 8.21 | 179.75 | 503.56 | 9.30 |
+| `molfit1` | 307 / 401 | -7.47 / -8.08 | 71.37 / 63.87 | 179.33 / 86.36 | 4.87 / 6.83 |
+| `molfit` | 307 / 401 | -5.19 / -6.42 | 3.61 / 6.19 | 90.54 / 5.40 | 2.02 / 0.12 |
+| `blocked` | 287 / 328 | -6.42 / -6.40 | 0.85 / 0.09 | 6.47 / 0.82 | 0.20 / 0.03 |
+
+`molfit` at ~300 points is 15-23x quieter than either ghost footing at ~276, which agrees
+with the energy and spread tables. But `ghostw` runs 163.37 at 344 points, **1.00** at
+427 and back up to 3.74 at 486, and its rms-over-draws does the same (34.20, 0.56, 8.99).
+A ladder that moves by two orders of magnitude between adjacent rungs and then reverses
+cannot support a ratio quoted at one rung, in either direction - a first draft of this
+section read `molfit`'s 6.19 at 401 points against `ghostw`'s 163.37 at 344 and concluded
+26x, which the 427-point rung then inverted. The torque is quoted here because §13 quotes
+it and the direction agrees; the ranking above rests on the energy and spread tables,
+which have 6 molecules x 3 rungs behind them and are interpolated to matched size.
+
+That noise is a caveat on §13's own table as much as on this one: its headline ratios
+(0.02 / 9.02 / 27.2 / 52.3) are single-rung reads of the same statistic.
+
+### The overlap residual cannot see any of this
+
+`molw` has the best in-molecule overlap residual of any transferable mode on the training
+set (0.19-0.30, within noise of `molfit`'s 0.17-0.28) and an S-RMSD of 5.0e-2 against
+`molfit`'s 4.6e-2 - and it loses to `ghostw` 0 times out of 12 in the other direction.
+`molfit1`, meanwhile, has a *terrible* residual (8-36, worse than `ghost` in places,
+because a support selected by a weighted fit and then stripped of its weights is not a
+quadrature rule at all) and lands within a factor of 2 of `molfit` on energy. Two grids
+matched on the fitted objective to 10% differ by 1.5-2.8x in the quantities that matter,
+and in the opposite order.
+
+This is §5 and §3's decoupling in its sharpest form yet: the overlap matrix is a *cheap
+proxy that has visibly run out*. It was enough to select points spanning the co-density
+manifold and it is enough to weight them once the points are right, but it cannot rank
+two grids that both fit it, and the conclusion it does support here is the wrong way
+round. The remedy this pointed at - a target closer to what is computed, the atom's own
+ERIs - is exactly what §14 built independently and concurrently, and §14's numbers are
+the better evidence for it. Read the two together: §14 shows the richer target works,
+this section shows why the overlap target could not have told you.
+
+### Cost
+
+Seconds per element, independent of the molecule the grid is used in, exactly as the
+ghost fit is. `molfit` is larger than `ghost` at a given threshold (629 against 512 points
+on methanol at 1e-4), which is why every comparison here is at matched size; `insitu.py`
+interpolates each ladder for that reason and `data/insitu.json` carries the result.
+
+Against §14 this route is strictly worse and should not be preferred: it needs training
+molecules, it lands at ~3x over `ghostw` where `eriw` lands at 1481x over the ladder, and
+its product is no more transferable. The `molw` control is what earns it a section.
+
+
 
 ## Verdict
 
@@ -2016,7 +2197,9 @@ What remains to be measured, in order:
    `--scheme` did not exist when that data was produced. §13 also settles what the gap
    between the transferable grid and the in-molecule one is made of: the **weight
    footing**, since `ghost` converges like `blocked1` (35.6x against 39.6x) and not like
-   weighted `blocked` (17667x).
+   weighted `blocked` (17667x). §14 qualifies the size of that: at matched support the
+   weights are worth 2-2.5x, not the 450x this pair implies, and a torque quoted at one
+   rung is not a reliable statistic to take a ratio from.
 7. ~~**What does the torque do over a trajectory?**~~ **Done - see §13.** It reorients
    rather than heats. Over 2.5 ps of thermal tumbling the torque is 95% incoherent, the
    component along `L` that could spin the molecule up is held at +0.36 hbar by energy
@@ -2056,6 +2239,17 @@ What remains to be measured, in order:
     It now is, so the 4.5 degrees of axis tilt in 2.5 ps can be measured on the surface it
     was always meant to describe rather than inferred first-order from another one.
 
+11. ~~**Can a support and its weights be chosen separately?**~~ **Answered, no - see §16.**
+    The control §14's warning implies but does not run: a per-element weight set fitted
+    against real molecules, laid onto the ghost support it was *not* selected with,
+    beats `ghostw` 0 times out of 12 on held-out molecules. Refit support and weights
+    together and the same machinery wins 8/10. So the footings are not merely
+    incommensurate - a weight set carried onto the wrong support is worse than none, and
+    §14's 1481x belongs to the ERI *fit* rather than to weights that could be
+    transplanted. §16 also prices the footing itself at 2-2.5x at matched support, well
+    short of the 450x §13's single-rung `blocked`/`blocked1` pair implied.
+
+
 
 ## Caveats
 
@@ -2064,6 +2258,31 @@ damped filter §12 mandates for gradient work. The correctness claims do not lea
 of that - the rotational identity is exact rather than statistical, and the response is
 basis- and method-general - but every claim about cost or about what a picosecond would do
 does. The response costs `3 N` coupled-perturbed solves, not one.
+
+§16 trains on three molecules and tests on three, all H/C/O in cc-pVDZ. Nitrogen is
+absent, as it is from the ghost partner list, so nothing here says whether one
+per-element weight set serves an element across *rows* of the periodic table rather than
+across bonding within one. Three training molecules is also few enough that the held-out
+gain (2-3x) could be a property of this particular split; the honest claim is that the
+gain exists and transfers to unseen bonding, not that its size is converged.
+
+The rotation spreads behind §16 are peak-to-peak over 4 draws, which is a coarse
+statistic - §7 used 5 and 6 and flagged the same thing. The margins it carries the
+conclusion on (0 wins out of 12 for `molw`, 7-8 out of 10 for `molfit`) are counts rather
+than magnitudes for that reason.
+
+`molfit1` in §16 is handicapped by construction, and the "what the weights are worth"
+table should be read with it in mind. Its support was selected by a *weighted* fit and
+then stripped of its weights; a support chosen for `w = 1` from the start would be a
+different and probably better point set. So 2-2.5x is an upper bound on what the weights
+buy over a genuinely `w = 1`-optimal transferable grid, and the comparison that avoids
+this entirely - `molfit` against `ghost`, both self-consistent - is the 8/10 and 7/10
+counts rather than the ratio table.
+
+The `molw` ladder sits at smaller point counts than `ghost` at every threshold, because
+NNLS zeroes part of a held support wherever non-negativity binds. The matched-size
+interpolation only quotes inside the window both ladders cover, so this does not bias the
+0/12, but it does mean `molw` was never measured at the sizes `ghost`'s top rungs reach.
 
 cc-pVDZ only; MMFF geometries; `ov` mode and MP2 only. The rank and weight analyses are
 on methanol and ethanol; §10 widens the molecule set to twelve but widens neither the
