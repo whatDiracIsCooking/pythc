@@ -106,11 +106,27 @@ def octahedron_directions():
     return np.vstack([np.eye(3), -np.eye(3)])
 
 
-DIRECTIONS = {'icosahedron': icosahedron_directions, 'octahedron': octahedron_directions}
+def tetrahedron_directions():
+    """
+    The 4 vertices of a regular tetrahedron.
+
+    The smallest direction set that is not degenerate on the sphere, and the one that
+    matches sp3 bonding geometry - which is the intuition for trying it, and which
+    section 14 finds is not the property that matters. Integrates the sphere exactly
+    through degree 2, against the octahedron's 3 and the icosahedron's 5.
+    """
+    v = np.array([[1.0, 1.0, 1.0], [1.0, -1.0, -1.0],
+                  [-1.0, 1.0, -1.0], [-1.0, -1.0, 1.0]])
+    return v / np.linalg.norm(v, axis=1)[:, None]
+
+
+DIRECTIONS = {'icosahedron': icosahedron_directions,
+              'octahedron': octahedron_directions,
+              'tetrahedron': tetrahedron_directions}
 
 
 def ghost_environments(element, directions='icosahedron', partners=PARTNERS,
-                       scales=SCALES, full_cross=False):
+                       scales=SCALES, full_cross=False, cage=False, basis=None):
     """
     The training environments for one element: an atom of that element at the origin,
     with a single ghost neighbour placed around it.
@@ -126,8 +142,20 @@ def ghost_environments(element, directions='icosahedron', partners=PARTNERS,
     instead: better sampled, ``len(partners) * len(scales)`` times more expensive, and a
     way to check that the cycling is not what the answer depends on.
 
+    ``cage=True`` builds the arrangement the paragraph above argues against: every
+    direction occupied at once, one environment per ``(partner, scale)``. It is here to
+    be measured rather than argued about - see `levers.py` and FINDINGS section 14,
+    which confirm the partition collapse the argument predicts (the central atom keeps
+    0.2-1.2% of its free-atom Becke weight) and then find that the support ceiling goes
+    *up* rather than down, so the argument's premise is right and its conclusion does
+    not follow from rank alone.
+
+    :param basis: AO basis for the central atom and for the ghost shells. Defaults to
+        the module's ``BASIS``; the offline object is per element *and per basis*, so
+        this is one of the levers section 14 measures.
     :return: List of ``(atom_spec, basis_dict, label)`` ready for :func:`gto.M`.
     """
+    basis = basis or BASIS
     dirs = DIRECTIONS[directions]()
     combos = [(p, s) for p in partners for s in scales]
 
@@ -135,7 +163,24 @@ def ghost_environments(element, directions='icosahedron', partners=PARTNERS,
     # The free atom itself. Its own overlap block has to be integrated whatever the
     # neighbours are doing, and in the ghost environments it is damped by the partition
     # function, so without this the core is fitted only in a half-shadowed form.
-    envs.append((f"{element} 0.0 0.0 0.0", {element: BASIS}, 'free'))
+    envs.append((f"{element} 0.0 0.0 0.0", {element: basis}, 'free'))
+
+    if cage:
+        # Every direction occupied simultaneously, one environment per (partner, scale).
+        # The environment count is then len(partners) * len(scales) whatever the
+        # direction set is, so a cage and a single-ghost ensemble are NOT matched in
+        # environment count - which section 9 identifies as the thing that supplies
+        # rank. Read the two against each other with that in mind.
+        for partner, scale in combos:
+            r = (COVALENT[element] + COVALENT[partner]) * scale
+            ghost = f'ghost-{partner}'
+            spec = f"{element} 0.0 0.0 0.0"
+            for d in dirs:
+                pos = r * d
+                spec += f"; {ghost} {pos[0]:.8f} {pos[1]:.8f} {pos[2]:.8f}"
+            envs.append((spec, {element: basis, ghost: gto.basis.load(basis, partner)},
+                         f"cage-{partner}@{r:.2f}"))
+        return envs
 
     pairs = ([(d, c) for d in dirs for c in combos] if full_cross
              else [(d, combos[i % len(combos)]) for i, d in enumerate(dirs)])
@@ -146,30 +191,36 @@ def ghost_environments(element, directions='icosahedron', partners=PARTNERS,
         ghost = f'ghost-{partner}'
         spec = (f"{element} 0.0 0.0 0.0; "
                 f"{ghost} {pos[0]:.8f} {pos[1]:.8f} {pos[2]:.8f}")
-        basis = {element: BASIS, ghost: gto.basis.load(BASIS, partner)}
-        envs.append((spec, basis, f"{partner}@{r:.2f}"))
+        envs.append((spec, {element: basis, ghost: gto.basis.load(basis, partner)},
+                     f"{partner}@{r:.2f}"))
 
     return envs
 
 
 @functools.lru_cache(maxsize=None)
-def element_grid(symbol):
-    """The level-0 atomic grid of one element, about its own nucleus.
+def element_grid(symbol, basis=None, level=0):
+    """The atomic grid of one element, about its own nucleus.
 
     This is the candidate point set an offline fit selects from, and the object a
-    transferable grid is a subset of. It depends on the element and nothing else, so the
-    same points reappear - to the last bit - around every atom of that element in every
-    molecule, which is what makes an index list a portable grid.
+    transferable grid is a subset of. It depends on the element, the basis and the
+    parent grid level and nothing else, so the same points reappear - to the last bit -
+    around every atom of that element in every molecule, which is what makes an index
+    list a portable grid. An index list is only portable *against the same
+    (basis, level)*, which is why both travel with the support.
+
+    ``level`` is the second lever of FINDINGS section 14: it sets the number of
+    candidate columns the NNLS solve chooses between, which section 4(9) of HANDOFF.md
+    expected to be non-binding and which section 14 measures as co-binding at level 0.
     """
-    mol = gto.M(atom=f"{symbol} 0.0 0.0 0.0", basis=BASIS, spin=None, verbose=0)
+    mol = gto.M(atom=f"{symbol} 0.0 0.0 0.0", basis=basis or BASIS, spin=None, verbose=0)
     g = gen_grid.Grids(mol)
-    grid = g.gen_atomic_grids(mol, level=0, prune=treutler_prune)[symbol][0]
+    grid = g.gen_atomic_grids(mol, level=level, prune=treutler_prune)[symbol][0]
     grid.flags.writeable = False           # it is cached and handed out by reference
     return grid
 
 
 def fit_element(element, threshold, screening=1e-8, max_points=None, free=False,
-                normalise=True, with_weights=False, **env_kwargs):
+                normalise=True, with_weights=False, basis=None, level=0, **env_kwargs):
     """
     Select one element's transferable point set, offline.
 
@@ -189,20 +240,23 @@ def fit_element(element, threshold, screening=1e-8, max_points=None, free=False,
         conditioning work again and the offline object may need to carry them. They cost
         one float per point to store and nothing at all to differentiate: frozen weights
         have ``dw/dR = 0`` exactly as frozen points do.
+    :param basis: AO basis to fit in. The support is an index list into
+        ``element_grid(element, basis, level)`` and means nothing against another pair.
+    :param level: Becke parent grid level the candidate points come from.
     :return: ``(indices, n_parent, n_env)``, indices into :func:`element_grid` - or
         ``((indices, weights), n_parent, n_env)`` when ``with_weights``.
     """
-    envs = ghost_environments(element, **env_kwargs)
+    envs = ghost_environments(element, basis=basis, **env_kwargs)
     if free:
         envs = envs[:1]
 
-    parent = element_grid(element)
+    parent = element_grid(element, basis, level)
 
     blocks, targets = [], []
     for spec, basis, label in envs:
         mol = gto.M(atom=spec, basis=basis, spin=None, verbose=0)
         g = gen_grid.Grids(mol)
-        atom_grids = g.gen_atomic_grids(mol, level=0, prune=treutler_prune)
+        atom_grids = g.gen_atomic_grids(mol, level=level, prune=treutler_prune)
         coords_per_atom, weights_per_atom = g.gen_partition(mol, atom_grids, concat=False)
 
         coords_a, weights_a = coords_per_atom[0], weights_per_atom[0]
@@ -251,7 +305,7 @@ def element_supports(elements, threshold, free=False, quiet=False, **kwargs):
     return supports
 
 
-def assemble_from_supports(mol, supports):
+def assemble_from_supports(mol, supports, basis=None, level=0):
     """
     Build a molecule's grid by translating each element's point set onto its nuclei.
 
@@ -263,14 +317,16 @@ def assemble_from_supports(mol, supports):
     coords = []
     for ia in range(mol.natm):
         symbol = mol.atom_symbol(ia)
-        coords.append(element_grid(symbol)[supports[symbol]] + mol.atom_coord(ia))
+        coords.append(element_grid(symbol, basis, level)[supports[symbol]]
+                      + mol.atom_coord(ia))
     coords = np.vstack(coords)
     return coords, np.ones(len(coords))
 
 
-def per_atom_sets(mol, supports):
+def per_atom_sets(mol, supports, basis=None, level=0):
     """A support dictionary in the per-atom form ``rotate.assemble`` expects."""
-    return [(np.asarray(element_grid(mol.atom_symbol(ia))[supports[mol.atom_symbol(ia)]]),
+    return [(np.asarray(element_grid(mol.atom_symbol(ia), basis, level)
+                        [supports[mol.atom_symbol(ia)]]),
              np.ones(len(supports[mol.atom_symbol(ia)])))
             for ia in range(mol.natm)]
 

@@ -62,7 +62,8 @@ MMFF.
 | `gradient.py` | can the gradient be computed, and does it match the curve? | **yes, to machine precision** - but only for `lambda` in `1e-2..1e-5`; at 4(1)'s `1e-8` it varies 2x between runs. Net torque 188 uHa/rad blocked, **5592 ghost** |
 | `window.py` | what sets that floor, and is the torque a property of the grid? | **the filter's shape, not the metric's rank.** The damped inverse buys 3-5 decades of `lambda` and <5 uHa. The torques were mostly the regulariser: **water's are 0.001/0.002 at `pinv`**, and the ghost:blocked ratio is 4.5x, not 30x |
 | `torque_ladder.py` | does the torque 4(6) is left holding converge away with grid size? | **yes, in every mode.** methanol at `pinv`: blocked 357 -> 0.02 uHa/rad, ghost 969 -> 27. The committed ridge data said otherwise and was taken three decades outside where a torque means anything |
-| `trajectory.py` | what does the torque do over a trajectory, and is it worse than the grid it is pruned from? | **it reorients, it does not heat** - 95% incoherent, 4.5 deg of axis tilt in 2.5 ps. RKS/PBE on the same level-0 parent is **6x worse**; level 3 is 2-3 decades better on 163x the points |
+| `trajectory.py` | what does the torque do over a trajectory, and is it worse than the grid it is pruned from? | **it reorients, it does not heat** - 95% incoherent, 4.5 deg of axis tilt in 2.5 ps. RKS/PBE on the same level-0 parent is **8x worse** at a picosecond; level 3 is ~25x better on 163x the points |
+| `levers.py` | what sets where a ghost fit's support stops - basis, parent level, directions, cage? | **the cage, which was rejected on an argument.** Ghost gap 1.78x -> **1.22x** at 10 uHa; a finer parent moves the ceiling at *unchanged* equations, contradicting 4(9)'s premise; a tetrahedron is cheapest at 50 uHa and cannot reach 10 |
 
 The key methodological move: `NNLSGrid(blocked=True)` already fits each atomic sub-grid
 independently, so the penalty for giving up molecular pruning is measurable today. Because
@@ -133,8 +134,8 @@ awkward - the `lambda` window - and cut the orientation problem down with it. **
 now closed the orientation question outright and reordered what is left.** The torque
 converges with grid size in every mode, a trajectory says the residue reorients rather
 than heats, and - the result nobody asked for - plain DFT on the level-0 Becke grid these
-fits are pruned from loses angular momentum *six times faster* than the frozen support
-does. Lab-fixed atom-centred quadrature is not an acTHC defect; it is what the whole
+fits are pruned from loses angular momentum *eight times faster at a picosecond* than
+the frozen support does. Lab-fixed atom-centred quadrature is not an acTHC defect; it is what the whole
 family does, and the pruned reweighted support is better at it than its own parent.
 
 **What that leaves is one prerequisite and one lever.** The prerequisite is the
@@ -548,15 +549,24 @@ metric rather than the in-molecule one. Nobody has tried fitting a per-element w
 *for* the in-molecule objective. Frozen weights differentiate exactly as cleanly as frozen
 points (`dw/dR = 0` either way), so anything recovered here is free in the gradient.
 
-**(9) Try a finer parent grid. NOT STARTED, and it is the cheapest experiment left.** The
+**(9) Try a finer parent grid. PARTLY DONE - `levers.py`, FINDINGS section 14 - and its
+premise was wrong.** The reasoning below is that NNLS cannot retain more points than its
+target supplies equations, so a finer parent buys "the same support size, chosen better".
+Measured, a level-1 parent moves the *ceiling* by **1.26-1.42x at unchanged equation
+count**: the level-0 parent has been co-limiting all along, and support size is not held
+fixed. On methanol it is worth 1.78x -> 1.46x at 10 uHa - real, cheap, and much smaller
+than the cage of (12) below. **What is still not done is the part this entry was actually
+for:** nothing measures a torque or a rotation spread on a finer-parent support, and 4(7)
+shows the level-0 parent is a poor grid to be rotationally invariant on, so the
+orientation question that motivated this is untouched. `element_grid` now takes `level`.
+
+**[Historic premise, kept because it is the thing that turned out false:]** The
 offline object is a list of indices into an element's level-0 atomic grid, and nothing
 forces level 0. 4(3) established that NNLS cannot retain more points than its target
 supplies equations - `n_AO (n_AO + 1) / 2`, a property of the *basis*, not of the parent.
 So a finer parent offers a richer candidate set against the same number of equations: the
 same support size, chosen better. If that holds, orientation quality is buyable at no cost
-in `n_P` at all. It is a one-line change to `ghosts.element_grid`, and it is what would
-tell whether the level-0 parent - which 4(7) shows is a bad grid to be rotationally
-invariant on - is what has been setting the floor all along.
+in `n_P` at all.
 
 **(10) The orbital response.** Unchanged in content from 4(5) and still standard DF-MP2
 machinery, but 4(7) moves it to the front: it is the larger of the two symmetry violations
@@ -569,6 +579,46 @@ evaluate inside a selection loop. 4(7) weakens the case slightly - the torque co
 its own, and (8) and (9) both look like larger levers - but it targets the defect directly
 and remains the only idea here that would make a support *designed* to be rotationally
 quiet rather than incidentally so.
+
+**(12) The four levers on the ghost fit. DONE on energy, NOT STARTED on orientation** -
+`levers.py`, FINDINGS section 14. Everything in 4(3) through 4(7) was measured at one
+point in the space of things that set where a ghost fit's support stops: cc-pVDZ, a
+level-0 parent, 12 icosahedral directions, one ghost per environment. All four are now
+varied, as a ceiling (SCF-free, seconds) and as points per microhartree on methanol.
+
+* **The cage is the result, and it inverts a decision this directory made on an
+  argument.** `ghost_environments` refuses to put ghosts in every direction at once on
+  the grounds that the central atom's Becke share would collapse. It does collapse -
+  **0.2-0.3% of the free-atom weight against 57%** - and the ceiling rises anyway (2.2x
+  on carbon), because `stack_targets` normalises each environment's target and what
+  survives sees every direction at once. On methanol the ghost gap is **1.78x -> 1.22x**
+  at 10 uHa and **1.60x -> 1.13x** at 5 uHa; at 2 uHa the transferable grid is *smaller*
+  than the in-molecule fit (0.96x) and reaches the parent-grid floor, which `ghost`
+  never does. Against a global fit that is **1.85x rather than 2.7x**, halving the
+  headline `n_P^2` tax of the programme to 3.4x.
+* **Stage A and stage B do not rank the levers the same way, and stage B is the one that
+  counts.** `basis:cc-pVTZ` has the highest ceilings and `tetra` the lowest, yet `tetra`
+  is the *cheapest* setting measured at 50 uHa (0.87x, better than `blocked` itself) and
+  cannot reach 10 uHa at any threshold. A ceiling is a necessary condition. It is still
+  worth running first, because it is free and it is what catches `tetra` before the
+  single points do - which is exactly the use section 9 already prescribes.
+* **4(9)'s premise is false** - see that entry. A finer parent moves the ceiling at
+  unchanged equation count.
+* **Nothing here has been near a gradient.** All of it is `w = 1` at
+  `metric_ridge = 1e-8`, which 4(6) disqualifies for gradient work, and no lever has been
+  through `window.py`, `torque_ladder.py` or `trajectory.py`. **The cage's torque is
+  unmeasured**, and 4(7) puts the whole remaining gap to production DFT on orientation
+  and the weight footing rather than on the energy. So the lever that halves the point
+  tax is not yet known to help the quantity that actually blocks AIMD - and it could
+  plausibly hurt it, since a cage-fitted support is trained on a fragment of the atom.
+  **Run `torque_ladder.py --scheme damped --pinv` on a cage support before believing
+  section 14 is good news for the application** rather than only for the energy.
+* Left undone: one molecule, and `cage` was run in stage B with the icosahedral direction
+  set only. `cage:tetrahedron` hits `ghost`'s hydrogen ceiling exactly on an order of
+  magnitude fewer equations, so it may be most of the win at a fraction of the fit cost.
+  `cage` and `ghost` are also not matched in environment count (10 against 13), which
+  section 9 identifies as the thing that supplies rank, so part of the win may be
+  bookkeeping rather than geometry.
 
 ## 5. Open questions
 
@@ -586,7 +636,12 @@ quiet rather than incidentally so.
   1.35x on methanol, 1.05x on ethanol, so it amortises; but each ensemble has a rank
   ceiling that caps reachable accuracy at any threshold, and the cheapest one tested
   fails ethanol on it. What remains open is whether the *rank* of a ghost ensemble can be
-  raised cheaply. Section 4(4)'s second half narrows this usefully: raising the *variety*
+  raised cheaply. **Section 14 answers this: yes, by caging.** An icosahedral cage
+  supplies 29x the nominal equations of the single-ghost ensemble and lifts the ceiling
+  1.3-2.2x per element, which is the cheapest rank available - it costs environments
+  nothing (10 against 13) and buys the accuracy in FINDINGS section 14. What is still
+  open is the count-versus-geometry split, since the two ensembles are not matched in
+  environment count. Section 4(4)'s second half narrows this usefully: raising the *variety*
   at fixed environment count is not merely neutral but actively harmful (a fourth partner
   element costs 1.23x -> 1.48x on propene), so the knob to turn is the number of
   environments, not the number of distinct neighbours among them. Nothing yet says how

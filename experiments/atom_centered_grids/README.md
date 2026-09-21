@@ -40,6 +40,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `window.py` | what sets that floor, whether a different filter moves it, and what the torque is once the regulariser is taken out of it |
 | `torque_ladder.py` | whether the torque `window.py` is left holding converges away with grid size, the way the energy spread did |
 | `trajectory.py` | what that torque does over a trajectory, and whether it is worse than the quadrature the grid is pruned from |
+| `levers.py` | the four things that set where a ghost fit's support stops - AO basis, parent grid level, ghost direction set, cage or not - as a ceiling (no SCF) and as points per microhartree |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -76,11 +77,17 @@ uv run python trajectory.py methanol --modes hf,blocked,ghost --steps 5000 \
 uv run python trajectory.py methanol --modes hf --reference rks --xc pbe \
     --grid-level 0 --steps 2000 --out data/traj_methanol_rks.json   # the DFT control
 uv run python trajectory.py --report data/traj_*.json
+uv run python levers.py --ceilings H,C,O --out data/levers_ceilings.json  # no SCF
+uv run python levers.py methanol --variants ghost,parent1,cage,tetra \
+    --out data/levers_methanol.json                                  # does a ceiling convert?
+uv run python levers.py methanol --basis cc-pvtz --variants ghost,cage \
+    --out data/levers_methanol_tz.json               # the basis lever, with its own floor
+uv run python levers.py --report data/levers_*.json
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Fourteen headlines:
+See [`FINDINGS.md`](FINDINGS.md). Fifteen headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -167,6 +174,21 @@ See [`FINDINGS.md`](FINDINGS.md). Fourteen headlines:
   rotational invariance at **~8300 uHa/rad** - fifty times the transferable grid's own
   torque, and identical on a grid with five thousand times less. No AIMD runs on the
   present gradient whatever the grid does.
+* **The ghost cage was rejected on an argument, and the argument is wrong - the point
+  tax is roughly halved.** `ghost_environments` declines to put ghosts in every direction
+  at once because that would squeeze the central atom's Becke share to a lobe around the
+  nucleus. It does - the caged atom keeps **0.2-0.3%** of its free-atom weight against
+  57% with one neighbour - and the support ceiling goes **up** anyway, 2.2x on carbon,
+  because `stack_targets` normalises the fragment and what is left sees every direction
+  at once. On methanol the ghost gap goes **1.78x -> 1.22x** at 10 uHa and
+  **1.60x -> 1.13x** at 5 uHa, and at 2 uHa the transferable grid is *smaller* than the
+  in-molecule fit (0.96x) while `ghost` cannot reach that target at all. Compounded
+  against a global molecular fit that is **1.85x rather than 2.7x**, i.e. 3.4x rather
+  than 7.3x on the `n_P^2` parts. Two more levers behave as §9 predicts: a finer parent
+  grid moves the ceiling 1.26-1.42x *at unchanged equation count* - which contradicts the
+  premise HANDOFF 4(9) is written on - and a tetrahedral direction set is the cheapest
+  thing measured at 50 uHa and cannot reach 10 uHa at any threshold, which is §9's rank
+  ceiling on a new axis. **No torque has been measured for any of them.**
 * **The gradient exists and verifies to machine precision** (`pythc.grad`, driven by
   `gradient.py`): quadratic convergence against a finite difference, and forces that sum
   to zero to 2.4e-15 with no finite difference involved. Two things came back with it

@@ -1,0 +1,470 @@
+{
+  "meta": {
+    "experiment": "levers",
+    "molecule": "methanol",
+    "natm": 6,
+    "nao": 48,
+    "basis": "cc-pvdz",
+    "auxbasis": "cc-pvdz-ri",
+    "mp2_ri_reference": -0.34340193503079874,
+    "ridge": 1e-08,
+    "weights": "ones",
+    "elements": [
+      "C",
+      "H",
+      "O"
+    ],
+    "variants": [
+      "ghost",
+      "parent1",
+      "cage",
+      "tetra"
+    ]
+  },
+  "rows": [
+    {
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 3288,
+      "rmsd_S": 0.00026867542665599576,
+      "e_corr": -0.34339924215184736,
+      "err_uha": 2.6928789513824825,
+      "fit_seconds": 4.76837158203125e-07
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 301,
+      "rmsd_S": 3.0482243279532213,
+      "e_corr": -0.3433855276393929,
+      "err_uha": 16.407391405848237,
+      "fit_seconds": 0.567279577255249
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 491,
+      "rmsd_S": 2.8880234677863243,
+      "e_corr": -0.3433966401867276,
+      "err_uha": 5.294844071135341,
+      "fit_seconds": 1.1913235187530518
+    },
+    {
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 670,
+      "rmsd_S": 3.673710658092599,
+      "e_corr": -0.34339778435850943,
+      "err_uha": 4.150672289315871,
+      "fit_seconds": 1.828920602798462
+    },
+    {
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 223,
+      "rmsd_S": 1.5665919403707183,
+      "e_corr": -0.34312406938409007,
+      "err_uha": 277.8656467086749,
+      "fit_seconds": 0.6710896492004395,
+      "per_element": {
+        "C": 37,
+        "H": 35,
+        "O": 46
+      },
+      "level": 0,
+      "lever": {}
+    },
+    {
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 414,
+      "rmsd_S": 0.7290696413977303,
+      "e_corr": -0.34338215426703134,
+      "err_uha": 19.78076376740745,
+      "fit_seconds": 1.0065219402313232,
+      "per_element": {
+        "C": 68,
+        "H": 69,
+        "O": 70
+      },
+      "level": 0,
+      "lever": {}
+    },
+    {
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 512,
+      "rmsd_S": 0.7054513386793316,
+      "e_corr": -0.3433716762179436,
+      "err_uha": 30.258812855121775,
+      "fit_seconds": 1.5316886901855469,
+      "per_element": {
+        "C": 85,
+        "H": 84,
+        "O": 91
+      },
+      "level": 0,
+      "lever": {}
+    },
+    {
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 627,
+      "rmsd_S": 3.1018612784524326,
+      "e_corr": -0.3433930815943505,
+      "err_uha": 8.85343644824177,
+      "fit_seconds": 2.0571787357330322,
+      "per_element": {
+        "C": 100,
+        "H": 100,
+        "O": 127
+      },
+      "level": 0,
+      "lever": {}
+    },
+    {
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 702,
+      "rmsd_S": 0.777728063330733,
+      "e_corr": -0.34339608256115683,
+      "err_uha": 5.85246964190933,
+      "fit_seconds": 2.5234756469726562,
+      "per_element": {
+        "C": 125,
+        "H": 108,
+        "O": 145
+      },
+      "level": 0,
+      "lever": {}
+    },
+    {
+      "mode": "ghost",
+      "threshold": 1e-06,
+      "n_points": 816,
+      "rmsd_S": 0.8875206418900841,
+      "e_corr": -0.34339626531397016,
+      "err_uha": 5.669716828582416,
+      "fit_seconds": 3.054795980453491,
+      "per_element": {
+        "C": 144,
+        "H": 124,
+        "O": 176
+      },
+      "level": 0,
+      "lever": {}
+    },
+    {
+      "mode": "parent1",
+      "threshold": 0.001,
+      "n_points": 245,
+      "rmsd_S": 3.0260990716031873,
+      "e_corr": -0.3433084503706474,
+      "err_uha": 93.48466015135503,
+      "fit_seconds": 1.632781744003296,
+      "per_element": {
+        "C": 36,
+        "H": 40,
+        "O": 49
+      },
+      "level": 1,
+      "lever": {}
+    },
+    {
+      "mode": "parent1",
+      "threshold": 0.0003,
+      "n_points": 455,
+      "rmsd_S": 3.087356647702371,
+      "e_corr": -0.34338659932856064,
+      "err_uha": 15.335702238106208,
+      "fit_seconds": 4.903090000152588,
+      "per_element": {
+        "C": 78,
+        "H": 76,
+        "O": 73
+      },
+      "level": 1,
+      "lever": {}
+    },
+    {
+      "mode": "parent1",
+      "threshold": 0.0001,
+      "n_points": 593,
+      "rmsd_S": 3.1319796534910798,
+      "e_corr": -0.3433948195532328,
+      "err_uha": 7.115477565933226,
+      "fit_seconds": 3.7136404514312744,
+      "per_element": {
+        "C": 91,
+        "H": 101,
+        "O": 98
+      },
+      "level": 1,
+      "lever": {}
+    },
+    {
+      "mode": "parent1",
+      "threshold": 3e-05,
+      "n_points": 745,
+      "rmsd_S": 3.082288187634066,
+      "e_corr": -0.34339755581192233,
+      "err_uha": 4.379218876415791,
+      "fit_seconds": 5.52640438079834,
+      "per_element": {
+        "C": 117,
+        "H": 123,
+        "O": 136
+      },
+      "level": 1,
+      "lever": {}
+    },
+    {
+      "mode": "parent1",
+      "threshold": 1e-05,
+      "n_points": 912,
+      "rmsd_S": 4.764468984051999,
+      "e_corr": -0.34339802207250747,
+      "err_uha": 3.912958291274471,
+      "fit_seconds": 8.543505668640137,
+      "per_element": {
+        "C": 151,
+        "H": 149,
+        "O": 165
+      },
+      "level": 1,
+      "lever": {}
+    },
+    {
+      "mode": "parent1",
+      "threshold": 1e-06,
+      "n_points": 1111,
+      "rmsd_S": 2.999836283423433,
+      "e_corr": -0.34339849199484784,
+      "err_uha": 3.4430359509007857,
+      "fit_seconds": 10.23962664604187,
+      "per_element": {
+        "C": 196,
+        "H": 173,
+        "O": 223
+      },
+      "level": 1,
+      "lever": {}
+    },
+    {
+      "mode": "cage",
+      "threshold": 0.001,
+      "n_points": 314,
+      "rmsd_S": 3.3777325412764667,
+      "e_corr": -0.3433575919609351,
+      "err_uha": 44.34306986361713,
+      "fit_seconds": 12.822955131530762,
+      "per_element": {
+        "C": 80,
+        "H": 39,
+        "O": 78
+      },
+      "level": 0,
+      "lever": {
+        "cage": true
+      }
+    },
+    {
+      "mode": "cage",
+      "threshold": 0.0003,
+      "n_points": 529,
+      "rmsd_S": 2.735951100377203,
+      "e_corr": -0.3433970903502269,
+      "err_uha": 4.844680571824966,
+      "fit_seconds": 17.09268045425415,
+      "per_element": {
+        "C": 142,
+        "H": 63,
+        "O": 135
+      },
+      "level": 0,
+      "lever": {
+        "cage": true
+      }
+    },
+    {
+      "mode": "cage",
+      "threshold": 0.0001,
+      "n_points": 795,
+      "rmsd_S": 2.4787308517385642,
+      "e_corr": -0.3433986071595655,
+      "err_uha": 3.327871233249624,
+      "fit_seconds": 36.98569369316101,
+      "per_element": {
+        "C": 203,
+        "H": 105,
+        "O": 172
+      },
+      "level": 0,
+      "lever": {
+        "cage": true
+      }
+    },
+    {
+      "mode": "cage",
+      "threshold": 3e-05,
+      "n_points": 923,
+      "rmsd_S": 3.715691648764487,
+      "e_corr": -0.34339886148647336,
+      "err_uha": 3.073544325382649,
+      "fit_seconds": 48.91755294799805,
+      "per_element": {
+        "C": 239,
+        "H": 116,
+        "O": 220
+      },
+      "level": 0,
+      "lever": {
+        "cage": true
+      }
+    },
+    {
+      "mode": "cage",
+      "threshold": 1e-05,
+      "n_points": 1053,
+      "rmsd_S": 2.6744892319242726,
+      "e_corr": -0.34339897164982214,
+      "err_uha": 2.9633809766060892,
+      "fit_seconds": 66.51228499412537,
+      "per_element": {
+        "C": 276,
+        "H": 134,
+        "O": 241
+      },
+      "level": 0,
+      "lever": {
+        "cage": true
+      }
+    },
+    {
+      "mode": "cage",
+      "threshold": 1e-06,
+      "n_points": 1112,
+      "rmsd_S": 3.8678804998734893,
+      "e_corr": -0.3433989791198103,
+      "err_uha": 2.9559109884225165,
+      "fit_seconds": 83.10393500328064,
+      "per_element": {
+        "C": 308,
+        "H": 132,
+        "O": 276
+      },
+      "level": 0,
+      "lever": {
+        "cage": true
+      }
+    },
+    {
+      "mode": "tetra",
+      "threshold": 0.001,
+      "n_points": 191,
+      "rmsd_S": 1.039202111218004,
+      "e_corr": -0.3429948699146883,
+      "err_uha": 407.06511611043885,
+      "fit_seconds": 0.3114461898803711,
+      "per_element": {
+        "C": 34,
+        "H": 28,
+        "O": 45
+      },
+      "level": 0,
+      "lever": {
+        "directions": "tetrahedron"
+      }
+    },
+    {
+      "mode": "tetra",
+      "threshold": 0.0003,
+      "n_points": 210,
+      "rmsd_S": 1.1625918010058434,
+      "e_corr": -0.3429606485039413,
+      "err_uha": 441.28652685743174,
+      "fit_seconds": 0.44258713722229004,
+      "per_element": {
+        "C": 42,
+        "H": 29,
+        "O": 52
+      },
+      "level": 0,
+      "lever": {
+        "directions": "tetrahedron"
+      }
+    },
+    {
+      "mode": "tetra",
+      "threshold": 0.0001,
+      "n_points": 278,
+      "rmsd_S": 3.199658990870296,
+      "e_corr": -0.3433715792934651,
+      "err_uha": 30.355737333620514,
+      "fit_seconds": 0.6981697082519531,
+      "per_element": {
+        "C": 63,
+        "H": 37,
+        "O": 67
+      },
+      "level": 0,
+      "lever": {
+        "directions": "tetrahedron"
+      }
+    },
+    {
+      "mode": "tetra",
+      "threshold": 3e-05,
+      "n_points": 316,
+      "rmsd_S": 2.995076864526855,
+      "e_corr": -0.34338112729966747,
+      "err_uha": 20.807731131278207,
+      "fit_seconds": 0.8252437114715576,
+      "per_element": {
+        "C": 76,
+        "H": 40,
+        "O": 80
+      },
+      "level": 0,
+      "lever": {
+        "directions": "tetrahedron"
+      }
+    },
+    {
+      "mode": "tetra",
+      "threshold": 1e-05,
+      "n_points": 363,
+      "rmsd_S": 3.147888489610795,
+      "e_corr": -0.34338814711835997,
+      "err_uha": 13.787912438778527,
+      "fit_seconds": 0.9770123958587646,
+      "per_element": {
+        "C": 92,
+        "H": 45,
+        "O": 91
+      },
+      "level": 0,
+      "lever": {
+        "directions": "tetrahedron"
+      }
+    },
+    {
+      "mode": "tetra",
+      "threshold": 1e-06,
+      "n_points": 375,
+      "rmsd_S": 3.1647301887723103,
+      "e_corr": -0.3433866108492736,
+      "err_uha": 15.324181525167013,
+      "fit_seconds": 1.2236461639404297,
+      "per_element": {
+        "C": 91,
+        "H": 46,
+        "O": 100
+      },
+      "level": 0,
+      "lever": {
+        "directions": "tetrahedron"
+      }
+    }
+  ]
+}
