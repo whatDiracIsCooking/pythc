@@ -1,0 +1,158 @@
+{
+  "meta": {
+    "experiment": "levers",
+    "molecule": "methanol",
+    "natm": 6,
+    "nao": 116,
+    "basis": "cc-pvtz",
+    "auxbasis": "cc-pvtz-ri",
+    "mp2_ri_reference": -0.4576687114814061,
+    "ridge": 1e-08,
+    "weights": "ones",
+    "elements": [
+      "C",
+      "H",
+      "O"
+    ],
+    "variants": [
+      "ghost",
+      "cage"
+    ]
+  },
+  "rows": [
+    {
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 3288,
+      "rmsd_S": 0.0005399554231064027,
+      "e_corr": -0.457661394956127,
+      "err_uha": 7.316525279077446,
+      "fit_seconds": 7.152557373046875e-07
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 767,
+      "rmsd_S": 1.936904599411261,
+      "e_corr": -0.4575558496140934,
+      "err_uha": 112.86186731268577,
+      "fit_seconds": 6.498942136764526
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.0001,
+      "n_points": 1053,
+      "rmsd_S": 1.9840786163070203,
+      "e_corr": -0.4576293827820752,
+      "err_uha": 39.32869933087613,
+      "fit_seconds": 11.771506071090698
+    },
+    {
+      "mode": "blocked",
+      "threshold": 1e-05,
+      "n_points": 1293,
+      "rmsd_S": 2.9769695966000915,
+      "e_corr": -0.45764209823165947,
+      "err_uha": 26.613249746620937,
+      "fit_seconds": 18.02172827720642
+    },
+    {
+      "mode": "ghost",
+      "threshold": 0.001,
+      "n_points": 523,
+      "rmsd_S": 0.7933458320600507,
+      "e_corr": -0.45706701496143726,
+      "err_uha": 601.6965199688307,
+      "fit_seconds": 3.385169744491577,
+      "per_element": {
+        "C": 93,
+        "H": 82,
+        "O": 102
+      },
+      "level": 0,
+      "lever": {}
+    },
+    {
+      "mode": "ghost",
+      "threshold": 0.0003,
+      "n_points": 778,
+      "rmsd_S": 1.3904614050856603,
+      "e_corr": -0.45758660458596473,
+      "err_uha": 82.1068954413584,
+      "fit_seconds": 5.0134546756744385,
+      "per_element": {
+        "C": 137,
+        "H": 122,
+        "O": 153
+      },
+      "level": 0,
+      "lever": {}
+    },
+    {
+      "mode": "ghost",
+      "threshold": 0.0001,
+      "n_points": 1063,
+      "rmsd_S": 1.2786196328381918,
+      "e_corr": -0.45765295344546864,
+      "err_uha": 15.758035937452064,
+      "fit_seconds": 10.669329404830933,
+      "per_element": {
+        "C": 219,
+        "H": 156,
+        "O": 220
+      },
+      "level": 0,
+      "lever": {}
+    },
+    {
+      "mode": "ghost",
+      "threshold": 3e-05,
+      "n_points": 1202,
+      "rmsd_S": 1.399695217314651,
+      "e_corr": -0.4576575073021142,
+      "err_uha": 11.20417929190154,
+      "fit_seconds": 15.569637298583984,
+      "per_element": {
+        "C": 270,
+        "H": 164,
+        "O": 276
+      },
+      "level": 0,
+      "lever": {}
+    },
+    {
+      "mode": "ghost",
+      "threshold": 1e-05,
+      "n_points": 1351,
+      "rmsd_S": 1.3957456936152177,
+      "e_corr": -0.4576569638426146,
+      "err_uha": 11.74763879147056,
+      "fit_seconds": 21.045414686203003,
+      "per_element": {
+        "C": 308,
+        "H": 182,
+        "O": 315
+      },
+      "level": 0,
+      "lever": {}
+    },
+    {
+      "mode": "cage",
+      "threshold": 0.001,
+      "n_points": 699,
+      "rmsd_S": 1.508843731306482,
+      "e_corr": -0.4571483134665847,
+      "err_uha": 520.3980148213993,
+      "fit_seconds": 152.43882489204407,
+      "per_element": {
+        "C": 138,
+        "H": 107,
+        "O": 133
+      },
+      "level": 0,
+      "lever": {
+        "cage": true
+      }
+    }
+  ]
+}
