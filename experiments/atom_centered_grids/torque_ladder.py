@@ -34,16 +34,41 @@ Three things are controlled for, because each could fake a convergence:
 * **The asymptote.** ``--parent`` adds the unpruned atomic grid as the top of the ladder.
   A complete atomic grid is very nearly rotationally invariant, so its torque is the floor
   the ladder should be heading for. If it is not small, the convergence is not real.
+* **The rung.** This statistic is *not* monotone in point count - 4(9) notes it for the
+  ERI ladders and 4(13) hit it head on: ``ghostw`` on formaldehyde runs 163 uHa/rad at
+  344 points, 1.00 at 427 and 3.74 at 486, and the rms over draws does the same. Two
+  modes compared at one rung each, at different sizes, can be made to say almost
+  anything - a draft of FINDINGS section 16 read a 26x from such a pair and the next rung
+  inverted it. Read a whole ladder, at matched point count, and prefer ``insitu.py``'s
+  energy and spread ladders when the question is which of two grids is better.
 
 No finite differences: section 4(5) already checked this torque against one to six
 significant figures, and ``gradient.py`` re-runs that check. This script only needs the
 analytic value, so a row costs one gradient evaluation per draw.
+
+The transferable modes are one offline object at seven weight footings, and the footing
+is never incidental - see 4(9)'s warning not to read one against another. Ordered by how
+the support was chosen:
+
+* ``ghost`` / ``ghostw`` - ghost-neighbour overlap fit, at ``w = 1`` and at its own
+  weights (section 4(3)).
+* ``eri`` / ``eriw`` - free-atom ERI fit, same two footings (section 4(9)). ``eriw`` is
+  the best of them.
+* ``molw`` / ``molfit`` / ``molfit1`` - ``insitu.py``'s in-molecule fits (section 4(13)).
+  ``molfit`` pairs an in-molecule support with its own weights; ``molw`` deliberately
+  does *not*, and is the mixed-footing control.
+
+The ``mol*`` rows are the only ones that consume training molecules (``insitu.TRAIN``),
+so a run on one of those is a fit-quality measurement rather than a transfer one - the
+banner says which. Every other mode is fitted per element with no molecule in sight.
 
 Usage:
 
     uv run python experiments/atom_centered_grids/torque_ladder.py water --parent
     uv run python experiments/atom_centered_grids/torque_ladder.py methanol \
         --modes blocked,ghost --draws 4 --out torque_ladder_methanol.json
+    uv run python experiments/atom_centered_grids/torque_ladder.py formaldehyde \
+        --modes eriw,ghostw,molw,molfit,molfit1 --ridges "" --pinv --draws 4
 """
 import argparse
 import json
@@ -64,7 +89,9 @@ from pythc.grad.factorisation import ThcFactorisation
 from pythc.lib import ridge_shift
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from atomic_eri import element_supports as eri_element_supports
 from ghosts import element_grid, element_supports, per_atom_sets
+from insitu import TRAIN as INSITU_TRAIN, per_atom_for_mode
 from rotate import blocked_fit_per_atom
 from sweep import MOLECULES, BASIS, AUXBASIS
 
@@ -76,9 +103,24 @@ DEFAULT_THRESHOLDS = {
     "blocked1": (3e-3, 1e-3, 3e-4, 1e-4, 1e-5),
     "ghost": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
     "ghostw": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
+    # The section 4(9) ERI-target ladder, calibrated in atomic_eri.py to land on the
+    # same point counts as the ghost rungs above.
+    "eri": (1e-4, 1e-5, 1e-6, 1e-7, 1e-8),
+    "eriw": (1e-4, 1e-5, 1e-6, 1e-7, 1e-8),
+    # The in-molecule weight modes of insitu.py (section 4(13)). molw holds the ghost
+    # support of the same rung, so its ladder has to be the ghost ladder; molfit selects
+    # for itself and carries the same knob.
+    "molw": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
+    "molfit": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
+    "molfit1": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
 }
 
-MODES = ("blocked", "blocked1", "ghost", "ghostw", "parent", "parent1")
+MODES = ("blocked", "blocked1", "ghost", "ghostw", "eri", "eriw",
+         "molw", "molfit", "molfit1", "parent", "parent1")
+
+# Modes whose supports or weights come from insitu.py rather than from a ghost or ERI
+# fit. These are the only ones that consume training molecules.
+INSITU_MODES = ("molw", "molfit", "molfit1")
 
 
 def parent_per_atom(mol, ones):
@@ -122,14 +164,30 @@ def build_per_atom(mol, mode, threshold, support_cache):
             return fitted
         return [(rel, np.ones(len(rel))) for rel, _ in fitted]
 
-    keep_w = mode == "ghostw"
+    if mode in INSITU_MODES:
+        # Section 4(13)'s in-molecule fits. `molw` is the mixed-footing control that
+        # 4(9)'s "do not read an eriw number against a w = 1 number" warning implies but
+        # does not measure: a weight set fitted for one objective, laid onto a support
+        # selected for another. It is here so that control sits on the same ladder as
+        # the self-consistent pairings.
+        return per_atom_for_mode(mol, mode, threshold, INSITU_TRAIN,
+                                 support_cache.setdefault("_insitu", {}))
+
+    keep_w = mode in ("ghostw", "eriw")
+    # "eri" / "eriw" are the free-atom ERI fits of section 4(9): the same kind of
+    # transferable object as "ghost", selected from the same per-element parent grid,
+    # but fitted against the atom's own two-electron integrals with no neighbour of any
+    # kind. They belong on this ladder because section 4(7) put the whole remaining
+    # orientation gap on the weight footing, and an ERI-fitted weight set is the first
+    # per-element one with any claim to the right footing.
+    fit = eri_element_supports if mode in ("eri", "eriw") else element_supports
     elements = sorted({mol.atom_symbol(ia) for ia in range(mol.natm)})
-    key = [(e, threshold, keep_w) for e in elements]
+    key = [(e, threshold, mode) for e in elements]
     missing = [e for e, k in zip(elements, key) if k not in support_cache]
     if missing:
-        for e, support in element_supports(missing, threshold, quiet=True,
-                                           with_weights=keep_w).items():
-            support_cache[(e, threshold, keep_w)] = support
+        for e, support in fit(missing, threshold, quiet=True,
+                              with_weights=keep_w).items():
+            support_cache[(e, threshold, mode)] = support
 
     if not keep_w:
         return per_atom_sets(mol, {e: support_cache[k] for e, k in zip(elements, key)})
@@ -139,8 +197,8 @@ def build_per_atom(mol, mode, threshold, support_cache):
     # structurally; whether the weights a *ghost* fit produces are any use once the
     # support is transferred into a real molecule is what the row measures.
     return [(np.asarray(element_grid(mol.atom_symbol(ia))
-                        [support_cache[(mol.atom_symbol(ia), threshold, True)][0]]),
-             np.asarray(support_cache[(mol.atom_symbol(ia), threshold, True)][1]))
+                        [support_cache[(mol.atom_symbol(ia), threshold, mode)][0]]),
+             np.asarray(support_cache[(mol.atom_symbol(ia), threshold, mode)][1]))
             for ia in range(mol.natm)]
 
 
@@ -239,7 +297,12 @@ def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent,
           f"{scheme} lambdas {', '.join(f'{r:.0e}' for r in ridges)}"
           + ("; plus a pinv control row per rung" if with_pinv else ""))
     print("   weight footing: blocked/ghostw/parent carry fitted weights, "
-          "blocked1/ghost/parent1 are w = 1", flush=True)
+          "blocked1/ghost/parent1/molfit1 are w = 1, "
+          "molw/molfit carry in-molecule per-element weights", flush=True)
+    if any(m in INSITU_MODES for m in modes):
+        print(f"   in-molecule weights trained on {', '.join(INSITU_TRAIN)}"
+              + (f" - which INCLUDES {name}, so those rows are not held out"
+                 if name in INSITU_TRAIN else f" - {name} is held out"), flush=True)
 
     rungs = [(m, t) for m in modes for t in thresholds.get(m, (None,))]
     if with_parent:
