@@ -539,16 +539,54 @@ rotation fed back; the internal coordinates are still the RHF trajectory's, so t
 treatment is first order in the leak. A fully coupled run needs the orbital response
 first. One molecule that does not saturate, one initial condition per arm, gas phase.
 
-**(8) Fit per-element weights against the in-molecule objective. NOT STARTED, and it is
-now the highest-leverage thing on this list.** 4(7) localises the entire orientation gap
-to the weight footing: same support, `w = 1` gives 9.02 uHa/rad and NNLS weights give
-0.02. `ghostw` - the ghost fit's own weights, transferred - gives 52.3 and is *worse* than
-`w = 1`, which is consistent with 4(6)'s note that those weights condition the ghost
-metric rather than the in-molecule one. Nobody has tried fitting a per-element weight set
-*for* the in-molecule objective. Frozen weights differentiate exactly as cleanly as frozen
-points (`dw/dR = 0` either way), so anything recovered here is free in the gradient.
+**(8) Fit per-element weights against the in-molecule objective. DONE, and it both
+failed and succeeded - the split is the result. See (12) for its successor.**
+`insitu.py`, FINDINGS section 14. Per-element weights fitted against real atoms in real
+molecules (train water/methanol/ethane, held out ethanol/formaldehyde/propene), stacked
+into one NNLS solve per element so the product is still `element -> (indices, weights)`
+with no molecular index in it. Everything below is at matched point count, errors as
+distance from each molecule's own unpruned parent grid.
 
-**(9) Try a finer parent grid. NOT STARTED, and it is the cheapest experiment left.** The
+*As posed - weights only, on the existing ghost support (`molw`) - it is refuted, and not
+narrowly.* The fit reaches its objective and the gain transfers (held-out overlap residual
+0.36 on carbon against `ghostw`'s 1.48), but the grid it produces beats `ghostw`
+**0 times out of 12** on energy and **0 out of 12** on rotation spread across the three
+held-out molecules, at a median of 1.5-2.8x worse.
+
+*Fit the support and the weights together (`molfit`) and it wins.* 8/10 rungs on energy
+and 7/10 on spread against `ghostw`, at a median of ~3x on energy - the best transferable
+grid in the file, and it holds up on molecules whose bonding is in neither the training
+set nor the ghost environments.
+
+*`molw` is the diagnostic that explains both.* It carries the best-fitted weights in the
+table and the second worst grid; the only thing separating it from `molfit` is that its
+points were chosen by a different fit than its weights. **Support and weights are one
+object.** 4(6)'s "those weights condition the ghost metric rather than the in-molecule
+one" was the right mechanism read one step too narrowly: it is not that ghost weights are
+wrong, it is that a ghost *fit* is wrong, points and weights together.
+
+*And the weights are worth far less than 4(7) implied.* `molfit` against `molfit1` is the
+same support at two footings, so it needs no interpolation: **2-2.5x on energy, 1.5-3x on
+spread**, nothing at all at the coarsest rung, growing with grid size. Not the 450x that
+4(7)'s single-rung `blocked` / `blocked1` pair (0.02 against 9.02 uHa/rad) suggested. Part
+of that gap is that the single-rung torque is not a reliable statistic: `ghostw` on
+formaldehyde runs 163.37 uHa/rad at 344 points, 1.00 at 427 and 3.74 at 486. A first draft
+of section 14 quoted 26x from exactly that kind of size-mismatched pair and the next rung
+inverted it. **Read these at matched size, and prefer the energy and spread ladders to a
+torque quoted at one rung** - which is a caveat on 4(7) and section 13's own headline
+numbers too.
+
+Nothing here costs the gradient - `dw/dR = 0` for a frozen per-element weight table
+exactly as for frozen points, and `pythc.grad` is unchanged.
+
+What is now open in place of (8): `molfit` is still well short of `blocked`, and section
+14 shows the overlap objective can no longer see the difference between the grids being
+chosen among (two matched on it to 10% differ by 1.5-2.8x in the quantities that matter,
+in the opposite order). Further offline tuning needs a target closer to what is computed.
+See (12).
+
+**(9) Try a finer parent grid. NOT STARTED, and with (8) done it is the cheapest
+experiment left.** The
 offline object is a list of indices into an element's level-0 atomic grid, and nothing
 forces level 0. 4(3) established that NNLS cannot retain more points than its target
 supplies equations - `n_AO (n_AO + 1) / 2`, a property of the *basis*, not of the parent.
@@ -569,6 +607,19 @@ evaluate inside a selection loop. 4(7) weakens the case slightly - the torque co
 its own, and (8) and (9) both look like larger levers - but it targets the defect directly
 and remains the only idea here that would make a support *designed* to be rotationally
 quiet rather than incidentally so.
+
+**(12) A richer offline target than the overlap matrix. NOT STARTED, and section 14
+makes it the successor to (8).** Every offline fit in this programme minimises a residual
+against `S`, and section 14 is where that proxy visibly runs out: `molw` and `molfit` are
+matched on it to within 10% and differ by 29x in net torque, so it can no longer rank the
+grids being chosen between. Section 8's rank ceiling says the same thing from the other
+side - a free atom's `S` supplies only `n_AO (n_AO + 1) / 2` equations. Both point at the
+target, not the environment. Three candidates, cheapest first: fit the atom's own
+**co-density manifold** (the products `phi_mu phi_nu`, far more numerous than the overlap
+elements it contracts to); fit its one-centre **ERIs**, `O(n_AO^4)` equations against
+`O(n_AO^2)`; or fit the atom **in a field** and in a few charge states, which is the ANO
+recipe and cheaper than ghosts. If any of them works it is strictly better than more
+environments, because it removes the equation-count ceiling without a training set at all.
 
 ## 5. Open questions
 

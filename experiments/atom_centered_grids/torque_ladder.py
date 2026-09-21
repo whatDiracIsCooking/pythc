@@ -65,6 +65,7 @@ from pythc.lib import ridge_shift
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ghosts import element_grid, element_supports, per_atom_sets
+from insitu import TRAIN as INSITU_TRAIN, per_atom_for_mode
 from rotate import blocked_fit_per_atom
 from sweep import MOLECULES, BASIS, AUXBASIS
 
@@ -76,9 +77,19 @@ DEFAULT_THRESHOLDS = {
     "blocked1": (3e-3, 1e-3, 3e-4, 1e-4, 1e-5),
     "ghost": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
     "ghostw": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
+    # The in-molecule weight modes of insitu.py (HANDOFF step 8). molw holds the ghost
+    # support of the same rung, so its ladder has to be the ghost ladder; molfit selects
+    # for itself and carries the same knob.
+    "molw": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
+    "molfit": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
+    "molfit1": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
 }
 
-MODES = ("blocked", "blocked1", "ghost", "ghostw", "parent", "parent1")
+MODES = ("blocked", "blocked1", "ghost", "ghostw", "molw", "molfit", "molfit1",
+         "parent", "parent1")
+
+# Modes whose supports or weights come from insitu.py rather than from a ghost fit.
+INSITU_MODES = ("molw", "molfit", "molfit1")
 
 
 def parent_per_atom(mol, ones):
@@ -121,6 +132,14 @@ def build_per_atom(mol, mode, threshold, support_cache):
         if mode == "blocked":
             return fitted
         return [(rel, np.ones(len(rel))) for rel, _ in fitted]
+
+    if mode in INSITU_MODES:
+        # Section 4(7) left one square of the weight-footing table empty: a per-element
+        # weight set fitted for the objective the runtime actually faces. insitu.py
+        # fills it, and it is measured here so the torque is quoted in the harness that
+        # produced section 13's table rather than a parallel one.
+        return per_atom_for_mode(mol, mode, threshold, INSITU_TRAIN,
+                                 support_cache.setdefault("_insitu", {}))
 
     keep_w = mode == "ghostw"
     elements = sorted({mol.atom_symbol(ia) for ia in range(mol.natm)})
@@ -239,7 +258,12 @@ def main(name, modes, thresholds, ridges, n_laplace, draws, seed, with_parent,
           f"{scheme} lambdas {', '.join(f'{r:.0e}' for r in ridges)}"
           + ("; plus a pinv control row per rung" if with_pinv else ""))
     print("   weight footing: blocked/ghostw/parent carry fitted weights, "
-          "blocked1/ghost/parent1 are w = 1", flush=True)
+          "blocked1/ghost/parent1/molfit1 are w = 1, "
+          "molw/molfit carry in-molecule per-element weights", flush=True)
+    if any(m in INSITU_MODES for m in modes):
+        print(f"   in-molecule weights trained on {', '.join(INSITU_TRAIN)}"
+              + (f" - which INCLUDES {name}, so those rows are not held out"
+                 if name in INSITU_TRAIN else f" - {name} is held out"), flush=True)
 
     rungs = [(m, t) for m in modes for t in thresholds.get(m, (None,))]
     if with_parent:

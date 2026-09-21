@@ -40,6 +40,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `window.py` | what sets that floor, whether a different filter moves it, and what the torque is once the regulariser is taken out of it |
 | `torque_ladder.py` | whether the torque `window.py` is left holding converges away with grid size, the way the energy spread did |
 | `trajectory.py` | what that torque does over a trajectory, and whether it is worse than the quadrature the grid is pruned from |
+| `insitu.py` | whether a per-element support and weight set fitted against *real* neighbours beats one fitted against ghosts, and whether the gain survives on molecules no fit saw |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -76,6 +77,10 @@ uv run python trajectory.py methanol --modes hf,blocked,ghost --steps 5000 \
 uv run python trajectory.py methanol --modes hf --reference rks --xc pbe \
     --grid-level 0 --steps 2000 --out data/traj_methanol_rks.json   # the DFT control
 uv run python trajectory.py --report data/traj_*.json
+uv run python insitu.py --calibrate                  # supports + weight sums, no SCF
+uv run python insitu.py --out data/insitu.json       # train/held-out, energy and spread
+uv run python torque_ladder.py formaldehyde --modes ghost,ghostw,molw,molfit,molfit1 \
+    --ridges "" --pinv --draws 4                     # the same modes, as torque
 ```
 
 ## Results
