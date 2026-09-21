@@ -1,0 +1,84 @@
+{
+  "meta": {
+    "experiment": "levers_oracle",
+    "molecule": "methanol",
+    "basis": "cc-pvdz",
+    "auxbasis": "cc-pvdz-ri",
+    "nao": 48,
+    "mp2_ri_reference": -0.34340193503079763,
+    "ridge": 1e-10,
+    "scheme": "damped",
+    "draws": 4,
+    "seed": 7,
+    "threshold_ghost": 1e-05,
+    "threshold_blocked": 1e-05,
+    "oracle_nonzero_weights_per_atom": [
+      81,
+      98,
+      69,
+      73,
+      69,
+      62
+    ]
+  },
+  "rows": [
+    {
+      "ridge": 1e-10,
+      "energy": -0.3433991942075368,
+      "grad_norm": 0.035682627630076465,
+      "net_torque": 1.6233593908276255e-07,
+      "rms_atom_torque": 1.0858491786238626e-07,
+      "ratio": 4.5494390369932145e-06,
+      "translation_share": 7.93053739309481e-06,
+      "collocation_share": 0.00018560347206999776,
+      "draw_energies": [
+        -0.3433991906491058,
+        -0.34339918406775993,
+        -0.34339918430309907,
+        -0.343399203878008
+      ],
+      "draw_net_torques": [
+        1.4288833684876789e-07,
+        2.135658216817228e-07,
+        6.178098109428732e-07,
+        1.7101203183925123e-07
+      ],
+      "spread_uha": 0.019810248053087065,
+      "rms_draw_net_torque": 3.4531200186536165e-07,
+      "max_draw_net_torque": 6.178098109428732e-07,
+      "mode": "blocked",
+      "n_points": 670,
+      "err_uha": 2.7408232608494565,
+      "seconds": 65.57978892326355
+    },
+    {
+      "ridge": 1e-10,
+      "energy": -0.34339922191762273,
+      "grad_norm": 0.035683531650191586,
+      "net_torque": 8.536700054632194e-07,
+      "rms_atom_torque": 2.9922217158449407e-07,
+      "ratio": 2.3923360889045743e-05,
+      "translation_share": 1.803042584236318e-05,
+      "collocation_share": 0.00017855371903932498,
+      "draw_energies": [
+        -0.34339919243508066,
+        -0.3433991832145424,
+        -0.3433991949183131,
+        -0.3433991787060558
+      ],
+      "draw_net_torques": [
+        7.698722447447615e-07,
+        2.679447032608525e-07,
+        5.928068744056623e-07,
+        9.580987539186924e-07
+      ],
+      "spread_uha": 0.016212257314407452,
+      "rms_draw_net_torque": 6.953184252263573e-07,
+      "max_draw_net_torque": 9.580987539186924e-07,
+      "mode": "blocked1",
+      "n_points": 670,
+      "err_uha": 2.713113174901416,
+      "seconds": 68.69575905799866
+    }
+  ]
+}

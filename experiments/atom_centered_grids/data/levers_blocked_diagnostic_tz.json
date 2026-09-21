@@ -6,7 +6,7 @@
     "nao": 116,
     "basis": "cc-pvtz",
     "auxbasis": "cc-pvtz-ri",
-    "mp2_ri_reference": -0.45766871148140587,
+    "mp2_ri_reference": -0.45766871148140825,
     "ridge": 1e-08,
     "thresholds": [
       0.0001,
@@ -185,6 +185,136 @@
       "err_uha": 7.10832990480359,
       "fit_seconds": 36.34230041503906,
       "scheme": "damped"
+    },
+    {
+      "mode": "blocked:ones:ridge_jacobi",
+      "threshold": 0.0001,
+      "n_points": 1053,
+      "rmsd_S": 1.9840786163070203,
+      "e_corr": -0.45766163194864173,
+      "err_uha": 7.079532766518515,
+      "fit_seconds": 10.233896732330322,
+      "scheme": "ridge_jacobi"
+    },
+    {
+      "mode": "blocked:ones:ridge_jacobi",
+      "threshold": 1e-05,
+      "n_points": 1293,
+      "rmsd_S": 2.9769695966000915,
+      "e_corr": -0.4576615650904147,
+      "err_uha": 7.146390993528762,
+      "fit_seconds": 17.601632833480835,
+      "scheme": "ridge_jacobi"
+    },
+    {
+      "mode": "blocked:ones:ridge_jacobi",
+      "threshold": 1e-06,
+      "n_points": 1531,
+      "rmsd_S": 4.311321269284383,
+      "e_corr": -0.45766158353829384,
+      "err_uha": 7.127943114415558,
+      "fit_seconds": 26.76127576828003,
+      "scheme": "ridge_jacobi"
+    },
+    {
+      "mode": "blocked:ones:ridge_jacobi",
+      "threshold": 1e-07,
+      "n_points": 1746,
+      "rmsd_S": 6.519451002083996,
+      "e_corr": -0.45766158448891486,
+      "err_uha": 7.126992493389217,
+      "fit_seconds": 62.54830551147461,
+      "scheme": "ridge_jacobi"
+    },
+    {
+      "mode": "blocked:ones:damped_jacobi",
+      "threshold": 0.0001,
+      "n_points": 1053,
+      "rmsd_S": 1.9840786163070203,
+      "e_corr": -0.45766170310087645,
+      "err_uha": 7.008380531803304,
+      "fit_seconds": 10.233896732330322,
+      "scheme": "damped_jacobi"
+    },
+    {
+      "mode": "blocked:ones:damped_jacobi",
+      "threshold": 1e-05,
+      "n_points": 1293,
+      "rmsd_S": 2.9769695966000915,
+      "e_corr": -0.4576615774078819,
+      "err_uha": 7.1340735263714095,
+      "fit_seconds": 17.601632833480835,
+      "scheme": "damped_jacobi"
+    },
+    {
+      "mode": "blocked:ones:damped_jacobi",
+      "threshold": 1e-06,
+      "n_points": 1531,
+      "rmsd_S": 4.311321269284383,
+      "e_corr": -0.45766157049807876,
+      "err_uha": 7.1409833294899805,
+      "fit_seconds": 26.76127576828003,
+      "scheme": "damped_jacobi"
+    },
+    {
+      "mode": "blocked:ones:damped_jacobi",
+      "threshold": 1e-07,
+      "n_points": 1746,
+      "rmsd_S": 6.519451002083996,
+      "e_corr": -0.4576615742122653,
+      "err_uha": 7.137269142976077,
+      "fit_seconds": 62.54830551147461,
+      "scheme": "damped_jacobi"
+    },
+    {
+      "mode": "blocked:nnls:ridge_jacobi",
+      "threshold": 0.0001,
+      "n_points": 1053,
+      "rmsd_S": 0.0013385243253580957,
+      "e_corr": -0.45766164026909917,
+      "err_uha": 7.071212309084363,
+      "fit_seconds": 10.233896732330322,
+      "scheme": "ridge_jacobi"
+    },
+    {
+      "mode": "blocked:nnls:ridge_jacobi",
+      "threshold": 1e-05,
+      "n_points": 1293,
+      "rmsd_S": 0.0010060928360650294,
+      "e_corr": -0.4576615437014119,
+      "err_uha": 7.167779996375412,
+      "fit_seconds": 17.601632833480835,
+      "scheme": "ridge_jacobi"
+    },
+    {
+      "mode": "blocked:nnls:ridge_jacobi",
+      "threshold": 1e-06,
+      "n_points": 1531,
+      "rmsd_S": 0.0009399345053329755,
+      "e_corr": -0.45766156180225154,
+      "err_uha": 7.149679156714939,
+      "fit_seconds": 26.76127576828003,
+      "scheme": "ridge_jacobi"
+    },
+    {
+      "mode": "blocked:nnls:ridge_jacobi",
+      "threshold": 1e-07,
+      "n_points": 1746,
+      "rmsd_S": 0.0009387529635394388,
+      "e_corr": -0.4576615777787625,
+      "err_uha": 7.1337026457674035,
+      "fit_seconds": 62.54830551147461,
+      "scheme": "ridge_jacobi"
+    },
+    {
+      "mode": "blocked:nnls:damped_jacobi",
+      "threshold": 0.0001,
+      "n_points": 1053,
+      "rmsd_S": 0.0013385243253580957,
+      "e_corr": -0.45766170637434717,
+      "err_uha": 7.005107061086591,
+      "fit_seconds": 10.233896732330322,
+      "scheme": "damped_jacobi"
     }
   ]
 }
