@@ -595,7 +595,8 @@ varied, as a ceiling (SCF-free, seconds) and as points per microhartree on metha
   at 10 uHa and **1.60x -> 1.13x** at 5 uHa; at 2 uHa the transferable grid is *smaller*
   than the in-molecule fit (0.96x) and reaches the parent-grid floor, which `ghost`
   never does. Against a global fit that is **1.85x rather than 2.7x**, halving the
-  headline `n_P^2` tax of the programme to 3.4x.
+  headline `n_P^2` tax of the programme to 3.4x **in cc-pVDZ, and only there** - see the
+  basis entry below.
 * **Stage A and stage B do not rank the levers the same way, and stage B is the one that
   counts.** `basis:cc-pVTZ` has the highest ceilings and `tetra` the lowest, yet `tetra`
   is the *cheapest* setting measured at 50 uHa (0.87x, better than `blocked` itself) and
@@ -613,8 +614,17 @@ varied, as a ceiling (SCF-free, seconds) and as points per microhartree on metha
   plausibly hurt it, since a cage-fitted support is trained on a fragment of the atom.
   **Run `torque_ladder.py --scheme damped --pinv` on a cage support before believing
   section 14 is good news for the application** rather than only for the energy.
-* Left undone: one molecule, and `cage` was run in stage B with the icosahedral direction
-  set only. `cage:tetrahedron` hits `ghost`'s hydrogen ceiling exactly on an order of
+* **The cage does not survive a change of basis, which is the single most important
+  thing in section 14 after the cage itself.** Carried to cc-pVTZ on the same molecule it
+  is **1.2-1.4x worse** than the single-ghost ensemble it beats by 1.5x in cc-pVDZ.
+  Neither ladder is converged there - `cage`'s is still falling steeply at its tightest
+  rung while `ghost`'s has flattened, and the `blocked` ladder never converges at all,
+  which also voids the apparent result that `ghost` beats the in-molecule fit in cc-pVTZ
+  (0.74-0.88x). `levers_methanol_tz_wide.json` extends both to `1e-6`/`1e-7`. Until it
+  lands, **quote section 8's tax, not section 14's**, and treat the cage as a cc-pVDZ
+  best case.
+* Left undone: one molecule per basis, and `cage` was run in stage B with the icosahedral
+  direction set only. `cage:tetrahedron` hits `ghost`'s hydrogen ceiling exactly on an order of
   magnitude fewer equations, so it may be most of the win at a fraction of the fit cost.
   `cage` and `ghost` are also not matched in environment count (10 against 13), which
   section 9 identifies as the thing that supplies rank, so part of the win may be

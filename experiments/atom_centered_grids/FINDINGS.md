@@ -1646,8 +1646,10 @@ Interpolated to matched accuracy, against the in-molecule `blocked` lower bound:
 | 5 uHa | 405 | 650 (1.60x) | 575 (1.42x) | **456 (1.13x)** | n/a |
 | 2 uHa | 565 | n/a | 716 (1.27x) | **542 (0.96x)** | n/a |
 
-**The cage is the best lever measured, and it nearly closes the ghost gap.** 1.78x becomes
-**1.22x** at 10 uHa and 1.60x becomes **1.13x** at 5 uHa. At 2 uHa the transferable grid
+**The cage is the best lever measured in this basis, and it nearly closes the ghost
+gap.** 1.78x becomes **1.22x** at 10 uHa and 1.60x becomes **1.13x** at 5 uHa. (In
+cc-pVTZ it does the opposite - see the basis lever below, which is why "in this basis"
+is not a hedge.) At 2 uHa the transferable grid
 is *smaller* than the in-molecule fit it is supposed to be paying a penalty against, and
 `ghost` cannot reach that target at all while `cage` reaches the parent-grid floor
 (+2.96 uHa against +2.69) and stops improving because there is nothing left to improve.
@@ -1678,6 +1680,53 @@ the candidate points. Worth having, much cheaper to obtain than the cage's equat
 nowhere near the cage. Its real interest is elsewhere: §13 shows the level-0 parent is a
 poor grid to be rotationally invariant on, and nothing here measures a torque.
 
+### The basis lever, and the cage does not survive it
+
+The basis gets its own file and its own floor, because the parent grid is a different
+object in a different basis: the same 3288-point level-0 Becke grid is **+7.32 uHa** in
+cc-pVTZ against +2.69 in cc-pVDZ. Nothing here ratios across the two.
+
+Methanol, 116 AOs, cc-pVTZ / cc-pVTZ-RI, error **above that floor**:
+
+| | curve |
+| --- | --- |
+| `blocked` | 767/+105.6, 1053/+32.0, 1293/+19.3 |
+| `ghost` | 523/+594.4, 778/+74.8, 1063/+8.4, 1202/**+3.9**, 1351/+4.4 |
+| `cage` | 699/+513.1, 918/+66.0, 1150/+27.9, 1366/+17.4, 1504/**+6.0** |
+
+| target | `blocked` | `ghost` | `cage` |
+| --- | --- | --- | --- |
+| 50 uHa | 935 | 824 | 987 (**1.20x** `ghost`) |
+| 20 uHa | 1274 | 940 | 1298 (**1.38x**) |
+| 10 uHa | n/a | 1038 | 1436 (**1.38x**) |
+
+**In cc-pVTZ the cage is 1.2-1.4x worse than the single-ghost ensemble it beats by
+1.5x in cc-pVDZ.** That is the reversal, and it is the reason the stage-B headline above
+must be read as a statement about one molecule in one basis rather than about caging.
+
+Two things stop this being a clean refutation, and both point the same way - the ladders
+are off-scale in this basis, as §10 warns they go:
+
+* **`cage`'s curve is still falling steeply at its tightest rung** (27.9 -> 17.4 -> 6.0)
+  while `ghost`'s has flattened and gone non-monotone (8.4 -> 3.9 -> 4.4). A curve that
+  is still descending has not reached the point count its ratio is being read at.
+* **`blocked`'s ladder never converges at all.** Its tightest rung is 19.3 uHa above the
+  floor and still falling, which makes the apparent result that `ghost` *beats* the
+  in-molecule fit here (0.74-0.88x) an artefact of an unconverged denominator and not a
+  measurement. The cc-pVDZ default `--blocked-thresholds` is simply the wrong ladder in
+  cc-pVTZ.
+
+So what cc-pVTZ establishes is narrow and negative: **the cage's cc-pVDZ win does not
+generalise across basis sets as measured**, and the ladders need extending (`1e-6`,
+`1e-7`) before either the cage's ranking or the ghost gap in a larger basis means
+anything. That run is `levers_methanol_tz_wide.json`.
+
+What does carry across is stage A's mechanism. cc-pVTZ raises the per-element ceilings
+1.55-2.34x and the supports are correspondingly larger at every threshold - `ghost` spans
+523-1351 points here against 223-816 on the same molecule in cc-pVDZ. The basis lever
+moves what it was predicted to move. It just does not follow that a lever which buys
+points buys accuracy, which is the same lesson `tetra` teaches from the other end.
+
 ### What this does not settle
 
 **The two stages disagree and stage B is the one that counts.** `basis:cc-pVTZ` has the
@@ -1700,7 +1749,11 @@ weight footing and orientation rather than on the energy - so the lever that hal
 point-count tax is not yet known to help, or not to hurt, the quantity that actually
 blocks AIMD.
 
-One molecule, one geometry, one ensemble family. The cage was run with the icosahedral,
+One molecule, one geometry, one ensemble family **in cc-pVDZ - and the one basis it was
+carried to reverses its ranking**, on ladders that are not converged in either direction.
+Until `levers_methanol_tz_wide.json` lands, the cage is a cc-pVDZ result and the honest
+summary of the programme's point tax is still §8's, with §14's figure as the best case
+rather than the number. The cage was run with the icosahedral,
 octahedral and tetrahedral direction sets in stage A but only the icosahedral one in
 stage B, and `cage:tetrahedron` is the interesting cell there - it reaches `ghost`'s
 ceiling on H exactly (132) and 1.4-1.9x of it on C and O with an order of magnitude

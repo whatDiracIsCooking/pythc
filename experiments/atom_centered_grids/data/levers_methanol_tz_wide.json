@@ -1,0 +1,42 @@
+{
+  "meta": {
+    "experiment": "levers",
+    "molecule": "methanol",
+    "natm": 6,
+    "nao": 116,
+    "basis": "cc-pvtz",
+    "auxbasis": "cc-pvtz-ri",
+    "mp2_ri_reference": -0.4576687114814082,
+    "ridge": 1e-08,
+    "weights": "ones",
+    "elements": [
+      "C",
+      "H",
+      "O"
+    ],
+    "variants": [
+      "ghost",
+      "cage"
+    ]
+  },
+  "rows": [
+    {
+      "mode": "becke",
+      "threshold": null,
+      "n_points": 3288,
+      "rmsd_S": 0.0005399554231064027,
+      "e_corr": -0.45766156849935397,
+      "err_uha": 7.1429820542312505,
+      "fit_seconds": 1.1920928955078125e-06
+    },
+    {
+      "mode": "blocked",
+      "threshold": 0.001,
+      "n_points": 767,
+      "rmsd_S": 1.936904599411261,
+      "e_corr": -0.4575558496183801,
+      "err_uha": 112.86186302811308,
+      "fit_seconds": 7.142739534378052
+    }
+  ]
+}

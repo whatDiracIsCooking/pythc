@@ -153,6 +153,78 @@
       "lever": {
         "cage": true
       }
+    },
+    {
+      "mode": "cage",
+      "threshold": 0.0003,
+      "n_points": 918,
+      "rmsd_S": 1.96241429678673,
+      "e_corr": -0.45759544693043147,
+      "err_uha": 73.2645509746166,
+      "fit_seconds": 201.19345688819885,
+      "per_element": {
+        "C": 236,
+        "H": 117,
+        "O": 214
+      },
+      "level": 0,
+      "lever": {
+        "cage": true
+      }
+    },
+    {
+      "mode": "cage",
+      "threshold": 0.0001,
+      "n_points": 1150,
+      "rmsd_S": 2.5140157496208113,
+      "e_corr": -0.4576334517244609,
+      "err_uha": 35.25975694518291,
+      "fit_seconds": 299.5958318710327,
+      "per_element": {
+        "C": 290,
+        "H": 136,
+        "O": 316
+      },
+      "level": 0,
+      "lever": {
+        "cage": true
+      }
+    },
+    {
+      "mode": "cage",
+      "threshold": 3e-05,
+      "n_points": 1366,
+      "rmsd_S": 2.5629974883338877,
+      "e_corr": -0.45764401670802013,
+      "err_uha": 24.694773385958158,
+      "fit_seconds": 440.61951661109924,
+      "per_element": {
+        "C": 326,
+        "H": 159,
+        "O": 404
+      },
+      "level": 0,
+      "lever": {
+        "cage": true
+      }
+    },
+    {
+      "mode": "cage",
+      "threshold": 1e-05,
+      "n_points": 1504,
+      "rmsd_S": 2.206147575065163,
+      "e_corr": -0.4576554220026272,
+      "err_uha": 13.289478778877317,
+      "fit_seconds": 484.20263290405273,
+      "per_element": {
+        "C": 371,
+        "H": 177,
+        "O": 425
+      },
+      "level": 0,
+      "lever": {
+        "cage": true
+      }
     }
   ]
 }

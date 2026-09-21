@@ -184,7 +184,9 @@ See [`FINDINGS.md`](FINDINGS.md). Fifteen headlines:
   **1.60x -> 1.13x** at 5 uHa, and at 2 uHa the transferable grid is *smaller* than the
   in-molecule fit (0.96x) while `ghost` cannot reach that target at all. Compounded
   against a global molecular fit that is **1.85x rather than 2.7x**, i.e. 3.4x rather
-  than 7.3x on the `n_P^2` parts. Two more levers behave as §9 predicts: a finer parent
+  than 7.3x on the `n_P^2` parts. **All of that is cc-pVDZ, and cc-pVTZ reverses it** -
+  there the cage is 1.2-1.4x *worse* than the single-ghost ensemble, on ladders that have
+  not converged in either direction. Treat the halved tax as a best case, not a result. Two more levers behave as §9 predicts: a finer parent
   grid moves the ceiling 1.26-1.42x *at unchanged equation count* - which contradicts the
   premise HANDOFF 4(9) is written on - and a tetrahedral direction set is the cheapest
   thing measured at 50 uHa and cannot reach 10 uHa at any threshold, which is §9's rank
