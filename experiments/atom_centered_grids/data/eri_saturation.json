@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "basis": "cc-pvdz",
+    "rank_tol": 1e-10,
+    "grid_level": 0,
+    "floor": 1e-14,
+    "targets": [
+      "quadrature"
+    ]
+  },
+  "rows": [
+    {
+      "element": "H",
+      "n_parent": 392,
+      "n_ao": 5,
+      "overlap_equations": 15,
+      "overlap_saturation": 15,
+      "overlap_profile": {
+        "n": 15,
+        "r_mean": 0.6810563706037563,
+        "r_max": 1.4517205783231768,
+        "frac_beyond_cov": 0.9333333333333333,
+        "frac_beyond_2cov": 0.4
+      },
+      "eri_quadrature": {
+        "equations": 225,
+        "saturation": 97,
+        "rel_residual": 3.088065994373357e-08,
+        "profile": {
+          "n": 97,
+          "r_mean": 0.7114779802871319,
+          "r_max": 2.2318800475331355,
+          "frac_beyond_cov": 0.7835051546391752,
+          "frac_beyond_2cov": 0.36082474226804123
+        }
+      }
+    },
+    {
+      "element": "C",
+      "n_parent": 858,
+      "n_ao": 14,
+      "overlap_equations": 105,
+      "overlap_saturation": 92,
+      "overlap_profile": {
+        "n": 92,
+        "r_mean": 0.8276125997623041,
+        "r_max": 2.2236860218841707,
+        "frac_beyond_cov": 0.5,
+        "frac_beyond_2cov": 0.16304347826086957
+      },
+      "eri_quadrature": {
+        "equations": 8464,
+        "saturation": 463,
+        "rel_residual": 9.360961547676485e-07,
+        "profile": {
+          "n": 463,
+          "r_mean": 0.9790467686739325,
+          "r_max": 2.986829156710789,
+          "frac_beyond_cov": 0.5637149028077754,
+          "frac_beyond_2cov": 0.2591792656587473
+        }
+      }
+    },
+    {
+      "element": "N",
+      "n_parent": 858,
+      "n_ao": 14,
+      "overlap_equations": 105,
+      "overlap_saturation": 92,
+      "overlap_profile": {
+        "n": 92,
+        "r_mean": 0.7236509628730762,
+        "r_max": 1.8193794724506853,
+        "frac_beyond_cov": 0.34782608695652173,
+        "frac_beyond_2cov": 0.08695652173913043
+      },
+      "eri_quadrature": {
+        "equations": 8464,
+        "saturation": 467,
+        "rel_residual": 4.822394901618755e-07,
+        "profile": {
+          "n": 467,
+          "r_mean": 0.8228455730985126,
+          "r_max": 2.4437693100360995,
+          "frac_beyond_cov": 0.4068522483940043,
+          "frac_beyond_2cov": 0.14132762312633834
+        }
+      }
+    },
+    {
+      "element": "O",
+      "n_parent": 858,
+      "n_ao": 14,
+      "overlap_equations": 105,
+      "overlap_saturation": 92,
+      "overlap_profile": {
+        "n": 92,
+        "r_mean": 0.5932980438601733,
+        "r_max": 1.819379472450685,
+        "frac_beyond_cov": 0.41304347826086957,
+        "frac_beyond_2cov": 0.13043478260869565
+      },
+      "eri_quadrature": {
+        "equations": 8464,
+        "saturation": 423,
+        "rel_residual": 1.3391395035954056e-06,
+        "profile": {
+          "n": 423,
+          "r_mean": 0.6731458633939013,
+          "r_max": 1.8193794724506853,
+          "frac_beyond_cov": 0.48699763593380613,
+          "frac_beyond_2cov": 0.1773049645390071
+        }
+      }
+    }
+  ]
+}

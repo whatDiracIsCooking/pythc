@@ -64,6 +64,7 @@ from pythc.grad.factorisation import ThcFactorisation
 from pythc.lib import ridge_shift
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from atomic_eri import element_supports as eri_element_supports
 from ghosts import element_grid, element_supports, per_atom_sets
 from rotate import blocked_fit_per_atom
 from sweep import MOLECULES, BASIS, AUXBASIS
@@ -76,9 +77,13 @@ DEFAULT_THRESHOLDS = {
     "blocked1": (3e-3, 1e-3, 3e-4, 1e-4, 1e-5),
     "ghost": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
     "ghostw": (1e-3, 3e-4, 1e-4, 3e-5, 1e-5),
+    # The section 4(9) ERI-target ladder, calibrated in atomic_eri.py to land on the
+    # same point counts as the ghost rungs above.
+    "eri": (1e-4, 1e-5, 1e-6, 1e-7, 1e-8),
+    "eriw": (1e-4, 1e-5, 1e-6, 1e-7, 1e-8),
 }
 
-MODES = ("blocked", "blocked1", "ghost", "ghostw", "parent", "parent1")
+MODES = ("blocked", "blocked1", "ghost", "ghostw", "eri", "eriw", "parent", "parent1")
 
 
 def parent_per_atom(mol, ones):
@@ -122,14 +127,21 @@ def build_per_atom(mol, mode, threshold, support_cache):
             return fitted
         return [(rel, np.ones(len(rel))) for rel, _ in fitted]
 
-    keep_w = mode == "ghostw"
+    keep_w = mode in ("ghostw", "eriw")
+    # "eri" / "eriw" are the free-atom ERI fits of section 4(9): the same kind of
+    # transferable object as "ghost", selected from the same per-element parent grid,
+    # but fitted against the atom's own two-electron integrals with no neighbour of any
+    # kind. They belong on this ladder because section 4(7) put the whole remaining
+    # orientation gap on the weight footing, and an ERI-fitted weight set is the first
+    # per-element one with any claim to the right footing.
+    fit = eri_element_supports if mode in ("eri", "eriw") else element_supports
     elements = sorted({mol.atom_symbol(ia) for ia in range(mol.natm)})
-    key = [(e, threshold, keep_w) for e in elements]
+    key = [(e, threshold, mode) for e in elements]
     missing = [e for e, k in zip(elements, key) if k not in support_cache]
     if missing:
-        for e, support in element_supports(missing, threshold, quiet=True,
-                                           with_weights=keep_w).items():
-            support_cache[(e, threshold, keep_w)] = support
+        for e, support in fit(missing, threshold, quiet=True,
+                              with_weights=keep_w).items():
+            support_cache[(e, threshold, mode)] = support
 
     if not keep_w:
         return per_atom_sets(mol, {e: support_cache[k] for e, k in zip(elements, key)})
@@ -139,8 +151,8 @@ def build_per_atom(mol, mode, threshold, support_cache):
     # structurally; whether the weights a *ghost* fit produces are any use once the
     # support is transferred into a real molecule is what the row measures.
     return [(np.asarray(element_grid(mol.atom_symbol(ia))
-                        [support_cache[(mol.atom_symbol(ia), threshold, True)][0]]),
-             np.asarray(support_cache[(mol.atom_symbol(ia), threshold, True)][1]))
+                        [support_cache[(mol.atom_symbol(ia), threshold, mode)][0]]),
+             np.asarray(support_cache[(mol.atom_symbol(ia), threshold, mode)][1]))
             for ia in range(mol.natm)]
 
 

@@ -56,7 +56,8 @@ def main(paths):
         # order does not name - ensemble.py labels its rows by ensemble, not by mode - is
         # appended in the order it first appears, so a file of unknown modes still ranks
         # against whichever of them came first.
-        known = ('global', 'blocked', 'global_orbits', 'blocked_orbits', 'free', 'ghost')
+        known = ('global', 'blocked', 'blockedw', 'global_orbits', 'blocked_orbits',
+                 'free', 'ghost', 'ghostw', 'eri', 'eriw')
         modes = [m for m in known if curve(rows, m)]
         for r in rows:
             m = r.get('mode')

@@ -40,6 +40,7 @@ molecule and never re-selected - and prices it against that lower bound.
 | `window.py` | what sets that floor, whether a different filter moves it, and what the torque is once the regulariser is taken out of it |
 | `torque_ladder.py` | whether the torque `window.py` is left holding converges away with grid size, the way the energy spread did |
 | `trajectory.py` | what that torque does over a trajectory, and whether it is worse than the quadrature the grid is pruned from |
+| `atomic_eri.py` | whether a **richer purely-atomic target** - the free atom's own ERIs rather than its overlap matrix - lifts the equation-count ceiling that forced ghosts, and what the support it selects is worth |
 
 All use cc-pVDZ / cc-pVDZ-RI on a level-0 Becke parent grid, `ov` mode, 10 Laplace points,
 against a DF-MP2 reference. Geometries come from RDKit ETKDG + MMFF.
@@ -76,11 +77,17 @@ uv run python trajectory.py methanol --modes hf,blocked,ghost --steps 5000 \
 uv run python trajectory.py methanol --modes hf --reference rks --xc pbe \
     --grid-level 0 --steps 2000 --out data/traj_methanol_rks.json   # the DFT control
 uv run python trajectory.py --report data/traj_*.json
+uv run python atomic_eri.py --saturate H,C,N,O            # the ceiling, per target, no SCF
+uv run python atomic_eri.py --calibrate H,C,O --with-ghost   # the ladder, no SCF
+uv run python atomic_eri.py methanol --out data/eri_methanol.json
+uv run python analyse.py data/eri_methanol.json
+uv run python torque_ladder.py methanol --modes eri,eriw,ghost --scheme damped \
+    --ridges 1e-8 --pinv --draws 4 --out data/torque_ladder_methanol_eri.json
 ```
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Fourteen headlines:
+See [`FINDINGS.md`](FINDINGS.md). Fifteen headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
@@ -167,6 +174,25 @@ See [`FINDINGS.md`](FINDINGS.md). Fourteen headlines:
   rotational invariance at **~8300 uHa/rad** - fifty times the transferable grid's own
   torque, and identical on a grid with five thousand times less. No AIMD runs on the
   present gradient whatever the grid does.
+* **The ghosts turn out not to be necessary: fit the atom's own ERIs instead.** §4(3)
+  killed the free-atom fit on an *equation count* - an isolated atom's overlap target
+  supplies `n_AO(n_AO+1)/2` equations, 15 for hydrogen in cc-pVDZ, and NNLS can never
+  retain more points than that. Ghosts lift the count by stacking environments. So does a
+  richer observable of the same isolated atom: `(mu nu|lambda sigma) = int dr phi_mu
+  phi_nu V_{lambda sigma}` makes the ERI *linear* in the quadrature weights, so the same
+  solver fits it unchanged against `O(n_AO^4)` equations instead of `O(n_AO^2)`. The
+  ceiling lifts **4.6-6.5x** (H 15 -> 97, C 92 -> 463, N 92 -> 467, O 92 -> 423) and the
+  support - no ghosts, no partners, no training molecules - costs **0.89-1.16x** the
+  in-molecule `blocked` grid at matched accuracy and matched weight footing, where
+  thirteen ghost environments cost 1.11-1.78x.
+* **And the weights that same fit produces are the first transferable ones that help.**
+  §13 put the whole remaining orientation gap on the weight footing and found `ghostw`
+  *worse* than `w = 1`. `eriw` converges on the `pinv` torque ladder at **1481x**, next to
+  weighted `blocked`'s 17667x and against 13-40x for `blocked1`, `ghost`, `ghostw` and
+  `eri` alike, reaching **0.19 uHa/rad on 565 points** - below the 0.24 the complete
+  3284-point parent grid sits at - while landing within 0.05 uHa of that parent grid's
+  energy. A transferable support *can* carry usable weights; they just have to be fitted
+  against something LS-THC cares about.
 * **The gradient exists and verifies to machine precision** (`pythc.grad`, driven by
   `gradient.py`): quadratic convergence against a finite difference, and forces that sum
   to zero to 2.4e-15 with no finite difference involved. Two things came back with it

@@ -43,7 +43,7 @@ in-range against 1.50x out-of-range. The transferable grid transfers.**
 
 ## 2. What was attempted
 
-Eleven experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke
+Fifteen experiments, all in this directory, all on cc-pVDZ / cc-pVDZ-RI, level-0 Becke
 parent grid, `ov` mode, 10 Laplace points, against DF-MP2. Geometries from RDKit ETKDG +
 MMFF.
 
@@ -63,6 +63,7 @@ MMFF.
 | `window.py` | what sets that floor, and is the torque a property of the grid? | **the filter's shape, not the metric's rank.** The damped inverse buys 3-5 decades of `lambda` and <5 uHa. The torques were mostly the regulariser: **water's are 0.001/0.002 at `pinv`**, and the ghost:blocked ratio is 4.5x, not 30x |
 | `torque_ladder.py` | does the torque 4(6) is left holding converge away with grid size? | **yes, in every mode.** methanol at `pinv`: blocked 357 -> 0.02 uHa/rad, ghost 969 -> 27. The committed ridge data said otherwise and was taken three decades outside where a torque means anything |
 | `trajectory.py` | what does the torque do over a trajectory, and is it worse than the grid it is pruned from? | **it reorients, it does not heat** - 95% incoherent, 4.5 deg of axis tilt in 2.5 ps. RKS/PBE on the same level-0 parent is **6x worse**; level 3 is 2-3 decades better on 163x the points |
+| `atomic_eri.py` | does a richer *purely atomic* target lift the ceiling that forced ghosts? | **yes, 4.6-6.5x.** The free atom's own ERIs are `O(n_AO^4)` equations against the overlap's `O(n_AO^2)`. The support costs **0.89-1.16x** `blocked` at matched footing against ghosts' 1.11-1.78x, and its weights converge on the torque ladder at **1481x** - like weighted `blocked`, unlike anything else transferable |
 
 The key methodological move: `NNLSGrid(blocked=True)` already fits each atomic sub-grid
 independently, so the penalty for giving up molecular pruning is measurable today. Because
@@ -83,7 +84,7 @@ conclusions are listed here with their current status, so they are not re-derive
 | NNLS weights need active-set freezing, QP sensitivity theory, strict complementarity | **Superseded, but only the freezing apparatus - and section 4(6) has partly walked the rest back.** There is still nothing to *freeze*: a frozen weight has `dw/dR = 0` like a frozen point, so keeping the weights costs the gradient nothing. What is no longer true is that they do not matter. Section 3's exact-absorption argument is about the **pseudoinverse**; 4(5) forces a ridge, which is not scale-equivariant, and inside its window the same 156-point water support gives 165 uHa and 188 uHa/rad with NNLS weights against 3304 uHa and 7145 uHa/rad at `w = 1`. **Keep the weights in the offline object.** See FINDINGS section 12. |
 | Reparametrise `w = theta^2` to remove the inequality constraint | **Moot**, and it was the wrong power: this codebase builds `X = w^(1/4) phi`, so `theta^2` still leaves `X = |theta|^(1/2) phi`, singular at 0. If a weight fit is ever kept, parametrise the *collocation amplitude* `X = t phi` with `w = t^4`; the whole pipeline is then polynomial in `t`. |
 | Add `sum_P w_P = 1`; equality constraints differentiate cleanly | **Moot** for the same reason. |
-| Isolated-atom NNLS will discard exactly the tail points a bond needs; fix with ghost atoms | **Measured. Right conclusion, wrong mechanism, and the mechanism matters.** Ghosts are indeed necessary and they work (1.1-1.8x over `blocked`). But the free-atom fit does not fail by misplacing points - it fails because its target supplies only `n_AO(n_AO+1)/2` equations, so NNLS cannot retain more than **15 points per hydrogen in cc-pVDZ** at any threshold. The predicted anisotropy is real too (34 uHa rotation spread at the ceiling), it just is not what stops the scheme. See section 4(3) and FINDINGS section 8. |
+| Isolated-atom NNLS will discard exactly the tail points a bond needs; fix with ghost atoms | **Measured, and then overturned by 4(9) - but read the mechanism first, because it is what overturned it.** The free-atom fit does not fail by misplacing points; it fails because its *target* supplies only `n_AO(n_AO+1)/2` equations, so NNLS cannot retain more than **15 points per hydrogen in cc-pVDZ** at any threshold. Ghosts lift that by stacking environments, and they work (1.1-1.8x over `blocked`). But a count is not the only thing a richer target can supply: the free atom's own ERIs give `O(n_AO^4)` equations, lift the ceiling 4.6-6.5x, and produce a *better* support than the ghosts do (0.89-1.16x at matched footing). **Ghosts were the right fix for the right diagnosis and are no longer the only one.** The predicted anisotropy is real too (34 uHa rotation spread at the ceiling), it just is not what stops the scheme. See section 4(3), 4(9), and FINDINGS sections 8 and 14. |
 | Octahedral ghosts suffice because p orbitals are octahedral | **Rejected in the discussion itself, correctly** - points are sampling locations, not functions, and do not superpose. |
 | Frozen per-atom grids risk orientation-dependent energies | **Confirmed, deflated, re-confirmed, and now deflated again by 4(7) - and this time with the mechanism.** The torque converges with grid size in every mode; what separates the transferable grid from the in-molecule one is the **weight footing**, not the transfer or the pruning. The complete 3284-point parent grid sits at 0.24 uHa/rad and the *pruned* 670-point weighted grid at 0.02, so pruning is not a cost at all - it is a benefit. Over a trajectory the leak reorients rather than heats. Read the rest of this cell as the record of how the question looked before 4(7). **[Historic below.]** Everything in this cell is about energy *spreads*, and FINDINGS section 12 shows the spread converges away on the transferable grid while `dE/dtheta` does not. Read the rest of this cell as a statement about spreads only. No angular shell survives intact, and rank-limited grids shift 27-39 uHa under random per-atom rotation, but the shift converges away with grid size (methanol 218 -> 7.1 -> 0.01 uHa from 175 to 670 points). Ghost-fitted grids are 2-5x more orientation-dependent than `blocked` **at matched point count** - and identical **at matched accuracy** (882 ghost points: +5.14 uHa, 0.94 uHa spread; 491 blocked points: +5.29 uHa, 0.91 uHa spread). Still a symptom of rank limitation, not a separate defect. |
 | Fix isotropy with orbit-wise (group-sparsity) pruning over (radial shell, Lebedev orbit) blocks | **Implemented, measured, and rejected as a fix.** It delivers exactly what it promised - whole orbits, exact octahedral invariance - and that turns out not to be the useful property. At matched point count a point-wise grid is better on both accuracy and rotation spread. See section 4(2) and FINDINGS section 7. |
@@ -128,6 +129,13 @@ strength 4(1) recommends is three decades too small for a gradient to mean anyth
 the orientation dependence 4(2) deflated has a torque attached to it that is now measured
 rather than argued about. See 4(5) and FINDINGS section 11.
 
+**4(9) is the one item here that was not on this list**, and it is worth saying why it
+turned up: it comes from taking 4(3)'s *diagnosis* literally rather than its remedy. 4(3)
+found that the free-atom fit fails on an equation count and concluded that ghosts are what
+make it well posed. They are - but so is any richer observable of the same isolated atom,
+and the atom's own two-electron integrals are one. The result is that the training set the
+whole of 4(3), 4(4) and FINDINGS sections 8-10 is about may not be needed at all.
+
 **Nothing is left that can kill the idea.** 4(6) removed the one thing 4(5) left looking
 awkward - the `lambda` window - and cut the orientation problem down with it. **4(7) has
 now closed the orientation question outright and reordered what is left.** The torque
@@ -143,9 +151,12 @@ undone" to the thing actually blocking the application: on the fixed-orbital sur
 force is not the gradient of the propagated energy, and that alone breaks rotational
 invariance at **~8300 uHa/rad**, fifty times the transferable grid's own torque and
 identically so on a grid with five thousand times less. No AIMD runs on the present
-gradient whatever the grid does. The lever is the **weights** - see (8) below, and the
-open questions in section 5, where the selector question now shares top billing with
-them.
+gradient whatever the grid does. The lever was the **weights**, and 4(9) has now pulled
+it: weights fitted against the free atom's own ERIs transfer, converge on the torque
+ladder like the in-molecule weighted fit, and come with a support that beats the ghost
+one. So what is left is the prerequisite, the finer parent grid of (10), and the open
+questions in section 5 - where the selector question, which 4(9) speaks to directly,
+now has top billing.
 
 The target pipeline, for orientation:
 
@@ -531,7 +542,8 @@ third is the one that matters most.
   acTHC beats the grid it is pruned from by 8x at a picosecond and loses to a production
   grid by ~25x on 163x fewer points. **The in-molecule `blocked` grid is within 2.3x of
   level-3 DFT on 224x fewer points**, which puts the whole remaining gap on the weights
-  and makes (8) below the most valuable unrun experiment here.
+  and makes (8) below the most valuable unrun experiment here. **[(8) is now done, via
+  (9): the weight set that works is fitted against the free atom's own ERIs.]**
 
 Left undone: the trajectory is driven by DF-RHF, which is grid-free and therefore exactly
 rotationally invariant, with the frozen grid's torque integrated along it and the leaked
@@ -539,16 +551,59 @@ rotation fed back; the internal coordinates are still the RHF trajectory's, so t
 treatment is first order in the leak. A fully coupled run needs the orbital response
 first. One molecule that does not saturate, one initial condition per arm, gas phase.
 
-**(8) Fit per-element weights against the in-molecule objective. NOT STARTED, and it is
-now the highest-leverage thing on this list.** 4(7) localises the entire orientation gap
-to the weight footing: same support, `w = 1` gives 9.02 uHa/rad and NNLS weights give
-0.02. `ghostw` - the ghost fit's own weights, transferred - gives 52.3 and is *worse* than
-`w = 1`, which is consistent with 4(6)'s note that those weights condition the ghost
-metric rather than the in-molecule one. Nobody has tried fitting a per-element weight set
-*for* the in-molecule objective. Frozen weights differentiate exactly as cleanly as frozen
-points (`dw/dR = 0` either way), so anything recovered here is free in the gradient.
+**(8) Fit per-element weights against an objective LS-THC cares about. DONE, by 4(9)
+below, and the answer is that it works.** 4(7) localised the entire orientation gap to the
+weight footing: same support, `w = 1` gives 9.02 uHa/rad and NNLS weights give 0.02.
+`ghostw` - the ghost fit's own weights, transferred - gives 52.3 and is *worse* than
+`w = 1`, consistent with 4(6)'s note that those weights condition the ghost metric rather
+than the in-molecule one. The framing here was "fit a per-element weight set *for* the
+in-molecule objective", which sounded like it needed molecules. It did not. Weights fitted
+against the **free atom's own two-electron integrals** transfer into a molecule and land
+on the in-molecule curve: `eriw` converges 1481x over the torque ladder against weighted
+`blocked`'s 17667x, where every `w = 1` mode and `ghostw` sit at 13-40x, and it reaches
+0.19 uHa/rad on 565 points - below the complete 3284-point parent grid's 0.24. Frozen
+weights differentiate exactly as cleanly as frozen points (`dw/dR = 0` either way), so all
+of that is free in the gradient. See 4(9) and FINDINGS section 14.
 
-**(9) Try a finer parent grid. NOT STARTED, and it is the cheapest experiment left.** The
+**(9) A richer purely-atomic target: fit the atom's ERIs. DONE** - `atomic_eri.py` and
+`pythc.decomp.nnls.ERIFitOperator`, written up in FINDINGS section 14. This is the one
+item on this list that was not on it: it comes out of taking 4(3)'s diagnosis literally.
+
+* **The ceiling was an equation count, so supply more equations about the same atom.**
+  `(mu nu|lambda sigma) = int dr phi_mu phi_nu V_{lambda sigma}(r)` makes the ERI a
+  *linear* functional of the quadrature weights, so the same Lawson-Hanson solver fits it
+  unmodified - against `[n_AO(n_AO+1)/2]^2` equations instead of `n_AO(n_AO+1)/2`. The
+  potentials are PySCF's `int1e_grids`. Nothing else changes: same per-element level-0
+  parent, same solver, same `w = 1` / `metric_ridge = 1e-8` evaluation, so the offline
+  object is still a list of indices into an element's atomic grid.
+* **The ceiling lifts 4.6-6.5x** (`--saturate`, no SCF): H 15 -> 97, C 92 -> 463,
+  N 92 -> 467, O 92 -> 423. Hydrogen's overlap fit stops at exactly its equation count,
+  reproducing 4(3); the heavies stop at 92 of 105, which is the *parent grid's* resolving
+  power and not the target's - the same 92 the operator's exact rank reduction reports.
+* **It beats the ghosts.** At matched accuracy and matched weight footing the free-atom
+  ERI support costs **0.89-1.16x** the in-molecule `blocked` grid on methanol and ethanol,
+  where 13 ghost environments cost 1.11-1.78x. Most of the saving is a reallocation: an
+  ERI target gives hydrogen far fewer points than an overlap target does (methanol at
+  ~700 points, `ghost` is C 125/H 108/O 145 and `eri` at 565 is C 182/H 45/O 203).
+* **The weights are the real prize** - see (8). Do not read an `eriw` number against a
+  `w = 1` number; every ratio in section 14 is quoted against a control on the same
+  footing for that reason.
+* **Thresholds are on their own scale again.** Use `--calibrate` before spending single
+  points; `1e-4 .. 1e-6` lands on the ghost ladder's point counts. The ladders are not
+  monotone, as 4(4) warned.
+
+Left undone: two molecules, one basis, one parent level, `ov`/MP2, and the `quadrature`
+target only. The `exact` target - the true integrals rather than the ones the parent grid
+reproduces - is implemented and was swept on hydrogen alone, where it saturates at 85
+points against `quadrature`'s 97; whether it selects a *better* support on the heavies is
+untested, and it costs about an hour each to find out.
+Nothing has been fitted against ghosts *and* an ERI target together, which is the obvious
+next control and would say whether environments still add anything once the target is
+rich. The torque ladder is methanol, four draws, one seed. And 4(4)'s ten-molecule
+transferability suite has not been re-run on ERI supports, which is what would turn
+"better on two molecules" into the same statement 4(4) makes about ghosts.
+
+**(10) Try a finer parent grid. NOT STARTED, and it is the cheapest experiment left.** The
 offline object is a list of indices into an element's level-0 atomic grid, and nothing
 forces level 0. 4(3) established that NNLS cannot retain more points than its target
 supplies equations - `n_AO (n_AO + 1) / 2`, a property of the *basis*, not of the parent.
@@ -558,12 +613,12 @@ in `n_P` at all. It is a one-line change to `ghosts.element_grid`, and it is wha
 tell whether the level-0 parent - which 4(7) shows is a bad grid to be rotationally
 invariant on - is what has been setting the floor all along.
 
-**(10) The orbital response.** Unchanged in content from 4(5) and still standard DF-MP2
+**(11) The orbital response.** Unchanged in content from 4(5) and still standard DF-MP2
 machinery, but 4(7) moves it to the front: it is the larger of the two symmetry violations
 in the pipeline by fifty-fold, it is what makes a fully coupled trajectory possible, and it
 turns the rotational identity into a second free test of the gradient.
 
-**(11) Make `dE/dtheta` an objective of the offline selection.** 4(6) suggested it and
+**(12) Make `dE/dtheta` an objective of the offline selection.** 4(6) suggested it and
 nobody has run it. The torque needs no SCF beyond the reference, so it is nearly free to
 evaluate inside a selection loop. 4(7) weakens the case slightly - the torque converges on
 its own, and (8) and (9) both look like larger levers - but it targets the defect directly
@@ -575,13 +630,24 @@ quiet rather than incidentally so.
 * Does the 1.2-1.7x ratio hold in larger basis sets (cc-pVTZ) and for HF exchange rather
   than MP2 correlation? Everything here is cc-pVDZ / `ov` / MP2.
 * The ratio improves from water to alanine. Does it keep improving, or turn around?
+* ~~Can the free-atom fit be made well posed without a training set?~~ **Answered -
+  `atomic_eri.py`, FINDINGS section 14.** Yes: fit the atom's own ERIs rather than its
+  overlap matrix. `O(n_AO^4)` equations against `O(n_AO^2)`, still linear in the weights,
+  same solver, ceiling lifted 4.6-6.5x, and the support costs 0.89-1.16x `blocked` at
+  matched footing against ghosts' 1.11-1.78x. What is open now is whether that survives
+  the 4(4) treatment - ten molecules, unseen bonding, an unseen partner element - and
+  whether a ghost-*and*-ERI fit beats either alone.
 * If weights are irrelevant, is NNLS still the best *selector*? Pivoted Cholesky and QRCP
   select points directly and are already implemented (`ls_ri_cholesky.py`, `ls_ri_qrcp.py`).
   A like-for-like selector comparison at matched point count has not been done here.
   Section 4(3) sharpens this: NNLS's point ceiling is its equation count, which is a
   property of the *target*, not of the selector. A selector working directly on the
   co-density would not have that ceiling, and might not need ghosts at all - or might
-  need them for a completely different reason.
+  need them for a completely different reason. **Section 4(9) took the other branch of
+  exactly that sentence** - it kept NNLS and changed the target - and found that a target
+  with enough equations does not need ghosts. The selector comparison is still unrun, and
+  is now the more interesting half: against an ERI target, what does a direct co-density
+  selector buy that NNLS does not?
 * ~~Does the ghost ensemble matter?~~ **Answered - `ensemble.py`, FINDINGS section 9.**
   1.35x on methanol, 1.05x on ethanol, so it amortises; but each ensemble has a rank
   ceiling that caps reachable accuracy at any threshold, and the cheapest one tested
@@ -727,8 +793,10 @@ quiet rather than incidentally so.
   27 uHa/rad - the same energy, 6.5x less torque, 1.7x more points. If a grid has to be
   sized for its torque rather than for its accuracy, that is ~1.7x on `n_P` and ~3x on the
   `n_P^2` work *on top of* the 1.6-2.7x 4(3) and 4(4) price the freeze at, and none of the
-  compression figures in this directory include it. 4(8) and 4(9) are both attempts to
-  avoid paying it; whether it has to be paid at all is unmeasured.
+  compression figures in this directory include it. 4(9) changes this picture and has not
+  been re-read against it: `eriw` reaches 0.19 uHa/rad at 565 points, *below* its own
+  accuracy plateau's point count rather than above it, so on that mode the torque is not
+  what sizes the grid. Whether that holds beyond methanol is unmeasured.
 * Is a *fixed* `lambda` right, or should it track the grid? `shift/maxeig` at
   `lambda = 1e-8` came out at 1.7e-10 to 3.3e-10 across three systems - close enough that
   fixed looks defensible, but three systems in one basis is not a strong test. A much
