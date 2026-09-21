@@ -75,7 +75,7 @@ from pythc.thc.ls_ri_becke import LS_RI_Becke
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from analyse import points_for
 from ghosts import (DIRECTIONS, RIDGE, assemble_from_supports, element_grid,
-                    element_supports, fit_element, ghost_environments)
+                    element_supports, fit_element, ghost_environments, per_atom_sets)
 from rotate import FixedGrid, blocked_fit_per_atom
 from sweep import MOLECULES, BASIS
 
@@ -280,7 +280,8 @@ def run(name, variants, thresholds, blocked_thresholds, out_path, basis=BASIS):
     return rows
 
 
-def blocked_diagnostic(name, thresholds, out_path, basis='cc-pvtz', resume=False):
+def blocked_diagnostic(name, thresholds, out_path, basis='cc-pvtz', resume=False,
+                       schemes=('ridge', 'damped'), weightings=('ones', 'nnls')):
     """
     Is section 14's cc-pVTZ `blocked` plateau the grid, or the footing it is measured on?
 
@@ -356,7 +357,7 @@ def blocked_diagnostic(name, thresholds, out_path, basis='cc-pvtz', resume=False
     # supports, which is the whole point - anything that moves is the footing.
     needed = [thr for thr in thresholds
               if any((f'blocked:{w}:{sc}', thr) not in done
-                     for w in ('ones', 'nnls') for sc in ('ridge', 'damped'))]
+                     for w in weightings for sc in schemes)]
     fits = {}
     for thr in needed:
         t0 = time.time()
@@ -365,8 +366,8 @@ def blocked_diagnostic(name, thresholds, out_path, basis='cc-pvtz', resume=False
         print(f"  -- fitted blocked thr={thr:.0e}: {n} points "
               f"({fits[thr][1]:.1f}s)", flush=True)
 
-    for weighting in ('ones', 'nnls'):
-        for scheme in ('ridge', 'damped'):
+    for weighting in weightings:
+        for scheme in schemes:
             for thr in needed:
                 if (f'blocked:{weighting}:{scheme}', thr) in done:
                     continue
@@ -379,6 +380,119 @@ def blocked_diagnostic(name, thresholds, out_path, basis='cc-pvtz', resume=False
 
     with open(out_path, 'w') as fh:
         json.dump(dict(meta=meta, rows=rows), fh, indent=2)
+    return rows
+
+
+def oracle_per_atom(mol, supports, screening=1e-8):
+    """
+    The best non-negative weights a FIXED support can have, fitted in the molecule.
+
+    This is deliberately a cheat, and the cheat is the measurement. HANDOFF 4(8) proposes
+    one frozen weight vector per *element*, shared by every atom of that element in every
+    molecule. This fits weights **per atom, per molecule**, against that atom's real Becke
+    share of the real molecular overlap - strictly more freedom than any transferable
+    scheme can ever have.
+
+    So whatever it reaches is a **ceiling** on 4(8), not a proposal. If the ghost support
+    cannot be rescued even here, a single per-element vector will not rescue it either,
+    and 4(8) is dead without being built. If it can, the gap between this row and
+    `ghostw` is what an offline weight fit is playing for.
+
+    Only the weights are fitted; the support is the frozen ghost one, unchanged.
+    """
+    from pyscf.dft import gen_grid, treutler_prune
+    from pythc.decomp.nnls import OverlapFitOperator, lawson_hanson
+
+    g = gen_grid.Grids(mol)
+    atom_grids = g.gen_atomic_grids(mol, level=0, prune=treutler_prune)
+    coords_per_atom, weights_per_atom = g.gen_partition(mol, atom_grids, concat=False)
+
+    out, kept_counts = [], []
+    for ia, (coords_a, w_a) in enumerate(zip(coords_per_atom, weights_per_atom)):
+        symbol = mol.atom_symbol(ia)
+        idx = np.asarray(supports[symbol])
+        # gen_partition hands back coordinates already translated onto the nucleus, so
+        # the element grid the support indexes into is the relative one.
+        parent = element_grid(symbol)
+        rel = coords_a - mol.atom_coord(ia)
+        if len(rel) != len(parent) or not np.allclose(rel, parent, atol=1e-10):
+            raise RuntimeError(f"atom {ia} ({symbol}) sub-grid is not the element grid "
+                               f"the support indexes into")
+
+        R_a = _eval_basefuncs(mol, coords_a)
+        amp = np.abs(R_a).max(axis=0)
+        R_a = R_a[:, np.flatnonzero(amp > screening * amp.max())]
+        # The target is the same one `blocked` fits - this atom's Becke share of the
+        # molecular overlap - so the oracle differs from `blocked` only in being handed
+        # the ghost support instead of choosing its own.
+        S_a = (R_a * w_a[:, np.newaxis]).T @ R_a
+        op = OverlapFitOperator(R_a[idx])
+        w_fit = lawson_hanson(op, op.pack(S_a), weight_threshold=1e-14)
+        kept_counts.append(int(np.count_nonzero(w_fit)))
+        out.append((rel[idx], w_fit))
+    return out, kept_counts
+
+
+def oracle(name, thr_ghost, thr_blocked, out_path, ridge, scheme, draws, seed,
+           n_laplace=10):
+    """
+    The ceiling on HANDOFF 4(8): what would per-element weights buy, at best?
+
+    Five footings on two supports, all at one `lambda` and one filter, with the torque
+    measured on identical random orientations so the rows carry no sampling difference.
+    Section 13's ladder gives four of them at its top rung (methanol, `pinv`, uHa/rad):
+    `blocked` 0.02, `blocked1` 9.02, `ghost` 27.2, `ghostw` 52.3. The fifth is new.
+    """
+    from torque_ladder import measure
+
+    mol = gto.M(atom=MOLECULES[name](), basis=BASIS, verbose=0)
+    mf = scf.RHF(mol).density_fit(auxbasis=AUXBASIS_FOR[BASIS])
+    mf.verbose = 0
+    mf.conv_tol = 1e-12
+    mf.kernel()
+    ref = float(DFMP2(mf).kernel()[0])
+    elements = sorted(set(mol.atom_symbol(ia) for ia in range(mol.natm)))
+
+    blocked = blocked_fit_per_atom(mol, thr_blocked)
+    supports = element_supports(elements, thr_ghost, quiet=True)
+    supports_w = element_supports(elements, thr_ghost, quiet=True, with_weights=True)
+    oracle_sets, kept = oracle_per_atom(mol, supports)
+
+    footings = [
+        ('blocked', blocked),
+        ('blocked1', [(rel, np.ones(len(rel))) for rel, _w in blocked]),
+        ('ghost', per_atom_sets(mol, supports)),
+        ('ghostw', [(np.asarray(element_grid(mol.atom_symbol(ia))[supports_w[mol.atom_symbol(ia)][0]]),
+                     np.asarray(supports_w[mol.atom_symbol(ia)][1]))
+                    for ia in range(mol.natm)]),
+        ('ghost_oracle', oracle_sets),
+    ]
+
+    rows = []
+    meta = dict(experiment='levers_oracle', molecule=name, basis=BASIS,
+                auxbasis=AUXBASIS_FOR[BASIS], nao=int(mol.nao_nr()),
+                mp2_ri_reference=ref, ridge=ridge, scheme=scheme, draws=draws,
+                seed=seed, threshold_ghost=thr_ghost, threshold_blocked=thr_blocked,
+                oracle_nonzero_weights_per_atom=kept)
+    print(f"== oracle: {name}, {mol.nao_nr()} AOs, {scheme} lambda={ridge:g}, "
+          f"{draws} orientations", flush=True)
+    print(f"   oracle keeps {sum(kept)} of "
+          f"{sum(len(supports[mol.atom_symbol(ia)]) for ia in range(mol.natm))} "
+          f"ghost support points at non-zero weight", flush=True)
+
+    for label, per_atom in footings:
+        t0 = time.time()
+        row = measure(mol, mf, per_atom, ridge, n_laplace, draws, seed, scheme)
+        row.update(mode=label, n_points=int(sum(len(rel) for rel, _w in per_atom)),
+                   err_uha=(row['energy'] - ref) * 1e6, seconds=time.time() - t0)
+        rows.append(row)
+        print(f"  {label:14s} n={row['n_points']:5d}  err={row['err_uha']:+9.2f} uHa  "
+              f"net tau={1e6 * row['net_torque']:11.2f} uHa/rad  "
+              f"rms over draws={1e6 * row.get('rms_draw_net_torque', float('nan')):10.2f}  "
+              f"spread={row.get('spread_uha', float('nan')):8.2f} uHa "
+              f"({row['seconds']:.0f}s)", flush=True)
+        with open(out_path, 'w') as fh:
+            json.dump(dict(meta=meta, rows=rows), fh, indent=2)
     return rows
 
 
@@ -476,6 +590,17 @@ if __name__ == '__main__':
                    help='skip rows already present in --out. The heavy runs here have '
                         'twice been killed by the machine; every row is independent, so '
                         'a kill should cost one row')
+    p.add_argument('--oracle', action='store_true',
+                   help='the ceiling on HANDOFF 4(8): fit weights per atom IN the '
+                        'molecule on the frozen ghost support, which is more freedom '
+                        'than any transferable scheme can have, and compare its torque '
+                        'against section 13\'s four footings')
+    p.add_argument('--schemes', default='ridge,damped')
+    p.add_argument('--weightings', default='ones,nnls')
+    p.add_argument('--oracle-ridge', type=float, default=1e-10)
+    p.add_argument('--oracle-scheme', default='damped')
+    p.add_argument('--draws', type=int, default=4)
+    p.add_argument('--seed', type=int, default=7)
     p.add_argument('--blocked-diagnostic', action='store_true',
                    help='is section 14\'s cc-pVTZ blocked plateau the grid or the '
                         'footing? Runs the {ones,nnls} x {ridge,damped} 2x2 on one set '
@@ -489,7 +614,15 @@ if __name__ == '__main__':
             p.error('a molecule and --out are required for --blocked-diagnostic')
         blocked_diagnostic(a.molecule,
                            [float(x) for x in a.blocked_thresholds.split(',') if x],
-                           a.out, basis=a.basis, resume=a.resume)
+                           a.out, basis=a.basis, resume=a.resume,
+                           schemes=tuple(a.schemes.split(',')),
+                           weightings=tuple(a.weightings.split(',')))
+    elif a.oracle:
+        if not a.molecule or not a.out:
+            p.error('a molecule and --out are required for --oracle')
+        oracle(a.molecule, float(a.thresholds.split(',')[-1]),
+               float(a.blocked_thresholds.split(',')[-1]), a.out,
+               a.oracle_ridge, a.oracle_scheme, a.draws, a.seed)
     elif a.ceilings:
         axes = build_axes(dict(bases=a.bases.split(','),
                                levels=[int(x) for x in a.levels.split(',')]),
