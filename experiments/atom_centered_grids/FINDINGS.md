@@ -1751,6 +1751,127 @@ Three things are worth not over-reading:
   never be compared to `ghost`, `blocked1` or §8's numbers, all of which are `w = 1`.
 
 
+## 15. The orbital response, and the first AIMD to run on this surface
+
+`pythc.grad.response` and `pythc.grad.total`, tested in `tests/test_thc_response.py`.
+Section 13 promoted the orbital response from "standard machinery left undone" to the one
+thing blocking the application, on the grounds that the fixed-orbital force is not the
+gradient of the propagated energy and breaks rotational invariance at ~8300 uHa/rad -
+fifty times the transferable grid's own torque. That is now built, and the two claims it
+was blocking are now measured rather than argued.
+
+### The reformulation that made it a one-solve problem, not a two
+
+The obstacle was not the CPHF solve, which is standard and which PySCF supplies. It was
+that the Laplace factors carry orbital *energies*: written with `exp(t e_i)`, the THC-MP2
+energy is **not invariant** under a rotation among the occupied orbitals, so its response
+needs the occupied-occupied and virtual-virtual blocks of `U` - which no CPHF solver
+returns, and which the canonical condition pins down only through a second coupled
+equation whose unknowns feed back into the first.
+
+Writing `Theta_o = w^(1/4) exp(t F_oo)` in place of `diag(w^(1/4) exp(t e_i))` removes
+the problem rather than solving it. It is the *same function* at the canonical point -
+verified to 1e-12 - but manifestly invariant, so those blocks enter only through the
+overlap derivative, which is a skeleton quantity. What is left needing a coupled solve is
+the occupied-virtual block alone, which is exactly what a CPHF solver hands back.
+
+The adjoint of that rewriting is a Loewner divided-difference matrix,
+`L[i,j] = (f_i - f_j)/(e_i - e_j)` with `L[i,i] = t f_i`, and the new quantity is
+`dE/dF_oo = L o dE/dTheta_o` rather than the old `dE/de`. Its **diagonal is exactly the
+old `eps_bar`** (agreeing to 5e-17), which is a free and exact check that the rewriting
+reduces correctly; the off-diagonal is new, and finite-differences against a genuine
+Fock-block perturbation with the expected quadratic convergence.
+
+The invariance then checks *itself*: if the Fock adjoint is right, the occupied-occupied
+and virtual-virtual blocks of the MO Lagrangian cannot have an antisymmetric part. They
+come out symmetric to **6.4e-15**. That diagnostic is computed on every call, because it
+is free and because it fails loudly.
+
+### It is right
+
+Water, 158-point blocked grid at `1e-3`, cc-pVDZ, ridge `1e-2`, 6 Laplace points, against
+a central difference of the correlation energy with the **SCF re-converged at every
+displaced geometry**:
+
+| step | err, fixed-orbital | err, with response | ratio |
+| --- | --- | --- | --- |
+| `h = 1e-2` | 2.8e-3 - 5.6e-3 | 2.9e-7 | |
+| `h = 1e-3` | 2.8e-3 - 5.6e-3 | **2.2e-9** | 129x |
+| `h = 1e-4` | 2.8e-3 - 5.6e-3 | 5.4e-9 | (FD floor) |
+
+The relaxed error falls by 129x and 190x per decade on the two components continued
+furthest, then flattens where the finite difference hits its own noise floor at an SCF
+converged to `1e-14` - which is what a correct gradient does and what a gradient missing
+a term does not. The fixed-orbital error does not move at all, because it is not a
+step-size artefact: it is the missing response, and on this system it is **18% of the
+fixed-orbital correlation gradient's norm**.
+
+### The rotational identity closes, and that is the sharper test
+
+Section 11's identity - for a lab-fixed atom-centred grid the angular-momentum leak is
+exactly the grid's own orientation torque,
+
+    dL/dt = sum_A R_A x F_A = -sum_A R_A x dE/dR_A = +sum_A tau_A
+
+- needs no finite difference, so it is the sharpest instrument available. Density-fitted
+Hartree-Fock has no quadrature grid and satisfies it to 0.000 uHa/rad on its own, so any
+residual belongs to the correlation gradient:
+
+| gradient | \|dL/dt\| | residual vs the grid's own torque | relative |
+| --- | --- | --- | --- |
+| fixed-orbital | 413.7 uHa/rad | **195.6** uHa/rad | 9.1e-3 |
+| with response | 347.9 uHa/rad | **8.6e-5** uHa/rad | **6.1e-9** |
+
+The residual falls by a factor of 2.3 million and the identity closes to machine
+precision. Section 11 could only check it to 4.7e-4 relative and called the gap the
+omitted response; it was. Note that the 347.9 uHa/rad the relaxed gradient lands on is
+the grid's own torque *at ridge 1e-2* and is a regulariser artefact in the sense section
+12 insists on - water is rank-saturated and its true torque is zero. What is meaningful
+here is the residual, not the absolute.
+
+### And the trajectory runs
+
+NVE on the frozen-grid THC-MP2 surface through `pyscf.md`, water, `dt = 20` a.u., the
+grid frozen for the whole run and only translated onto the nuclei at each step:
+
+| force | drift per step | total, 12 steps |
+| --- | --- | --- |
+| fixed-orbital | 21.68 uHa | 207.4 uHa |
+| with response | **0.247 uHa** | **-1.4 uHa** |
+
+**Eighty-eight times better, and the fixed-orbital number reproduces section 13's "tens of
+microhartree per step" exactly.** Energy conservation is the property that decides whether
+a force is the gradient of the energy being propagated, and it is the one a trajectory
+can test that a single derivative cannot. Section 13 had to drive its trajectories with
+the DF-RHF gradient and integrate the frozen grid's torque along them, because propagating
+on the THC surface was not possible; it now is.
+
+### What this does and does not settle
+
+It settles the prerequisite. The gradient is the derivative of the energy it propagates,
+to machine precision by two independent routes - a relaxed finite difference and an exact
+rotational identity - and a trajectory on it conserves energy. Nothing in the acTHC
+programme is now blocked on unbuilt machinery.
+
+It does not make it cheap. `orbital_response_gradient` solves the coupled-perturbed
+equations **once per nuclear degree of freedom**, which is Hessian-level work: `3 N`
+solves where a Z-vector formulation needs one. That is deliberate - it has no transposed
+operator algebra in it to get wrong, so it is the reference the cheap route must
+reproduce - but it is not what production dynamics would use. `response_lagrangian`
+already returns the intermediate a Z-vector implementation contracts, and the change is
+local to one function.
+
+Everything here is water, cc-pVDZ, `ov` mode, one grid, ridge `1e-2` rather than the
+damped filter section 12 mandates for gradient work, and twelve steps of a trajectory
+started from rest. The response is basis- and method-general and the rotational identity
+is exact rather than statistical, so none of those restrictions is load-bearing for the
+*correctness* claim; all of them are for any claim about cost or about what a picosecond
+would do. In particular, **nothing here re-runs section 13's leak measurements on the
+propagated surface**, which is now possible for the first time and is the obvious next
+experiment: the 4.5 degrees of axis tilt in 2.5 ps was measured along an RHF trajectory
+with the leak fed back, not along a trajectory the THC force actually drove.
+
+
 ## Verdict
 
 The proposed object exists: §8 builds genuine offline per-element point sets, fits
@@ -1841,6 +1962,21 @@ the 0.24 §13 measured for the complete 3284-point parent grid. §13's sentence 
 transferable support cannot do is carry in-molecule weights" was true of *ghost* weights
 and is not true in general.
 
+**§15 removes the prerequisite, and the application runs.** §13's one urgent item was
+the orbital response, on the grounds that the fixed-orbital force is not the gradient of
+the propagated energy and breaks rotational invariance fifty times harder than the
+transferable grid does. What made it more than plumbing was not the coupled-perturbed
+solve but the Laplace factors: carrying orbital *energies*, they make the energy
+non-invariant under a rotation among the occupied orbitals, so the response would have
+needed blocks of `U` that no CPHF solver returns. Written with `Theta_o = w^(1/4)
+exp(t F_oo)` the energy is the same at the canonical point and manifestly invariant, and
+the standard occupied-virtual response is all that is left. The result verifies by two
+independent routes that share no machinery - a finite difference of the fully relaxed
+energy, converging quadratically, and section 11's rotational identity, which now closes
+to **6.1e-9** relative where the fixed-orbital force sits at 9.1e-3 - and an NVE
+trajectory on the THC surface conserves energy to **0.247 uHa per step against the
+fixed-orbital force's 21.68**. The programme has no unbuilt component left.
+
 What remains to be measured, in order:
 
 1. ~~**The ghost gap.**~~ **Done - see §8, and the answer is yes.** 1.1-1.8x over
@@ -1899,15 +2035,35 @@ What remains to be measured, in order:
    matter at all - conditioning work on a metric the regulariser is not equivariant to -
    predicts exactly this: an ERI target is a far better proxy for what the `Z` fit has to
    reproduce than an overlap target is.
-9. **Implement the orbital response.** §13 promotes this from the standard machinery §11
-   left undone to a prerequisite. On the fixed-orbital surface the force is not the
-   gradient of the propagated energy, and the resulting violation of rotational invariance
-   is **~8300 uHa/rad** - about fifty times the transferable grid's own torque, and
-   identical on a grid with five thousand times less torque of its own. No AIMD is
-   possible on the present gradient whatever the grid does.
+9. ~~**Implement the orbital response.**~~ **Done - see §15, and the trajectory runs.**
+   §13 promoted this from standard machinery left undone to the thing blocking the
+   application. The obstacle turned out not to be the CPHF solve but the Laplace factors'
+   dependence on orbital *energies*, which makes the energy non-invariant under
+   occupied-occupied rotation and so demands response blocks no solver returns; writing
+   `Theta_o = w^(1/4) exp(t F_oo)` instead is the same function at the canonical point
+   and manifestly invariant, and reduces the problem to the standard occupied-virtual
+   response. The relaxed gradient finite-differences quadratically against a re-converged
+   SCF, the rotational identity closes to **6.1e-9** relative against the fixed-orbital
+   force's 9.1e-3, and NVE on the THC surface drifts **0.247 uHa/step against 21.68**.
+
+10. **Make the response cheap, and re-run §13's leak on the propagated surface.** Two
+    things §15 leaves. The response solves the coupled-perturbed equations once per
+    nuclear degree of freedom - `3 N` solves where a Z-vector formulation needs one, which
+    is the difference between a reference implementation and production dynamics;
+    `response_lagrangian` already returns the intermediate it would contract. And every
+    leak number in §13 was measured along a *DF-RHF* trajectory with the frozen grid's
+    torque integrated along it, because propagating on the THC surface was not possible.
+    It now is, so the 4.5 degrees of axis tilt in 2.5 ps can be measured on the surface it
+    was always meant to describe rather than inferred first-order from another one.
 
 
 ## Caveats
+
+§15 is water only, one grid, twelve steps from rest, and ridge `1e-2` rather than the
+damped filter §12 mandates for gradient work. The correctness claims do not lean on any
+of that - the rotational identity is exact rather than statistical, and the response is
+basis- and method-general - but every claim about cost or about what a picosecond would do
+does. The response costs `3 N` coupled-perturbed solves, not one.
 
 cc-pVDZ only; MMFF geometries; `ov` mode and MP2 only. The rank and weight analyses are
 on methanol and ethanol; §10 widens the molecule set to twelve but widens neither the

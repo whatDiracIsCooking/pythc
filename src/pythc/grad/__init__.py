@@ -26,14 +26,15 @@ orbital energies are held at their reference-geometry values. That is the THC-sp
 content of the gradient - every term the frozen grid, the collocation, the metric and the
 ridge touch - and it is what had not been written down before.
 
-The orbital-response term (``dC/dR``, ``de/dR``) is **not implemented**, so this is not
-the total MP2 gradient and should not be compared against one. That term is structurally
-identical to DF-MP2's and needs no THC-specific theory: solve the coupled-perturbed
-equations once and contract the result with the ``C_bar`` and ``eps_bar`` that
-:class:`~pythc.grad.driver.ThcGradientResult` already returns for the purpose. Keeping
-the split explicit is deliberate rather than a shortcut - the fixed-orbital derivative is
-exactly finite-difference checkable on its own, so the novel machinery could be verified
-to machine precision without the response layer's approximations in the way.
+The orbital-response term (``dC/dR``, ``de/dR``) lives in :mod:`pythc.grad.response`,
+and :func:`pythc.grad.total.total_mp2_gradient` adds it to the Hartree-Fock gradient to
+give the derivative of ``E_HF + E_corr`` that a trajectory can actually be propagated on.
+There is no THC-specific theory in it: one coupled-perturbed solve, contracted with the
+``C_bar``, ``F_oo_bar`` and ``F_vv_bar`` that
+:class:`~pythc.grad.driver.ThcGradientResult` returns for the purpose. Keeping the split
+explicit is deliberate rather than a shortcut - the fixed-orbital derivative is exactly
+finite-difference checkable on its own, so the novel machinery could be verified to
+machine precision without the response layer in the way.
 
 **The orientation derivative needs no response at all.** Spinning an atom's frozen point
 set about its own nucleus leaves the molecule, the AOs and the SCF solution untouched -
@@ -49,8 +50,11 @@ dynamics, and it is what this package makes measurable.
 __all__ = [
     "FrozenGrid",
     "ThcGradientResult",
+    "ThcMP2Gradients",
+    "orbital_response_gradient",
     "orientation_gradient",
     "thc_mp2_gradient",
+    "total_mp2_gradient",
 ]
 
 
@@ -66,4 +70,12 @@ def __getattr__(name):
         import pythc.grad.driver as driver
 
         return getattr(driver, name)
+    if name == "orbital_response_gradient":
+        from pythc.grad.response import orbital_response_gradient
+
+        return orbital_response_gradient
+    if name in ("ThcMP2Gradients", "total_mp2_gradient"):
+        import pythc.grad.total as total
+
+        return getattr(total, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
