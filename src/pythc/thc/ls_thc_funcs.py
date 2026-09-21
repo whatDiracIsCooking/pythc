@@ -165,13 +165,30 @@ def invert_metric(S: np.ndarray, ridge: Optional[float] = None,
     if ridge is None:
         return lib.pinv(S)
 
+    if scheme.endswith("_jacobi"):
+        # Symmetric Jacobi preconditioning around the filter. The weights enter the
+        # metric ONLY as S(w) = D S(1) D with D = diag(sqrt(w)) - a symmetric diagonal
+        # scaling and nothing else - so a collocation weighting and a diagonal
+        # preconditioner are the same kind of object. The pseudoinverse absorbs either
+        # exactly; a ridge or damped filter, whose shift is absolute, absorbs neither.
+        # This applies the scaling the metric itself suggests, at runtime, per molecule:
+        #     Sj = E S E,  E = diag(1 / sqrt(diag S))   =>   S^-1 = E Sj^-1 E
+        # diag(S)_PP = (sum_mu X_muP^2)^2 is smooth in the nuclear coordinates and
+        # nowhere zero for a point carrying any amplitude, so unlike a fitted weight set
+        # this costs no offline object and stays differentiable.
+        e = 1.0 / np.sqrt(np.diag(S))
+        inner = invert_metric(e[:, None] * S * e[None, :], ridge, ridge_scale,
+                              scheme[: -len("_jacobi")])
+        return e[:, None] * inner * e[None, :]
+
     if scheme == "damped":
         return lib.damped_inv(S, ridge, scale=ridge_scale)
     if scheme == "ridge_eigh":
         return lib.ridge_inv_eigh(S, ridge, scale=ridge_scale)
     if scheme != "ridge":
         raise ValueError(f"unknown metric scheme {scheme!r}, expected 'ridge', "
-                         "'ridge_eigh' or 'damped'")
+                         "'ridge_eigh', 'damped', or any of those with a '_jacobi' "
+                         "suffix")
 
     return lib.ridge_inv(S, ridge, scale=ridge_scale)
 
