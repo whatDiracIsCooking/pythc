@@ -176,7 +176,12 @@ def invert_metric(S: np.ndarray, ridge: Optional[float] = None,
         # diag(S)_PP = (sum_mu X_muP^2)^2 is smooth in the nuclear coordinates and
         # nowhere zero for a point carrying any amplitude, so unlike a fitted weight set
         # this costs no offline object and stays differentiable.
-        e = 1.0 / np.sqrt(np.diag(S))
+        # S_PP = (sum_mu X_muP^2)^2 is exactly zero for a point carrying no amplitude -
+        # which a weight fit produces whenever it drops a point (the oracle fit of
+        # levers.py zeroes 250 of 702). Leave those rows unscaled; the filter sends them
+        # to zero anyway, and dividing by zero turns the whole metric into NaN.
+        diag = np.diag(S).copy()
+        e = np.where(diag > 0, 1.0 / np.sqrt(np.where(diag > 0, diag, 1.0)), 1.0)
         inner = invert_metric(e[:, None] * S * e[None, :], ridge, ridge_scale,
                               scheme[: -len("_jacobi")])
         return e[:, None] * inner * e[None, :]

@@ -474,7 +474,8 @@ def oracle(name, thr_ghost, thr_blocked, out_path, ridge, scheme, draws, seed,
                 mp2_ri_reference=ref, ridge=ridge, scheme=scheme, draws=draws,
                 seed=seed, threshold_ghost=thr_ghost, threshold_blocked=thr_blocked,
                 oracle_nonzero_weights_per_atom=kept)
-    print(f"== oracle: {name}, {mol.nao_nr()} AOs, {scheme} lambda={ridge:g}, "
+    lam = 'pinv (truncated pseudoinverse)' if ridge is None else f'{scheme} lambda={ridge:g}'
+    print(f"== oracle: {name}, {mol.nao_nr()} AOs, {lam}, "
           f"{draws} orientations", flush=True)
     print(f"   oracle keeps {sum(kept)} of "
           f"{sum(len(supports[mol.atom_symbol(ia)]) for ia in range(mol.natm))} "
@@ -597,7 +598,11 @@ if __name__ == '__main__':
                         'against section 13\'s four footings')
     p.add_argument('--schemes', default='ridge,damped')
     p.add_argument('--weightings', default='ones,nnls')
-    p.add_argument('--oracle-ridge', type=float, default=1e-10)
+    p.add_argument('--oracle-ridge', default='1e-10',
+                   help="lambda for the oracle run, or 'none' for the truncated "
+                        "pseudoinverse - which is what section 13 means by the pinv "
+                        "control, and is selected by ridge=None rather than by a scheme "
+                        "name")
     p.add_argument('--oracle-scheme', default='damped')
     p.add_argument('--draws', type=int, default=4)
     p.add_argument('--seed', type=int, default=7)
@@ -622,7 +627,8 @@ if __name__ == '__main__':
             p.error('a molecule and --out are required for --oracle')
         oracle(a.molecule, float(a.thresholds.split(',')[-1]),
                float(a.blocked_thresholds.split(',')[-1]), a.out,
-               a.oracle_ridge, a.oracle_scheme, a.draws, a.seed)
+               None if a.oracle_ridge.lower() == 'none' else float(a.oracle_ridge),
+               a.oracle_scheme, a.draws, a.seed)
     elif a.ceilings:
         axes = build_axes(dict(bases=a.bases.split(','),
                                levels=[int(x) for x in a.levels.split(',')]),
