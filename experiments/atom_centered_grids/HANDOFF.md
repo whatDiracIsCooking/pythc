@@ -617,12 +617,24 @@ varied, as a ceiling (SCF-free, seconds) and as points per microhartree on metha
 * **The cage does not survive a change of basis, which is the single most important
   thing in section 14 after the cage itself.** Carried to cc-pVTZ on the same molecule it
   is **1.2-1.4x worse** than the single-ghost ensemble it beats by 1.5x in cc-pVDZ.
-  Neither ladder is converged there - `cage`'s is still falling steeply at its tightest
-  rung while `ghost`'s has flattened, and the `blocked` ladder never converges at all,
-  which also voids the apparent result that `ghost` beats the in-molecule fit in cc-pVTZ
-  (0.74-0.88x). `levers_methanol_tz_wide.json` extends both to `1e-6`/`1e-7`. Until it
-  lands, **quote section 8's tax, not section 14's**, and treat the cage as a cc-pVDZ
-  best case.
+  `cage`'s ladder is still falling steeply at its tightest rung while `ghost`'s has
+  converged, so that ranking is provisional. **Quote section 8's tax, not section 14's**,
+  and treat the cage as a cc-pVDZ best case.
+* **And the extended ladder took `blocked` out from under section 1 and section 8.** The
+  `blocked` baseline in cc-pVTZ does not fail to converge - it **plateaus** at ~19 uHa
+  above the floor while its support grows 1293 -> 1746 points, and `ghost` passes it and
+  reaches 2.5. As measured, the transferable grid beats the in-molecule fit, so the
+  premise that `blocked` is a *strict lower bound* on any frozen scheme - which is what
+  makes §1 and §8 arguments about the programme rather than about two fitting modes -
+  does not hold in this basis. Before believing that, note the alternative: a support
+  growing 35% for no accuracy is the **footing** failing, not the grid, and this row is
+  `w = 1` under `metric_ridge = 1e-8` at 1700+ points, exactly where 4(1) and 4(6) say
+  the ridge inverts near-null directions. **Re-run the cc-pVTZ `blocked` ladder with NNLS
+  weights kept, and under `--scheme damped`, before concluding anything.** That is the
+  cheapest experiment on this list and it guards a load-bearing premise.
+* `levers_methanol_tz_wide.json` was killed by the machine during its second `cage` rung
+  - a cc-pVTZ cage environment carries ~360 AOs across 9 environments and is the heaviest
+  solve here. Re-run the cage rungs chunked, so a kill costs one rung.
 * Left undone: one molecule per basis, and `cage` was run in stage B with the icosahedral
   direction set only. `cage:tetrahedron` hits `ghost`'s hydrogen ceiling exactly on an order of
   magnitude fewer equations, so it may be most of the win at a fraction of the fit cost.

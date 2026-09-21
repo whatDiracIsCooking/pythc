@@ -1710,11 +1710,46 @@ are off-scale in this basis, as §10 warns they go:
 * **`cage`'s curve is still falling steeply at its tightest rung** (27.9 -> 17.4 -> 6.0)
   while `ghost`'s has flattened and gone non-monotone (8.4 -> 3.9 -> 4.4). A curve that
   is still descending has not reached the point count its ratio is being read at.
-* **`blocked`'s ladder never converges at all.** Its tightest rung is 19.3 uHa above the
-  floor and still falling, which makes the apparent result that `ghost` *beats* the
-  in-molecule fit here (0.74-0.88x) an artefact of an unconverged denominator and not a
-  measurement. The cc-pVDZ default `--blocked-thresholds` is simply the wrong ladder in
-  cc-pVTZ.
+* **[CORRECTED by the extended ladder - see below.** This read "`blocked`'s ladder never
+  converges at all. Its tightest rung is 19.3 uHa above the floor and still falling,
+  which makes the apparent result that `ghost` *beats* the in-molecule fit here an
+  artefact of an unconverged denominator and not a measurement." Extended two decades it
+  does not fall. It plateaus.**]**
+
+### The `blocked` baseline plateaus in cc-pVTZ, and the lower bound stops being one
+
+`levers_methanol_tz_wide.json`, the extended run. It was killed by the machine during its
+second `cage` rung - the same silent kill that took the parent ladder in the `torque_ladder`
+history, a cc-pVTZ cage environment carrying ~360 AOs across 9 environments being the
+heaviest solve in this directory - so the cage question above is still open. What it did
+deliver first settles the `blocked` one, the other way:
+
+| above floor (+7.14 uHa) | curve |
+| --- | --- |
+| `blocked` | 767/+105.7, 1053/+32.2, 1293/+19.5, 1531/**+18.7**, 1746/**+19.1** |
+| `ghost` | 1063/+8.6, 1202/+4.1, 1351/+4.6, 1423/+3.6, 1485/**+2.5** |
+
+**`blocked` is not unconverged. It is flat.** Two further decades of threshold grow its
+point count 1293 -> 1746 and buy nothing at all, while `ghost` passes it and reaches
+2.5 uHa above the floor. So the apparent result stands as measured: **in cc-pVTZ the
+transferable grid beats the in-molecule fit it is supposed to be paying a penalty
+against**, and §1 and §8's premise - that `blocked` is a *strict lower bound* on any
+frozen atom-centred scheme - does not hold in this basis.
+
+That premise is load-bearing for the whole programme, so the alternative explanation
+deserves more weight than the headline. A curve whose support grows 35% with no accuracy
+gain does not look like a grid running out of points; it looks like the **footing**
+failing. This `blocked` is `w = 1` under `metric_ridge = 1e-8` at 1700+ points, which is
+precisely the regime this file flags twice: §6 on ridge inverting near-null directions at
+`1/lambda` in a redundant metric, and §8's caveat that `blocked` with `w = 1` under ridge
+and `blocked` with NNLS weights are not the same curve. The parent-grid floor's 0.18 uHa
+irreproducibility reappearing in this basis (+7.14 here against +7.32 in the narrow run,
+identical grid and SCF settings) points the same way.
+
+**The diagnostic is cheap and specific, and nothing should be concluded before it is
+run:** re-run the cc-pVTZ `blocked` ladder with its NNLS weights kept, and again under
+`--scheme damped`. If the plateau lifts, the baseline was degenerate and `ghost`-beats-
+`blocked` evaporates. If it stays, §8's lower-bound premise needs qualifying by basis.
 
 So what cc-pVTZ establishes is narrow and negative: **the cage's cc-pVDZ win does not
 generalise across basis sets as measured**, and the ladders need extending (`1e-6`,
