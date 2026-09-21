@@ -85,14 +85,17 @@ uv run python torque_ladder.py formaldehyde --modes ghost,ghostw,molw,molfit,mol
 
 ## Results
 
-See [`FINDINGS.md`](FINDINGS.md). Fourteen headlines:
+See [`FINDINGS.md`](FINDINGS.md). Sixteen headlines:
 
 * The per-atom penalty is **1.2-1.7x** on point count, shrinking with system size - well
   inside the range where the scheme is worth building.
 * The fitted weights turn out to be **almost irrelevant** to LS-THC accuracy; the NNLS
   fit's real product is its support. Where the metric is full-rank, all-ones weights give
   bit-identical energies. That removes most of the gradient difficulty from the proposal,
-  since `X = phi(r_P)` has no weight to differentiate.
+  since `X = phi(r_P)` has no weight to differentiate. *(This is the pseudoinverse result.
+  §12 and §14 qualify it: under the ridge or damped filter the weights are worth 2-2.5x at
+  matched support, and they cost the gradient nothing either way, so the offline object
+  should carry them.)*
 * With the grid frozen, the metric's **eigenvalue truncation is the last discrete step**
   left, and it puts measurable ~0.5 uHa jumps in the energy exactly where an eigenvalue
   crosses the cutoff. Ridge regularisation removes them for 0.1-2.2 uHa, and is now
@@ -155,8 +158,8 @@ See [`FINDINGS.md`](FINDINGS.md). Fourteen headlines:
   `ghost` converges like `blocked1` (35.6x against 39.6x) and not like weighted `blocked`
   (17667x). The complete 3284-point parent grid sits at **0.24** uHa/rad and the *pruned*
   670-point weighted grid at **0.02**, so pruning is a benefit rather than a cost. What a
-  transferable support cannot do is carry in-molecule weights - which makes fitting
-  per-element weights for that objective the highest-leverage thing left.
+  transferable support cannot do is carry in-molecule weights - which made fitting
+  per-element weights for that objective the highest-leverage thing left. §14 ran it.
 * **Over a trajectory the leak reorients rather than heats, and it is smaller than the
   grid it is pruned from.** 2.5 ps of thermal tumbling on methanol: the torque is 95%
   incoherent, the spin-up component is pinned by energy conservation at the size of the
@@ -172,6 +175,19 @@ See [`FINDINGS.md`](FINDINGS.md). Fourteen headlines:
   rotational invariance at **~8300 uHa/rad** - fifty times the transferable grid's own
   torque, and identical on a grid with five thousand times less. No AIMD runs on the
   present gradient whatever the grid does.
+* **Support and weights are one object, and the weight footing is worth ~2-3x rather
+  than the 450x §13 implied.** Per-element weights fitted against *real* atoms in real
+  molecules, trained on three and held out on three. Laid onto the existing ghost support
+  (`molw`) they beat `ghostw` **0 times out of 12** on held-out molecules, on energy and
+  rotation spread alike - despite carrying much the better overlap residual. Refit the
+  *support and the weights together* (`molfit`) and it wins **8/10** on energy at a median
+  of ~3x, the best transferable grid here. A weight set is worth nothing on a support
+  selected by a different fit. Two methodology notes come with it: read these at **matched
+  point count**, and do not take a ratio from a torque quoted at one rung - `ghostw` on
+  formaldehyde runs 163 uHa/rad at 344 points, 1.0 at 427 and 3.7 at 486, which is a
+  caveat on §13's own headline numbers. What now blocks further offline tuning is the
+  *target*: two grids matched on the overlap objective to 10% differ by 1.5-2.8x in what
+  matters, in the opposite order, so `S` can no longer rank the candidates.
 * **The gradient exists and verifies to machine precision** (`pythc.grad`, driven by
   `gradient.py`): quadratic convergence against a finite difference, and forces that sum
   to zero to 2.4e-15 with no finite difference involved. Two things came back with it

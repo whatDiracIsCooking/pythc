@@ -11,7 +11,13 @@ measures.
 
 Three point sets per element are compared, all selected by the same NNLS solver on the
 same level-0 atomic grid, and all evaluated with the weights thrown away (`w = 1`, which
-section 3 of HANDOFF.md established costs nothing) and the metric ridge-regularised:
+section 3 of HANDOFF.md established costs nothing) and the metric ridge-regularised.
+
+That `w = 1` footing is this script's scope, not a recommendation: section 3's result is
+about the pseudoinverse, and 4(6) and 4(8) both walk it back for the regularised inverse
+the gradient needs. `insitu.py` carries the weighted transferable modes, and its `molfit`
+- support and weights fitted together against real neighbours - beats everything here.
+Keep that in mind before reading a `ghost` row as the ceiling of the scheme.
 
 * **blocked** - fitted in the molecule, per atom. The lower bound. Not transferable.
 * **free** - fitted on the isolated atom, no neighbours at all. The strawman, and the

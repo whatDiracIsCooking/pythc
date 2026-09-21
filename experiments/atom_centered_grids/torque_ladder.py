@@ -34,16 +34,32 @@ Three things are controlled for, because each could fake a convergence:
 * **The asymptote.** ``--parent`` adds the unpruned atomic grid as the top of the ladder.
   A complete atomic grid is very nearly rotationally invariant, so its torque is the floor
   the ladder should be heading for. If it is not small, the convergence is not real.
+* **The rung.** Section 4(8) found the hard way that this statistic is *not* monotone in
+  point count: ``ghostw`` on formaldehyde runs 163 uHa/rad at 344 points, 1.00 at 427 and
+  3.74 at 486, and the rms over draws does the same. Two modes compared at one rung each,
+  at different sizes, can be made to say almost anything - a draft of FINDINGS section 14
+  read a 26x from such a pair and the next rung inverted it. Read a whole ladder, at
+  matched point count, and prefer ``insitu.py``'s energy and spread ladders when the
+  question is which of two grids is better.
 
 No finite differences: section 4(5) already checked this torque against one to six
 significant figures, and ``gradient.py`` re-runs that check. This script only needs the
 analytic value, so a row costs one gradient evaluation per draw.
+
+The transferable modes come in five weight footings, three of them from ``insitu.py``
+(section 4(8)): ``ghost`` (ghost support, ``w = 1``), ``ghostw`` (ghost support, ghost
+weights), ``molw`` (ghost support, in-molecule weights), ``molfit`` (support and weights
+both fitted in-molecule, per element) and ``molfit1`` (that support at ``w = 1``). The
+``mol*`` rows are trained on ``insitu.TRAIN``, so a run on one of those molecules is a
+fit-quality measurement rather than a transfer one - the banner says which.
 
 Usage:
 
     uv run python experiments/atom_centered_grids/torque_ladder.py water --parent
     uv run python experiments/atom_centered_grids/torque_ladder.py methanol \
         --modes blocked,ghost --draws 4 --out torque_ladder_methanol.json
+    uv run python experiments/atom_centered_grids/torque_ladder.py formaldehyde \
+        --modes ghost,ghostw,molw,molfit,molfit1 --ridges "" --pinv --draws 4
 """
 import argparse
 import json

@@ -8,6 +8,16 @@ through the conditioning of the metric inversion, not through accuracy - which w
 the NNLS fit's real product is its SUPPORT (which points survive), not the weight values.
 
 Test: keep the NNLS-selected points, swap the weights for alternatives, compare MP2.
+
+Read the answer with its scope. The absorption argument above is exact for the
+**pseudoinverse**, and that is what this script measures against. It does not hold for the
+regularised inverses the *gradient* needs: a ridge is not scale-equivariant in a diagonal
+`D`, and FINDINGS sections 12 and 14 find the weights worth 2-2.5x there at matched
+support. Section 14 adds the constraint that makes them usable - the weights have to be
+the ones that selected the points, since an in-molecule weight set laid onto a
+ghost-selected support loses to the ghost's own weights 0 times out of 12. So the
+conclusion "the product is the support" is right about *this* experiment and wrong as a
+recipe for the offline object, which should carry both.
 """
 import os, sys, json
 
