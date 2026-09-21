@@ -8,9 +8,9 @@ ordered list of next steps.
 [`VIABILITY.md`](VIABILITY.md). Sections 14, 15 and 18 removed the last structural
 objection, but no single configuration here has been measured on more than one axis - every
 compression ratio is at `ridge 1e-8` and every orientation result is at `damped`, `pinv` or
-`damped_jacobi` - and nothing measures a cost, an observable, or a trajectory on the
-relaxed surface. That file lists the tests that would close the gap, and what would
-falsify the idea.
+`damped_jacobi` - and nothing measures a cost, a trajectory on the relaxed surface, or a
+head-to-head against the DFT anyone would actually run. That file lists the tests that
+would close the gap, and what would falsify the idea.
 
 The atom-centered proposal is to fit a THC grid once per element, offline, and translate it
 rigidly into any molecule. That buys unconditionally smooth potential energy surfaces —

@@ -65,8 +65,11 @@ Three further things are simply absent:
   in `FINDINGS.md`. The `n_P` tax is a *proxy* for cost, and `pythc.grad` is explicitly a
   reference implementation that holds `(n_ao, n_ao, n_aux)` and `(n_P, n_P, n_occ)` in core
   and caps near alanine. Compression ratios are not a speedup.
-* **No observable.** §13 measures 4.5 degrees of rotation-axis tilt per 2.5 ps and
-  `HANDOFF.md` says of it, three times, that it is `a measurement without a threshold`.
+* **No head-to-head against the DFT anyone would actually run.** §13 measures 4.5 degrees
+  of rotation-axis tilt per 2.5 ps and `HANDOFF.md` says of it, three times, that it is
+  `a measurement without a threshold`. The threshold is not missing because nobody picked
+  a tolerance - it is missing because the comparison stops at level-0 Becke, the grid
+  acTHC prunes from, which acTHC beats 8x. Against level-3 it loses 25x. See T8.
 * **No trajectory on the real surface.** Every leak number in §13 was integrated along a
   *DF-RHF* trajectory with the frozen grid's torque carried along it, from a torque **72x
   larger** than the one §18 measures. `trajectory.py` still calls the fixed-orbital
@@ -170,14 +173,16 @@ uv run python experiments/atom_centered_grids/trajectory.py methanol \
     --steps 5000 --torque-every 2 --out data/viab_traj.json
 ```
 
-*Report three things, all against controls already in §13's table at matched times:*
+*Report three things, all against controls already in §13's table at matched times.* The
+angular-momentum row is not a tolerance - it is a head-to-head against DFT, for the reason
+T8 sets out.
 
-| quantity | reference already measured | pass |
+| quantity | reference already measured | what to report |
 | --- | --- | --- |
-| `\|L - L0\|` at 1 ps | RKS/PBE level-0 Becke: 9.250 hbar on 4656 points | below its own parent quadrature, as §13's 1.188 already is |
-| | RKS/PBE level-3 Becke: 0.028 hbar at 300 fs | within ~2.5x, which `blocked` already achieves on 224x fewer points |
-| NVE drift per step | §15: 0.247 uHa/step (water, 12 steps, `ridge 1e-2`) | accumulated drift over the run below `kT` at 300 K |
-| axis tilt over 2.5 ps | §13: 4.5 deg, from a 72x larger torque | scales down, i.e. well under 1 deg |
+| `\|L - L0\|` at matched times | RKS/PBE level-0 Becke: 0.638 / 2.380 / 9.250 hbar on 4656 points | the same three times, on the same initial condition |
+| | RKS/PBE level-3 Becke: 0.004 / 0.028 hbar on 67432 points | ditto - this is the baseline that matters, see T8 |
+| NVE drift per step | §15: 0.247 uHa/step (water, 12 steps, `ridge 1e-2`) | drift on the same integrator on the grid-free DF-RHF surface, which isolates the grid from the integrator |
+| axis tilt over 2.5 ps | §13: 4.5 deg, from a 72x larger torque | ditto |
 
 *Falsify:* the leak does not improve on §13 despite the 72x smaller torque - which would
 mean the torque is not what sets the leak and the integrator or the response is. *Cost:*
@@ -191,20 +196,70 @@ molecule tumbles more slowly, giving the torque longer to act coherently, and th
 the plateau is what changes. Methanol at 48 AOs is the smallest molecule here that does not
 rank-saturate; ethanol or propene would say. Run T1 and T6 on one of them.
 
-### Tier 3 - the requirement. Without this, T6 produces a number with nothing to compare it to.
+### Tier 3 - the requirement. The bar is DFT, not a tolerance.
 
-**T8. Put an observable next to the leak.** `HANDOFF.md` raises this three separate times
-and nothing computes one. The natural choice, because it is exactly what artificial
-rotational diffusion would corrupt, is a **gas-phase rovibrational or IR spectrum from a
-dipole autocorrelation function** on the acTHC surface, against the same trajectory on the
-grid-free DF-RHF/relaxed-MP2 surface.
+**T8. Find acTHC parameters whose rotational diffusion is no worse than production DFT's.**
 
-*Pass:* line positions and widths agree to within the spectral resolution of the run
-length. *Why it decides the programme:* in condensed phase real collisional decorrelation
-runs on ~1 ps and would bury 4.5 deg/2.5 ps entirely; gas-phase rotational structure would
-not. If the spectrum is clean, the orientation question is closed against an observable
-rather than against a tolerance nobody has set. *Code work:* a dipole ACF and FFT on top of
-T6's trajectory - modest, and reusable.
+`HANDOFF.md` asks three separate times what the requirement is and calls 4.5 deg / 2.5 ps
+`a measurement without a threshold`. The temptation is to invent an absolute tolerance -
+"the spectrum must be clean to within line widths" - and that is the wrong test, because
+**DFT does not pass it either**. §13 already made exactly this point and it is the frame to
+carry forward: lab-fixed atom-centred quadrature is not an acTHC defect, it is what the
+whole family does, and the pruned support is quieter at it than its own parent grid.
+
+So state the requirement comparatively, and existentially:
+
+> **There exist acTHC parameters for which rotational diffusion is comparable to DFT's** -
+> and preferably, **for which it is less bad than DFT's**.
+
+That is a decidable claim with no invented threshold in it, because the baseline is a
+competing method's measured number rather than a tolerance nobody has set. It is also
+weaker and cheaper to establish than what T8 previously asked for: the deliverable is a
+**witness** - one configuration (support type, threshold, `n_P`, filter, `lambda`) - not a
+property of every configuration.
+
+**Where §13 leaves the claim today, which is the honest starting point:** acTHC sits
+*between* the two DFT baselines. Against RKS/PBE on level-0 Becke - the grid the fits are
+pruned from, 4656 points - the frozen supports win by **4.4x at 100 fs and ~8x at a
+picosecond**. Against level-3 Becke, 67432 points, they lose by **~25x** on 163x fewer
+points. So "less bad than DFT" is already true of the DFT you would not run, and not yet
+true of the DFT you would. **Which baseline is named decides whether the claim is
+interesting**, and only level 3 (or whatever the production setting is) is.
+
+The reason to expect the gap to have moved: every §13 trajectory number was integrated
+from a torque **72x larger** than the one §18 measures under the preconditioner, on a
+surface that was not even the THC one. Nothing has re-measured the leak since.
+
+*How to run it.* Both methods have a knob - DFT buys less rotational diffusion with grid
+level, acTHC with `n_P` - so this is a comparison of two curves, not two points. A
+trajectory ladder is unaffordable (T6 costs `3 N` coupled-perturbed solves per step), so
+screen first and propagate only the candidates:
+
+1. **Screen on the torque**, which needs no SCF beyond the reference and is already
+   laddered. §13 reports `log|tau|` tracking the rotation spread at Spearman **+0.89** and
+   grid accuracy at **+0.86** over 20 rungs, so it orders candidates cheaply. Treat it as
+   a screen and not as proof - §13's own warning is that a torque quoted at one rung is
+   not a statistic, and §16's `ghostw` swings 163 -> 1.00 -> 3.74 uHa/rad across three
+   consecutive rungs.
+2. **Propagate the best two or three rungs** plus the DFT ladder on one initial condition,
+   `--reference rks --grid-level 0,3` (and 5 if level 3 is beaten), reporting `|L - L0|` at
+   matched times. `trajectory.py` already carries several grids along one trajectory, so
+   the acTHC arms cost nothing extra in sampling.
+
+*Pass, in increasing strength:* (a) some acTHC configuration beats level-0 DFT - **already
+true in §13**, and the re-run should widen it; (b) some configuration is **within a small
+factor of level 3** at a point count 100x smaller, which makes the claim a cost argument
+and hands off to T13; (c) some configuration **beats level 3 outright**, which ends the
+orientation question permanently. *Falsify:* no rung reaches (b) even as `n_P` grows -
+i.e. the leak plateaus above production DFT and cannot be bought down - which would mean
+the frozen grid has a floor the quadrature it replaces does not.
+
+*Optional, and no longer load-bearing:* a **dipole autocorrelation spectrum** on both
+surfaces. Under the comparative framing this is no longer needed to set the bar - `|L - L0|`
+against DFT is the bar - but it answers the separate question of whether any of this is
+physically visible, and it is the thing to run if (b) holds and someone asks whether the
+residual factor matters. In condensed phase real collisional decorrelation runs on ~1 ps
+and would bury the whole effect; gas-phase rotational structure would not.
 
 ### Tier 4 - generality. These are the claims that are currently one molecule, one basis.
 
@@ -265,10 +320,16 @@ Stated up front, so the tests are not read as a formality:
 2. **T6 no better than §13.** A 72x smaller torque that does not produce a smaller leak
    means the leak is not the torque, and the whole §12-§18 arc was optimising the wrong
    quantity.
-3. **T9 reverses T1.** If the best support in cc-pVDZ is not the best in cc-pVTZ - which
+3. **T8 finds no witness.** If no acTHC configuration gets within a small factor of
+   production-level DFT's rotational diffusion, and the leak plateaus as `n_P` grows rather
+   than converging, then the frozen grid has an orientation floor that the quadrature it
+   replaces does not - and the smooth-PES argument buys a surface nobody can run dynamics
+   on. Note this is a *weaker* bar than it sounds and still the right one: acTHC does not
+   have to be rotationally clean, only cleaner than what it replaces at comparable cost.
+4. **T9 reverses T1.** If the best support in cc-pVDZ is not the best in cc-pVTZ - which
    §17 already observes for the cage - then "fit once per element offline" has a basis
    dependence the acCD analogy does not, and every ratio needs re-taking per basis.
-4. **T13 finds no crossover below the memory ceiling.** A scheme that compresses `n_P` but
+5. **T13 finds no crossover below the memory ceiling.** A scheme that compresses `n_P` but
    is not faster than DF-MP2 anywhere reachable is a result, not a method.
 
 ## 5. What not to re-run
@@ -309,7 +370,8 @@ of them twice:
 | T2 | `--scheme` through `sweep.py`, `ghosts.py`, `transfer.py`, `atomic_eri.py`, `insitu.py`; `metric_scheme` keyword on `ghosts.thc_mp2` | small |
 | T2 | `mf.conv_tol = 1e-12` in `sweep.py` and `ghosts.py` | trivial |
 | T6 | `ThcMP2Gradients.as_scanner()` into `trajectory.py`'s `Surface`, for `--propagate full` | moderate |
-| T8 | dipole ACF + FFT on a finished trajectory | moderate |
+| T8 | none - `trajectory.py` already takes `--reference rks --grid-level`, and carries several grids along one trajectory | none |
+| T8 (optional) | dipole ACF + FFT on a finished trajectory, only if the witness lands within a factor rather than beating level 3 | moderate |
 | T13 | Z-vector contraction of `response_lagrangian`'s intermediate; least-squares `Z` fit in place of forming `S^-1` twice | substantial |
 
 One bookkeeping item that touches every number in §17: `build_aux_coulomb_inv` did not
