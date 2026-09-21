@@ -276,8 +276,12 @@ See [`FINDINGS.md`](FINDINGS.md). Twenty-two headlines:
   E(1)` for any positive weights, and `blocked` and `blocked1` - one support at two
   footings - agree to **ten digits** under it. §13 put the whole remaining transferable
   gap on the weight footing and §16 showed it could not be repaired by transplanting a
-  weight set; both are about a quantity the preconditioner removes. One molecule, one
-  basis, one seed, and no trajectory has been run on it.
+  weight set; both are about a quantity the preconditioner removes. §14's ERI-fitted
+  weights - the only transferable set that ever helped - collapse onto their own
+  unweighted row under it too, and are beaten at matched support (565 points: 0.35
+  uHa/rad weighted, **0.06** preconditioned and unweighted), so that section splits: its
+  support survives, its weights are redundant. One molecule, one basis, one seed, and no
+  trajectory has been run on it.
 * **The gradient exists and verifies to machine precision** (`pythc.grad`, driven by
   `gradient.py`): quadratic convergence against a finite difference, and forces that sum
   to zero to 2.4e-15 with no finite difference involved. Two things came back with it

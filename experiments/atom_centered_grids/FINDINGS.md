@@ -2528,10 +2528,44 @@ geometry it is already at, with nothing fitted, nothing stored and nothing trans
 At 627 points the transferable grid's net torque is **0.09 uHa/rad**, below the **0.24**
 §13 measures for the complete 3284-point parent grid, and its energy is on the floor.
 
+### The same thing happens to §14's ERI weights, which is the sharper test
+
+`blocked`/`blocked1` are one support at two footings by construction, so their collapse is
+the algebra checking itself. §14's `eri`/`eriw` pair is not: the weights there come from a
+different fit against a different target, on a support selected by that fit, and §16's
+whole point is that such a pairing is not interchangeable with any other. The
+preconditioner should not care, and it does not. Same ladder, same draws, `--scheme` the
+only difference:
+
+| mode | 234 pts | 366 | 565 | 736 | 852 |
+| --- | --- | --- | --- | --- | --- |
+| `eri` damped | 264.28 | 27.56 | 2.69 | 1.34 | 0.55 |
+| `eriw` damped | 275.44 | 32.61 | 0.35 | 0.25 | 0.04 |
+| `eri` **damped_jacobi** | 230.26 | 7.93 | 0.06 | 0.02 | 0.01 |
+| `eriw` **damped_jacobi** | 230.26 | 7.92 | 0.07 | 0.02 | 0.02 |
+
+The bottom two rows are the same row - energies agree to nine or ten digits at every rung
+(`-0.34339917368705` against `-0.34339917323118` at 565 points), and the torques differ by
+less than the draw-to-draw noise. §14's ERI-fitted weights, the first transferable weight
+set that helped, are absorbed as completely as the in-molecule ones.
+
+And the preconditioner is *better* than them at matched support: `eriw` is the best fitted
+transferable footing this directory has, and at 565 points it reads 0.35 uHa/rad weighted
+against **0.06** preconditioned and unweighted, at +2.80 uHa against +2.76. Every
+preconditioned row from 565 points up is on the parent-grid floor, where `eri` under
+`damped` is still 1.33 uHa above it at 852 points.
+
+So §14 splits cleanly in two. Its **support** - the free atom's own ERIs, no ghosts, no
+training molecules - is untouched and remains the best transferable support measured here.
+Its **weights**, which §14 called the first transferable ones that help, are made
+redundant rather than beaten: what they were buying was the conditioning of the metric,
+and the metric supplies that itself for nothing.
+
 ### What this does not settle
 
 **One molecule, one basis, one seed.** Methanol, cc-pVDZ, `ov`, four draws at `damped
-1e-8`. §17's own energy result is cc-pVTZ, and the two have not been run together.
+1e-8`, on five supports (`blocked`, `blocked1`, `ghost`, `eri`, `eriw`). §17's own energy
+result is cc-pVTZ, and the two have not been run together.
 
 **The gain appears only once the grid resolves.** On the smallest rungs the preconditioner
 does nothing useful and can be slightly worse - `blocked` goes 341.7 to 357.3 at 235

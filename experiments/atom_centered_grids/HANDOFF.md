@@ -609,8 +609,10 @@ subject is removable rather than solvable.** `diag(S(w))_PP = w_P diag(S(1))_PP`
 `E(w) S(w) E(w) = E(1) S(1) E(1)` exactly and the preconditioned metric inverse does not
 see the weights at all - `blocked` and `blocked1` agree to ten digits under it, and
 `ghost` reaches 0.09 uHa/rad and the parent-grid energy floor carrying no weights of any
-kind. 4(9)'s `eriw` remains the best *fitted* transferable weight set and the two have
-not been run against each other.
+kind. They have since been run against each other, and 4(9)'s `eriw` - the best
+*fitted* transferable weight set there is - collapses onto its own unweighted row under
+the preconditioner and is beaten by it at matched support. What survives of 4(9) is its
+support, which nothing here touches.
 
 **(9) A richer purely-atomic target: fit the atom's ERIs. DONE** - `atomic_eri.py` and
 `pythc.decomp.nnls.ERIFitOperator`, written up in FINDINGS section 14. This is the one
@@ -844,6 +846,13 @@ support and an in-molecule one to the weight footing; 4(13) showed the footing c
 repaired by transplanting a weight set, because support and weights are one object. Both
 are statements about a quantity that the preconditioner removes.
 
+The sharper version of that test came from 4(9)'s supports rather than from
+`blocked`/`blocked1`, where one support at two footings is true by construction: `eri` and
+`eriw` - a support selected by an ERI fit, carrying the weights that same fit produced -
+also collapse onto one row, agreeing to nine or ten digits at every rung. And the
+preconditioner beats them at matched support: 565 points reads 0.35 uHa/rad with `eriw`'s
+weights and **0.06** with none. 4(9)'s support survives intact; its weights are redundant.
+
 Three things follow that nothing here has done:
 
 * **Every ghost-gap ratio in this directory is now measurable on a fair footing for the
@@ -1020,12 +1029,16 @@ filter it did not ask for, and is not bit-reproducible against today's code.
   and 4(11) has made propagating on the real THC surface possible, so the two open
   trajectory questions collapse into one run: `trajectory.py --scheme damped_jacobi`,
   which the script now accepts and nobody has used.
-* **Does the preconditioner beat 4(9)'s ERI-fitted weights, or compose with them?** They
-  are the two ways of solving the same problem and have never been on one ladder. The
-  preconditioner is invariant to weights *by construction*, so `eri` and `eriw` must
-  collapse onto one row under it - which is either a free confirmation of the algebra or,
-  if `eriw`'s 0.19 uHa/rad at 565 points is below what the preconditioner reaches on the
-  same support, evidence that ERI weights do something the metric's own diagonal cannot.
+* ~~Does the preconditioner beat 4(9)'s ERI-fitted weights, or compose with them?~~
+  **Answered - FINDINGS section 18.** Neither: it absorbs them. `eri` and `eriw` collapse
+  onto one row under the preconditioner, agreeing to nine or ten digits in the energy at
+  every rung, on a support 4(9) selected and weighted for its own objective - which is a
+  sharper test of the invariance than `blocked`/`blocked1`, where one support at two
+  footings is true by construction. And it beats them: at 565 points `eriw` reads 0.35
+  uHa/rad weighted against **0.06** preconditioned and unweighted, on the parent-grid
+  energy floor where `eri` under `damped` is still 1.33 uHa above it at 852 points. 4(9)
+  therefore splits - its **support** is untouched and still the best transferable one
+  here, its **weights** are redundant rather than wrong.
 * **Does the ten-digit collapse hold in cc-pVTZ?** 4(14)'s energy table is cc-pVTZ and
   4(15)'s ladder is cc-pVDZ, and the weight penalty the preconditioner replaces is the
   thing that grows with basis. The algebra is basis-independent; the accuracy it buys at
